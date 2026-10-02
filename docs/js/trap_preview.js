@@ -58,22 +58,22 @@ async function previewTrap(button) {
     panel.id = 'trap-full-preview'; panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-modal', 'true');
     panel.setAttribute('aria-label', `Conferma Trappola ${card.name}`);
-    panel.style.cssText = 'position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;padding:12px;background:#05050bf0;overflow:auto';
+    panel.style.cssText = 'position:absolute;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;padding:calc(6 * var(--p,1px));background:#05050bf0;overflow:auto';
     const wrap = document.createElement('div');
-    wrap.style.cssText = 'width:min(96vw,480px);max-height:96dvh;display:flex;flex-direction:column;align-items:center;gap:10px';
+    wrap.style.cssText = 'width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(8 * var(--p,1px))';
     const face = document.createElement('div');
-    face.style.cssText = 'width:min(92vw,420px);height:min(74dvh,650px);min-height:300px';
+    face.className = 'detail-image';
     const image = card.image_url ? `<img src="${escape(card.image_url)}" alt="Illustrazione di ${escape(card.name)}">` : '<span class="game-card-art-placeholder">🎴</span>';
     const text = escape(card.effect_text || 'Nessun effetto.').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
     face.innerHTML = `<article class="game-card"><header class="game-card-titlebar"><span class="game-card-name">${escape(card.name)}</span><span class="game-card-cost">⚡${Number(card.mana_cost ?? 0)}</span></header><div class="game-card-art">${image}</div><div class="game-card-type-row"><span>TRAPPOLA</span><span class="game-card-subtype">${escape(card.subtype ?? '')}</span></div><div class="game-card-rules">${text}</div><div class="game-card-flavor">${escape(card.flavor_text ?? '')}</div><footer class="game-card-footer"><span class="game-card-rarity">${escape(card.rarity ?? '')}</span></footer></article>`;
     const actions = document.createElement('div');
-    actions.style.cssText = 'display:flex;justify-content:center;gap:12px;flex-wrap:wrap;width:100%';
+    actions.style.cssText = 'display:flex;justify-content:center;gap:calc(10 * var(--p,1px));flex-wrap:nowrap;width:100%';
     const cancel = document.createElement('button');
     cancel.type = 'button'; cancel.className = 'secondary-button'; cancel.textContent = 'Annulla';
-    cancel.style.minHeight = '44px'; cancel.onclick = closePreview;
+    cancel.style.minHeight = 'var(--tap,44px)'; cancel.style.flex = '1 1 0'; cancel.style.fontSize = 'calc(15 * var(--p,1px))'; cancel.onclick = closePreview;
     const confirm = document.createElement('button');
     confirm.type = 'button'; confirm.className = 'primary-button'; confirm.textContent = 'Conferma Trappola';
-    confirm.style.minHeight = '44px';
+    confirm.style.minHeight = 'var(--tap,44px)'; confirm.style.flex = '1 1 0'; confirm.style.fontSize = 'calc(15 * var(--p,1px))';
     confirm.onclick = async () => {
       if (confirm.disabled) return;
       confirm.disabled = true;
@@ -97,7 +97,7 @@ async function previewTrap(button) {
     };
     actions.append(cancel, confirm); wrap.append(face, actions); panel.append(wrap);
     panel.addEventListener('click', event => { if (event.target === panel) closePreview(); });
-    document.body.append(panel); preview = panel;
+    (document.getElementById('stage') ?? document.body).append(panel); preview = panel;
     document.body.classList.add('trap-preview-open');
     cancel.focus();
   } finally { loading = false; }

@@ -1,5 +1,6 @@
 // docs/js/game.js — Bellum Penumbrum v4, bersaglio unico ETB (3d).
-// Passo 1 / Consegna A: layout a colonna centrale (stage), mano a ventaglio, dorsi IA, menu.
+// Passo 1 / Consegne A+B: layout a colonna centrale (stage), mano a ventaglio, dorsi IA, menu,
+// dialoghi confinati nella colonna e schermata iniziale (recupera / nuova partita).
 import { getAccessToken, getCurrentUser, signOut, usernameFromEmail } from './auth.js';
 
 const API = 'https://bellum-penumbrum-api.onrender.com';
@@ -39,6 +40,7 @@ const faction = d => {
   return ['chi','inf','pes','bul','gro','clo','ind'].includes(code) ? code : 'ind';
 };
 // ---------- Passo 1: helper di presentazione (stage) ----------
+const stageRoot = () => $('stage') ?? document.body; // tutti i dialoghi vivono dentro la colonna centrale
 const costText = d => d.card_type === 'mostrissimo' ? `✦${Number(d.sacrifice_cost ?? 0)}` : `⚡${Number(d.mana_cost ?? 0)}`;
 const plainText = d => String(d?.effect_text ?? '').replace(/\*\*/g,'').replace(/\s+/g,' ').trim();
 const hasText = d => plainText(d).length > 0;
@@ -74,6 +76,7 @@ function fitStage() {
   const unit = Math.min(byWidth, byHeight), fullWidth = byWidth <= byHeight;
   const width = fullWidth ? vw : STAGE_W * unit, height = fullWidth ? Math.min(vh, vw / STAGE_MIN_ASPECT) : vh;
   stage.style.setProperty('--p',`${unit.toFixed(4)}px`);
+  document.documentElement.style.setProperty('--p',`${unit.toFixed(4)}px`);
   stage.style.setProperty('--sw',`${Math.floor(width)}px`);
   stage.style.setProperty('--sh',`${Math.floor(height)}px`);
   stage.closest('.stage-frame')?.classList.toggle('is-framed',!fullWidth);
@@ -200,7 +203,7 @@ function overlay() {
   el.setAttribute('role','dialog'); el.setAttribute('aria-modal','true');
   el.innerHTML = '<div class="detail-stage"><div class="detail-image" id="detail-image"></div><div class="detail-actions" id="detail-actions"></div></div>';
   el.onclick = e => { if (e.target === el) close(); };
-  document.body.append(el); return el;
+  stageRoot().append(el); return el;
 }
 function reactionDialog() {
   let el = $('reaction-dialog');
@@ -212,7 +215,7 @@ function reactionDialog() {
   const text = document.createElement('p'); text.id = 'reaction-description';
   const choices = document.createElement('div'); choices.id = 'reaction-choices'; choices.style.cssText = 'display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;align-items:stretch;margin:.7rem 0';
   const actions = document.createElement('div'); actions.id = 'reaction-actions';
-  stage.append(title,text,choices,actions); el.append(stage); document.body.append(el); return el;
+  stage.append(title,text,choices,actions); el.append(stage); stageRoot().append(el); return el;
 }
 function choiceDialog() {
   let el = $('death-choice-dialog');
@@ -227,7 +230,7 @@ function choiceDialog() {
   const choices = document.createElement('div'); choices.id = 'death-choice-options';
   choices.style.cssText = 'display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center;margin:.8rem 0';
   const actions = document.createElement('div'); actions.id = 'death-choice-actions';
-  panel.append(title,text,choices,actions); el.append(panel); document.body.append(el);
+  panel.append(title,text,choices,actions); el.append(panel); stageRoot().append(el);
   // Nessun click sullo sfondo o Escape può annullare una scelta obbligatoria.
   return el;
 }
@@ -303,17 +306,17 @@ function presentationLayer() {
   let layer = $('public-checkpoint-layer');
   if (layer) return layer;
   layer = document.createElement('div'); layer.id = 'public-checkpoint-layer';
-  Object.assign(layer.style,{position:'fixed',inset:'0',zIndex:'9999',display:'none',
+  Object.assign(layer.style,{position:'absolute',inset:'0',zIndex:'200',display:'none',
     alignItems:'center',justifyContent:'center',background:'rgba(5,6,18,.78)',
-    padding:'20px',boxSizing:'border-box',pointerEvents:'auto'});
-  document.body.append(layer); return layer;
+    padding:'1.2rem',boxSizing:'border-box',pointerEvents:'auto'});
+  stageRoot().append(layer); return layer;
 }
 async function presentPublic(a, generation) {
   const layer = presentationLayer(); layer.replaceChildren();
   const panel = document.createElement('div');
-  Object.assign(panel.style,{width:'min(440px,95vw)',maxHeight:'90vh',overflowY:'auto',
+  Object.assign(panel.style,{width:'100%',maxHeight:'100%',overflowY:'auto',
     background:'#171426',color:'#f7eedc',border:'2px solid #a78355',borderRadius:'14px',
-    padding:'22px',boxShadow:'0 15px 60px #000',textAlign:'center',fontSize:'1.15rem'});
+    padding:'1.2rem',boxShadow:'0 15px 60px #000',textAlign:'center',fontSize:'1.15rem'});
   const title = document.createElement('div');
   title.textContent = a.kind === 'phase'
     ? `Turno ${a.turn} · ${a.phase === 'upkeep' ? 'MANATENIMENTO' : a.phase === 'main' ? 'PRINCIPALE' : a.phase === 'end' ? 'FINE' : 'INIZIO'} · Mana massimo ${a.max_mana ?? 0}`
@@ -379,7 +382,7 @@ async function renderReaction() {
     if (!inst) continue;
     const d = await card(inst.card_id);
     const b = document.createElement('button'); b.type = 'button'; b.className = 'hand-card reaction-card';
-    b.dataset.instanceId = inst.instance_id; b.dataset.cardId = d.id; b.innerHTML = cardHTML(d,true);
+    b.dataset.instanceId = inst.instance_id; b.dataset.cardId = d.id; b.innerHTML = handCardHTML(d);
     b.setAttribute('aria-label',`Gioca ${d.name} in risposta`);
     b.onclick = () => beginTrap(inst,d).catch(fail); choices.append(b);
   }
@@ -413,7 +416,7 @@ function graveyardDialog() {
   const actions = document.createElement('div'); actions.style.cssText = 'display:flex;justify-content:center'; actions.append(button('Chiudi',closeGraveyard));
   panel.append(title,list,actions); el.append(panel);
   el.addEventListener('click',e => { if (e.target === el) closeGraveyard(); });
-  document.body.append(el); return el;
+  stageRoot().append(el); return el;
 }
 function closeGraveyard() { $('graveyard-dialog')?.classList.add('hidden'); }
 async function openGraveyard(owner) {
@@ -424,9 +427,9 @@ async function openGraveyard(owner) {
   list.replaceChildren();
   if (!cards.length) { const empty = document.createElement('p'); empty.textContent = 'Cimitero vuoto.'; list.append(empty); }
   else for (const inst of cards) {
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'hand-card'; b.style.cssText = 'flex:0 0 125px;width:125px;height:175px';
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'hand-card grave-card';
     try {
-      const d = await card(inst.card_id); b.innerHTML = cardHTML(d,true);
+      const d = await card(inst.card_id); b.innerHTML = handCardHTML(d);
       b.setAttribute('aria-label',`Apri ${d.name} nel cimitero`);
       b.onclick = () => { closeGraveyard(); inspect('grave',inst.card_id).catch(fail); };
     } catch (error) { b.textContent = 'Carta non caricabile'; b.disabled = true; console.warn(error); }
@@ -592,6 +595,7 @@ function showDeckColors() {
 }
 async function render() {
   const set = (id,x) => { if ($(id)) $(id).textContent = String(x); };
+  if (state) hideStart();
   set('match-status',state?.status === 'finished' ? 'Terminata' : state ? 'In corso' : 'Nessuna partita');
   set('turn-status',state ? `${state.current_turn} · ${state.active_player_index === 1 ? 'Tu' : 'IA'}` : '—');
   set('phase-status',state?.phase === 'upkeep' ? 'MANATENIMENTO' : state?.phase === 'main' ? 'Principale' : state?.phase ?? '—');
@@ -707,12 +711,68 @@ function colorDialog() {
   const actions = document.createElement('div'); actions.style.cssText = 'display:flex;justify-content:center;flex-wrap:wrap;gap:.6rem';
   const confirm = document.createElement('button'); confirm.type = 'submit'; confirm.className = 'primary-button'; confirm.textContent = 'Crea partita'; confirm.id = 'deck-color-confirm';
   const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'secondary-button'; cancel.textContent = 'Annulla'; cancel.onclick = () => closeColorDialog();
-  actions.append(confirm,cancel); form.append(actions); panel.append(title,explanation,form); el.append(panel); document.body.append(el);
+  actions.append(confirm,cancel); form.append(actions); panel.append(title,explanation,form); el.append(panel); stageRoot().append(el);
   form.addEventListener('submit',e => { e.preventDefault(); submitColors().catch(fail); });
   el.addEventListener('click',e => { if (e.target === el && !busy) closeColorDialog(); });
   return el;
 }
-function closeColorDialog() { $('deck-color-dialog')?.classList.add('hidden'); }
+function closeColorDialog() { $('deck-color-dialog')?.classList.add('hidden'); if (!state && !busy && !$('game-screen')?.classList.contains('hidden')) showStart(); }
+// ---------- Schermata iniziale: recupera partita precedente / nuova partita ----------
+let priorMatch = null, probing = false;
+async function probePrior() {
+  priorMatch = null;
+  const prior = localStorage.getItem('bellum:last-match'); if (!prior) return;
+  try {
+    const [user,result] = await Promise.all([getCurrentUser(),api(`/match/${encodeURIComponent(prior)}`)]);
+    if (result.state?.state_version === 4 && user && result.state.players?.[1]?.user_id === user.id && result.state.status !== 'finished') priorMatch = {id:prior};
+  } catch(e) { console.warn('Ripristino non disponibile',e); }
+}
+function startDialog() {
+  let el = $('start-dialog'); if (el) return el;
+  el = document.createElement('div'); el.id = 'start-dialog'; el.className = 'card-detail-overlay start-dialog hidden';
+  el.setAttribute('role','dialog'); el.setAttribute('aria-modal','true'); el.setAttribute('aria-labelledby','start-title'); el.style.zIndex = '110';
+  const panel = document.createElement('div'); panel.className = 'panel';
+  const title = document.createElement('h2'); title.id = 'start-title'; title.textContent = 'Bellum Penumbrum';
+  const text = document.createElement('p'); text.id = 'start-text';
+  const actions = document.createElement('div'); actions.className = 'start-actions';
+  const recover = document.createElement('button'); recover.type = 'button'; recover.id = 'start-recover-button'; recover.className = 'primary-button'; recover.textContent = 'Recupera partita precedente';
+  recover.onclick = () => recoverPrior().catch(fail);
+  const fresh = document.createElement('button'); fresh.type = 'button'; fresh.id = 'start-new-button'; fresh.className = 'secondary-button'; fresh.textContent = 'Nuova partita';
+  fresh.onclick = () => openColorDialog();
+  actions.append(recover,fresh); panel.append(title,text,actions); el.append(panel); stageRoot().append(el);
+  return el;
+}
+function showStart() {
+  if (state || busy) return;
+  if ($('deck-color-dialog') && !$('deck-color-dialog').classList.contains('hidden')) return;
+  const el = startDialog(), has = !!priorMatch;
+  $('start-recover-button').classList.toggle('hidden',!has);
+  $('start-new-button').className = has ? 'secondary-button' : 'primary-button';
+  $('start-text').textContent = has ? 'Hai una partita in corso. Vuoi riprenderla o iniziarne una nuova?' : 'Inizia una nuova partita contro l’IA.';
+  el.classList.remove('hidden');
+}
+function hideStart() { $('start-dialog')?.classList.add('hidden'); }
+async function startScreen() {
+  if (state || busy || probing) return;
+  probing = true;
+  try { await probePrior(); } finally { probing = false; }
+  showStart();
+}
+async function recoverPrior() {
+  if (!priorMatch || busy) return;
+  const id = priorMatch.id; busy = true; controls();
+  try {
+    const result = await api(`/match/${encodeURIComponent(id)}`);
+    if (result.state?.state_version !== 4) throw new Error('Partita non più compatibile: avvia una nuova partita.');
+    matchId = id; state = result.state; flow = null; priorMatch = null; deathDraft = {choiceId:null,instanceIds:[]};
+    localStorage.setItem('bellum:last-match',matchId); hideStart(); close(); closeGraveyard(); closeColorDialog();
+  } catch(e) { fail(e); }
+  finally {
+    busy = false; await render().catch(fail);
+    if (state) { try { await logs(); } catch(e) { console.warn(e); } notice('Partita precedente ripristinata.','success'); queuePresentation(); }
+  }
+}
+
 function openColorDialog() {
   if (busy || reaction() || pending() || obligatory()) return;
   close(); closeGraveyard();
@@ -765,17 +825,11 @@ async function init() {
   });
   $('end-turn-button')?.addEventListener('click',() => { if (active()) request('end-turn',{},'È di nuovo il tuo turno.'); });
   $('refresh-button')?.addEventListener('click',() => refreshMatch().catch(fail));
-  $('logout-button')?.addEventListener('click',() => signOut().then(() => { presentationGeneration++; presentationLayer().style.display = 'none'; matchId = null; state = null; flow = null; deathDraft = {choiceId:null,instanceIds:[]}; close(); closeGraveyard(); closeColorDialog(); reactionDialog().classList.add('hidden'); choiceDialog().classList.add('hidden'); }).catch(fail));
+  $('logout-button')?.addEventListener('click',() => signOut().then(() => { presentationGeneration++; presentationLayer().style.display = 'none'; matchId = null; state = null; flow = null; priorMatch = null; deathDraft = {choiceId:null,instanceIds:[]}; close(); closeGraveyard(); closeColorDialog(); reactionDialog().classList.add('hidden'); choiceDialog().classList.add('hidden'); }).catch(fail));
   document.addEventListener('keydown',e => { if (e.key === 'Escape' && !obligatory()) { if (!$('deck-color-dialog')?.classList.contains('hidden') && !busy) closeColorDialog(); else if (!$('graveyard-dialog')?.classList.contains('hidden')) closeGraveyard(); else if (view) close(); } });
   await render();
-  const prior = localStorage.getItem('bellum:last-match');
-  if (prior) try {
-    const result = await api(`/match/${encodeURIComponent(prior)}`);
-    if (result.state?.state_version === 4 && result.state.players?.[1]?.user_id === user.id) {
-      matchId = prior; state = result.state; await render(); await logs(); notice('Partita precedente ripristinata.','success'); queuePresentation();
-    }
-  } catch(e) { console.warn('Ripristino non disponibile',e); }
+  await startScreen();
 }
-window.addEventListener('bellum:auth-ready',() => init().catch(fail));
+window.addEventListener('bellum:auth-ready',() => init().then(() => startScreen()).catch(fail));
 getCurrentUser().then(user => { if (user) return init(); }).catch(fail);
 wireStage();
