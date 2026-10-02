@@ -1,4 +1,5 @@
 // docs/js/game.js — Bellum Penumbrum v4, bersaglio unico ETB (3d).
+// Passo 1 / Consegna A: layout a colonna centrale (stage), mano a ventaglio, dorsi IA, menu.
 import { getAccessToken, getCurrentUser, signOut, usernameFromEmail } from './auth.js';
 
 const API = 'https://bellum-penumbrum-api.onrender.com';
@@ -37,6 +38,72 @@ const faction = d => {
   const code = String(d?.faction_code ?? factions[Number(d?.faction_id)] ?? 'IND').toLowerCase();
   return ['chi','inf','pes','bul','gro','clo','ind'].includes(code) ? code : 'ind';
 };
+// ---------- Passo 1: helper di presentazione (stage) ----------
+const costText = d => d.card_type === 'mostrissimo' ? `✦${Number(d.sacrifice_cost ?? 0)}` : `⚡${Number(d.mana_cost ?? 0)}`;
+const plainText = d => String(d?.effect_text ?? '').replace(/\*\*/g,'').replace(/\s+/g,' ').trim();
+const hasText = d => plainText(d).length > 0;
+const artHTML = d => d.image_url ? `<img src="${escape(d.image_url)}" alt="Illustrazione di ${escape(d.name)}">` : '<span class="game-card-art-placeholder">🎴</span>';
+const TEXT_ICON = '<span class="CLS" title="Questa carta ha un testo" aria-hidden="true">📜</span>';
+function cellHTML(d, c) {
+  const isCreature = isCreatureCell(c), atk = c.attack ?? d.attack ?? 0, hp = c.hp ?? d.hp ?? 0;
+  const hurt = isCreature && Number(c.max_hp) > 0 && Number(hp) < Number(c.max_hp) ? ' hurt' : '';
+  const buff = isCreature && Number(atk) > Number(d.attack ?? 0) ? ' buff' : '';
+  return `<article class="cell-card faction-${faction(d)}${c.kind === 'terraforma' ? ' is-terra' : ''}"><div class="cc-art">${artHTML(d)}</div><div class="cc-bar"><span class="cc-name">${escape(d.name)}</span><div class="cc-row"><span class="cc-cost">${costText(d)}</span>${hasText(d) ? TEXT_ICON.replace('CLS','cc-ico') : ''}</div></div>${isCreature ? `<div class="cc-stats"><span class="cc-atk${buff}">⚔ ${atk}</span><span class="cc-hp${hurt}">❤ ${hp}</span></div>` : ''}</article>`;
+}
+function handCardHTML(d) {
+  const isCreature = creature(d), text = hasText(d);
+  return `<article class="fan-card faction-${faction(d)}${isCreature ? '' : ' no-stats'}"><div class="fc-art">${artHTML(d)}</div><span class="fc-cost">${costText(d)}</span>${text ? TEXT_ICON.replace('CLS','fc-ico') : ''}${isCreature ? `<span class="fc-stat atk">⚔ ${d.attack ?? 0}</span><span class="fc-stat hp">❤ ${d.hp ?? 0}</span>` : ''}<div class="fc-info"><span class="fc-name">${escape(d.name)}</span>${text ? `<span class="fc-fx">${escape(plainText(d).slice(0,90))}</span>` : ''}</div></article>`;
+}
+// Geometria del ventaglio, in "px di riferimento" della colonna 455x768 (vedi css/stage.css).
+const HAND_AREA = 403, HAND_MIN_VISIBLE = 34;
+function handGeometry(n) {
+  const w = Math.max(56, Math.min(88, n > 1 ? HAND_AREA - HAND_MIN_VISIBLE * (n - 1) : 88));
+  const step = n > 1 ? Math.min(w + 6, (HAND_AREA - w) / (n - 1)) : 0;
+  const rot = n > 1 ? Math.min(3.4, 22 / (n - 1)) : 0;
+  const k = n > 1 ? Math.min(3, 12 / Math.max(1, ((n - 1) / 2) ** 2)) : 0;
+  return {w, h: Math.round(w * 1.48), step, rot, k, drop: k * ((n - 1) / 2) ** 2};
+}
+// Misura la finestra reale e imposta la scala della colonna centrale.
+// Riferimento 455x768. Finestra "larga" (PC): colonna di 455x768 scalata e centrata. Finestra "stretta" (telefono
+// in verticale): la colonna occupa tutta l'area visibile e l'altezza è flessibile.
+const STAGE_W = 455, STAGE_H = 768, STAGE_MIN_ASPECT = 0.44;
+function fitStage() {
+  const stage = $('stage'); if (!stage) return;
+  const vw = window.innerWidth, vh = window.innerHeight; if (!vw || !vh) return;
+  const byWidth = vw / STAGE_W, byHeight = vh / STAGE_H;
+  const unit = Math.min(byWidth, byHeight), fullWidth = byWidth <= byHeight;
+  const width = fullWidth ? vw : STAGE_W * unit, height = fullWidth ? Math.min(vh, vw / STAGE_MIN_ASPECT) : vh;
+  stage.style.setProperty('--p',`${unit.toFixed(4)}px`);
+  stage.style.setProperty('--sw',`${Math.floor(width)}px`);
+  stage.style.setProperty('--sh',`${Math.floor(height)}px`);
+  stage.closest('.stage-frame')?.classList.toggle('is-framed',!fullWidth);
+}
+function wireStage() {
+  fitStage();
+  window.addEventListener('resize',fitStage);
+  window.addEventListener('orientationchange',() => setTimeout(fitStage,150));
+  window.visualViewport?.addEventListener('resize',fitStage);
+}
+function wireMenu() {
+  const button = $('menu-button'), panel = $('menu-panel');
+  if (!button || !panel || button.dataset.ready) return;
+  button.dataset.ready = 'true';
+  const setOpen = open => { panel.classList.toggle('hidden',!open); button.setAttribute('aria-expanded',String(open)); };
+  button.addEventListener('click',e => { e.stopPropagation(); setOpen(panel.classList.contains('hidden')); });
+  panel.addEventListener('click',e => { if (e.target.closest?.('button')) setOpen(false); });
+  document.addEventListener('click',e => { if (!panel.classList.contains('hidden') && !panel.contains(e.target)) setOpen(false); });
+  document.addEventListener('keydown',e => { if (e.key === 'Escape' && !panel.classList.contains('hidden')) setOpen(false); });
+}
+function drawOpponentHand() {
+  const root = $('opponent-hand'); if (!root) return;
+  const n = them()?.hand?.length ?? 0; // SOLO il numero: mai card_id o faccia delle carte dell'IA.
+  root.replaceChildren(); root.style.setProperty('--n',String(Math.max(n,1)));
+  root.setAttribute('aria-label',`L’IA ha ${n} ${n === 1 ? 'carta' : 'carte'} in mano`);
+  const count = document.createElement('span'); count.className = 'oh-count'; count.innerHTML = `${n}<small>in mano</small>`;
+  const backs = document.createElement('span'); backs.className = 'oh-backs';
+  for (let i = 0; i < n; i++) { const back = document.createElement('span'); back.className = 'card-back'; backs.append(back); }
+  root.append(count,backs);
+}
 function cardHTML(d, mini = false, cell = null) {
   const cls = `faction-${faction(d)}`;
   const cost = d.card_type === 'mostrissimo' ? `✦${Number(d.sacrifice_cost ?? 0)}` : `⚡${Number(d.mana_cost ?? 0)}`;
@@ -446,7 +513,7 @@ async function drawBoard() {
       if (['hand','boss-target','trap-target'].includes(flow?.kind) && (flow?.step === 'target' || flow?.kind !== 'hand') && d && targetAllowed(d,c,flow?.kind === 'trap-target' ? reaction()?.event : null)) b.classList.add('valid-target');
       if (legal.some(x => eq(x,pos))) b.classList.add('valid-summon');
       b.setAttribute('aria-label',c ? `${definition?.name ?? 'Permanente'} ${c.owner_index === 1 ? 'Tu' : 'IA'}${isCreatureCell(c) ? ` ATK ${c.attack} HP ${c.hp}` : ', Terraforma non attaccabile'}${isCreatureCell(c) && c.auras?.length ? `, ${c.auras.length} Aura` : ''}` : `Cella [${row},${col}]`);
-      b.innerHTML = c && definition ? cardHTML(definition,true,c) + (isCreatureCell(c) && c.auras?.length ? `<span class="cell-aura-count" title="Aure assegnate">✧ ${c.auras.length}</span>` : '') + `<span class="cell-coordinate">[${row},${col}]</span>` : `<span class="empty-label">${['Riga IA','Centro','Riga Tu'][row]}<br>[${row},${col}]</span>`;
+      b.innerHTML = c && definition ? cellHTML(definition,c) + (isCreatureCell(c) && c.auras?.length ? `<span class="cell-aura-count" title="Aure assegnate">✧ ${c.auras.length}</span>` : '') + `<span class="cell-coordinate">[${row},${col}]</span>` : '';
       b.disabled = busy || obligatory();
       b.onclick = () => boardClick(pos).catch(fail); line.append(b);
     }
@@ -456,10 +523,15 @@ async function drawBoard() {
 async function drawHand() {
   const root = $('player-hand'); if (!root) return;
   root.replaceChildren();
-  for (const inst of me()?.hand ?? []) {
+  const hand = me()?.hand ?? [], g = handGeometry(hand.length);
+  root.style.setProperty('--hw',String(g.w)); root.style.setProperty('--hh',String(g.h)); root.style.setProperty('--hs',g.step.toFixed(2));
+  root.style.setProperty('--hr',g.rot.toFixed(2)); root.style.setProperty('--hk',g.k.toFixed(3)); root.style.setProperty('--hd',g.drop.toFixed(2));
+  let index = 0;
+  for (const inst of hand) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'hand-card';
+    b.style.setProperty('--t',(index - (hand.length - 1) / 2).toFixed(3)); b.style.setProperty('--i',String(index + 1)); index++;
     try {
-      const d = await card(inst.card_id); b.innerHTML = cardHTML(d,true);
+      const d = await card(inst.card_id); b.innerHTML = handCardHTML(d);
       b.disabled = !state || busy || !!reaction() || obligatory();
       if (playable(d)) b.classList.add('playable');
       b.setAttribute('aria-label',`Apri ${d.name}${playable(d) ? ', giocabile' : ''}`);
@@ -472,8 +544,8 @@ async function drawBoss() {
   let panel = $('mostrissimo-panel');
   if (!panel) {
     panel = document.createElement('section'); panel.id = 'mostrissimo-panel'; panel.className = 'panel'; panel.setAttribute('aria-label','Offerta Mostrissimi');
-    const before = document.querySelector('.logs-panel') ?? $('game-message');
-    if (before?.parentNode) before.parentNode.insertBefore(panel,before); else document.body.append(panel);
+    const slot = $('offer-slot'), before = document.querySelector('.logs-panel') ?? $('game-message');
+    if (slot) slot.append(panel); else if (before?.parentNode) before.parentNode.insertBefore(panel,before); else document.body.append(panel);
   }
   panel.replaceChildren();
   const h = document.createElement('h2'); h.textContent = '✦ Offerta'; panel.append(h);
@@ -487,20 +559,22 @@ async function drawBoss() {
     b.disabled = busy || !!reaction() || obligatory(); b.onclick = () => inspect('boss',inst.card_id); strip.append(b);
   }
   const p = pending(); if (!p) return;
+  const zone = document.createElement('div'); zone.className = 'tribute-zone is-info'; panel.append(zone);
   const info = document.createElement('p'); info.className = 'tribute-progress';
   info.textContent = p.stage === 'etb' ? 'Risoluzione degli ETB…' : p.stage === 'before_entry' ? 'Evocazione dichiarata: attendi la reazione.' : `Sacrifici ${p.paid.length}/${p.required}. Non puoi annullare.`;
-  panel.append(info);
+  zone.append(info);
   if (p.stage !== 'paying' || reaction() || obligatory()) return;
   if (p.paid.length < p.required) {
+    zone.className = 'tribute-zone is-select';
     const list = document.createElement('div'); list.className = 'tribute-list';
     for (const item of permanents()) {
       const d = await card(item.card_id), b = document.createElement('button');
       b.type = 'button'; b.textContent = `${item.type}: ${d.name}`; b.disabled = busy;
       b.onclick = () => inspect('tribute',item.card_id,{instanceId:item.id}); list.append(b);
     }
-    panel.append(list);
+    zone.append(list);
   } else {
-    const msg = document.createElement('p'); msg.textContent = flow?.kind === 'boss-target' ? 'Tocca il bersaglio ETB evidenziato.' : 'Tocca una cella evidenziata.'; panel.append(msg);
+    const msg = document.createElement('p'); msg.className = 'tribute-hint'; msg.textContent = flow?.kind === 'boss-target' ? 'Tocca il bersaglio ETB evidenziato.' : 'Tocca una cella evidenziata.'; zone.append(msg);
   }
 }
 function controls() {
@@ -525,18 +599,21 @@ async function render() {
   set('player-hand-count',me()?.hand?.length ?? 0); set('player-deck-count',me()?.deck?.length ?? 0); set('player-graveyard-count',me()?.graveyard?.length ?? 0);
   set('opponent-life',them()?.life ?? 20); set('opponent-current-mana',them()?.current_mana ?? 0); set('opponent-max-mana',them()?.max_mana ?? 0);
   set('opponent-hand-count',them()?.hand?.length ?? 0); set('opponent-deck-count',them()?.deck?.length ?? 0); set('opponent-graveyard-count',them()?.graveyard?.length ?? 0);
-  showDeckColors();
+  showDeckColors(); drawOpponentHand();
   await drawBoard(); await drawHand(); await drawBoss(); controls(); await renderReaction(); await renderDeathChoice();
 }
 async function logs() {
   if (!$('match-logs') || !matchId) return;
   const {logs:entries} = await api(`/match/${encodeURIComponent(matchId)}/logs?limit=1000`);
   $('match-logs').replaceChildren();
+  const texts = [];
   for (const e of entries ?? []) {
-    const li = document.createElement('li');
-    li.textContent = e.log_data?.description ?? e.log_data?.action_type ?? 'Evento';
+    const li = document.createElement('li'), text = e.log_data?.description ?? e.log_data?.action_type ?? 'Evento';
+    li.textContent = text; texts.push(text);
     $('match-logs').append(li);
   }
+  const latest = $('log-latest');
+  if (latest) { latest.replaceChildren(); for (const text of texts.slice(-3)) { const li = document.createElement('li'); li.textContent = text; latest.append(li); } }
 }
 async function request(path,body,message) {
   if (busy || !matchId) return;
@@ -679,7 +756,7 @@ async function init() {
   initialized = true;
   if ($('signed-in-user')) $('signed-in-user').textContent = `@${usernameFromEmail(user.email)}`;
   if ($('player-title')) $('player-title').textContent = usernameFromEmail(user.email) || 'Tu';
-  overlay(); reactionDialog(); choiceDialog(); graveyardDialog(); colorDialog(); wireGraveyards();
+  overlay(); reactionDialog(); choiceDialog(); graveyardDialog(); colorDialog(); wireGraveyards(); wireMenu(); fitStage();
   $('new-match-button')?.addEventListener('click',openColorDialog);
   $('cancel-selection-button')?.addEventListener('click',() => {
     if (obligatory()) return;
@@ -701,3 +778,4 @@ async function init() {
 }
 window.addEventListener('bellum:auth-ready',() => init().catch(fail));
 getCurrentUser().then(user => { if (user) return init(); }).catch(fail);
+wireStage();
