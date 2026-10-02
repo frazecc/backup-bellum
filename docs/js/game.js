@@ -336,15 +336,24 @@ async function presentPublic(a, generation) {
   await waitPresentation(1000);
   if (generation === presentationGeneration) layer.style.display = 'none';
 }
-function queuePresentation() {
+// Passo 3: ogni risultato pubblico ha il suo balloon (state.public_announcements, in ordine); /advance usa
+// sempre l'ID dell'ultimo (state.public_announcement). Dopo refresh/recupero (onlyLast) si ripresenta solo l'ultimo.
+function queuePresentation(onlyLast = false) {
   if (presentationRunning || !matchId || !state?.public_announcement) return;
   const generation = presentationGeneration;
   presentationRunning = true;
+  let replay = onlyLast;
   void (async () => {
     try {
       while (generation === presentationGeneration && matchId && state?.public_announcement) {
         const a = state.public_announcement, id = matchId;
-        await presentPublic(a,generation);
+        const list = !replay && Array.isArray(state.public_announcements) && state.public_announcements.length > 1 ? state.public_announcements : [a];
+        replay = false;
+        for (let i = 0; i < list.length; i++) {
+          await presentPublic(list[i],generation);
+          if (generation !== presentationGeneration || matchId !== id) break;
+          if (i < list.length - 1) await waitPresentation(180); // breve stacco: i balloon restano distinti
+        }
         if (generation !== presentationGeneration || matchId !== id) break;
         if (state.status !== 'running' || state.pending_reaction || obligatory() || !state.work_queue?.length) break;
         busy = true; controls();
@@ -769,7 +778,7 @@ async function recoverPrior() {
   } catch(e) { fail(e); }
   finally {
     busy = false; await render().catch(fail);
-    if (state) { try { await logs(); } catch(e) { console.warn(e); } notice('Partita precedente ripristinata.','success'); queuePresentation(); }
+    if (state) { try { await logs(); } catch(e) { console.warn(e); } notice('Partita precedente ripristinata.','success'); queuePresentation(true); }
   }
 }
 
