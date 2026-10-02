@@ -1,4 +1,5 @@
 // backend/engine-core.ts — eventi, effetti, turni, IA e scelte on-death (3d).
+// Passo 3: un annuncio pubblico distinto per ogni risultato di un'azione (public_announcements).
 // Passo 2: l'IA separa il bersaglio legale dalla mossa conveniente (Aure, cure e bonus solo sulle proprie
 // creature; danni e rimozioni solo sulle avversarie) e sceglie l'attacco migliore invece del primo adiacente.
 import { randomUUID } from 'node:crypto';
@@ -536,11 +537,9 @@ function traceEffect(w: ResolveEffectWork): string {
 }
 // Solo dati pubblici. Un commit contiene al massimo un checkpoint visibile;
 // i log diagnostici restano nel registro ma non guidano la presentazione.
-function announcement(c: Context, since = 0): PublicAnnouncement | null {
-  const visible = c.logs.slice(since).filter(x => !x.action_type.startsWith('trace_')
-    && !['reaction_window', 'death_order_window', 'death_target_window'].includes(x.action_type));
-  const entry = visible[0];
-  if (!entry) return null;
+// Passo 3: ogni risultato pubblico prodotto da un'azione diventa un annuncio distinto (nessun limite:
+// se un balloon deve comparire, compare). Gli annunci derivano da log già salvati con lo stesso commit.
+function announcementFor(c: Context, entry: MatchLogEntry): PublicAnnouncement {
   const actor = entry.player_index === 0 || entry.player_index === 1 ? entry.player_index : null;
   const phase = entry.action_type === 'upkeep' || entry.action_type === 'upkeep_end' || entry.action_type === 'turn_end';
   const kind: PublicAnnouncement['kind'] = phase ? 'phase'
@@ -560,10 +559,18 @@ function announcement(c: Context, since = 0): PublicAnnouncement | null {
   if (kind === 'phase' && actor !== null) out.max_mana = c.s.players[actor].max_mana;
   return out;
 }
+function announcements(c: Context, since = 0): PublicAnnouncement[] {
+  return c.logs.slice(since).filter(x => !x.action_type.startsWith('trace_')
+    && !['reaction_window', 'death_order_window', 'death_target_window'].includes(x.action_type))
+    .map(entry => announcementFor(c, entry));
+}
 function publish(c: Context, since = 0): boolean {
-  const next = announcement(c, since);
-  if (!next) return false;
-  c.s.public_announcement = next;
+  const list = announcements(c, since);
+  if (!list.length) return false;
+  // public_announcement = ultimo dell'elenco: /advance continua a usare il suo ID (CAS invariato).
+  // public_announcements (elenco completo) è presente solo quando i balloon sono più di uno.
+  c.s.public_announcement = list[list.length - 1];
+  if (list.length > 1) c.s.public_announcements = list; else delete c.s.public_announcements;
   return true;
 }
 
@@ -932,7 +939,7 @@ export async function advancePublicCheckpoint(id: string, expectedAnnouncementId
   if (s.pending_reaction || s.pending_death_order || s.pending_target_choice || s.status !== 'running')
     return s;
   const c: Context = { id, s, logs: [], deaths: [] };
-  delete s.public_announcement;
+  delete s.public_announcement; delete s.public_announcements;
   await drain(c);
   return commit(id, s, c.logs);
 }

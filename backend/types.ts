@@ -261,6 +261,9 @@ export type GameState = {
   ai_progress?: AiProgress;
   // Un solo annuncio corrente: l'ID consente il replay visivo dopo refresh.
   public_announcement?: PublicAnnouncement;
+  // Passo 3: tutti i risultati pubblici dell'ultimo commit, in ordine; l'ultimo coincide con public_announcement.
+  // Assente quando l'annuncio è uno solo.
+  public_announcements?: PublicAnnouncement[];
   last_mostrissimo_turn: Partial<Record<PlayerIndex, number>>;
   mostrissimo_result: MostrissimoResult | null;
 };
