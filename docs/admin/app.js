@@ -49,7 +49,8 @@ const TG = {
   draw: ['self', 'opponent'], discard: ['self', 'opponent'],
   heal: ['self', 'opponent', ...CT.map((x) => x[0])], damage: CT.map((x) => x[0]),
   return_hand: ['any_creature'], destroy: ['any_creature'],
-  buff: ['any_creature', 'all_creatures', 'all_creatures_self', 'enchanted_creature']
+  // all_creatures escluso: il motore applica i bonus solo alle creature di chi gioca la carta.
+  buff: ['any_creature', 'all_creatures_self', 'enchanted_creature']
 };
 
 function specErr(s, id) {
