@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bellum Penumbrum – Editor carte</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="admin/styles.css">
+</head>
+<body>
+<section id="gate">
+  <h2>Editor carte</h2>
+  <p class="hint">Accesso riservato all'amministratore.</p>
+  <label>Utente<input id="guser" autocomplete="username" autocapitalize="none"></label>
+  <label>Password<input id="gpass" type="password" autocomplete="current-password"></label>
+  <p id="gmsg" class="hint" aria-live="polite"></p>
+  <button id="glogin" type="button">Entra</button>
+  <button id="gout" type="button" class="sec" hidden>Esci</button>
+</section>
+
+<div id="app" hidden>
+<main>
+<section id="t-list">
+  <div class="bar">
+    <input id="q" placeholder="Cerca nome, testo, sottotipo">
+    <select id="ff"></select><select id="ft"></select><select id="fr"></select>
+    <select id="fs"><option value="">Tutte</option><option value="bad">Non valide</option><option value="img">Immagine mancante</option></select>
+    <input id="cmin" class="n" type="number" min="0" placeholder="Costo da"><input id="cmax" class="n" type="number" min="0" placeholder="Costo a"><input id="amin" class="n" type="number" min="0" placeholder="Attacco da"><input id="amax" class="n" type="number" min="0" placeholder="Attacco a"><input id="hmin" class="n" type="number" min="0" placeholder="PV da"><input id="hmax" class="n" type="number" min="0" placeholder="PV a"><button id="vw" type="button" class="sec">Vista: griglia</button>
+  </div>
+  <p id="count" class="hint"></p>
+  <div id="cards"></div>
+</section>
+
+<section id="t-editor" hidden>
+  <h2 id="et">Nuova carta</h2>
+  <form id="f" autocomplete="off">
+    <label>Nome<input id="name" required></label>
+    <div class="two">
+      <label>Fazione<select id="fac" required></select></label>
+      <label>Tipo<select id="type" required></select></label>
+    </div>
+    <label>Rarità<select id="rar"></select></label>
+
+    <label>Sottotipi<input id="subin" placeholder="Scrivi per cercare o creare"></label>
+    <div id="subsug" class="chips"></div>
+    <div id="subchips" class="chips"></div>
+
+    <div class="two">
+      <label id="gmana">Costo mana<input id="mana" type="number" min="0" value="0"></label>
+      <label id="gsac" hidden>Sacrifici<input id="sac" type="number" min="0" value="1"></label>
+    </div>
+    <div class="two" id="gstats">
+      <label>Attacco<input id="atk" type="number" min="0" value="1"></label>
+      <label>PV<input id="hp" type="number" min="1" value="1"></label>
+    </div>
+    <label id="gkw" class="check"><input id="kw" type="checkbox"> Iperattivo</label>
+
+    <label id="gtrap">Evento della Trappola
+      <select id="trap">
+        <option value="opponent_upkeep_start">Inizio manutenzione avversario</option>
+        <option value="opponent_upkeep_end">Fine manutenzione avversario</option>
+        <option value="opponent_hand_card">Avversario dichiara una carta (solo NOPE, solo Maledizioni)</option>
+        <option value="monster_etb">Prima dell'effetto d'ingresso di un mostro avversario</option>
+        <option value="mostrissimo_before_entry">Prima che un Mostrissimo avversario entri</option>
+      </select>
+    </label>
+
+    <div class="grp">
+      <b id="elab">Effetti</b>
+      <div id="effs"></div>
+      <button id="addE" type="button" class="sec">+ Effetto</button>
+    </div>
+
+    <div class="grp" id="gdeath">
+      <b>Effetti alla morte</b>
+      <div id="death"></div>
+      <button id="addD" type="button" class="sec">+ Effetto alla morte</button>
+    </div>
+
+    <label>Testo regole (bozza modificabile)<textarea id="txt" rows="4"></textarea></label>
+    <button id="regen" type="button" class="sec">Rigenera bozza</button>
+    <label>Testo flavour<textarea id="fl" rows="2"></textarea></label>
+
+    <label>Immagine<input id="img" type="file" accept="image/png,image/jpeg,image/webp"></label>
+    <p class="hint">Senza immagine caricata la carta resta "da completare" e non è giocabile.</p>
+
+    <div id="prev"></div>
+    <div id="msg" aria-live="polite"></div>
+    <div class="two">
+      <button type="submit" id="save">Salva carta</button>
+      <button type="button" id="clear" class="sec">Svuota</button>
+    </div>
+  </form>
+</section>
+
+<section id="t-effects" hidden>
+  <h2>Effetti</h2>
+  <p class="hint">Ogni effetto è un piccolo file nella cartella <code>docs/admin/effects/</code> del repository. Qui li leggi, li provi e prepari la modifica.</p>
+  <div class="two"><label>Repository<input id="gr" placeholder="utente/repo"></label><label>Ramo<input id="gb"></label></div>
+  <div id="elist"></div>
+  <button id="enew" type="button">+ Nuovo effetto</button>
+  <div id="eed" hidden>
+    <label>Nome file (senza .json)<input id="eid"></label>
+    <label>Contenuto<textarea id="ejs" rows="14" spellcheck="false"></textarea></label>
+    <div id="etest"></div>
+    <div class="two"><button id="ecopy" type="button" class="sec">Copia</button><button id="egh" type="button">Apri su GitHub</button></div>
+  </div>
+</section>
+
+<section id="t-ctl" hidden>
+  <h2>Controllo</h2>
+  <button id="bk" type="button">Scarica backup (JSON)</button>
+  <button id="lo" type="button" class="sec">Esci dall'editor</button>
+  <p class="hint">Uscendo dall'editor esci anche dal gioco, perché condividono la sessione.</p>
+  <h3>Statistiche per fazione</h3>
+  <div id="stats"></div>
+  <h3>Mazzi per coppia di colori</h3>
+  <div id="decks"></div>
+</section>
+</main>
+
+<nav>
+  <button data-tab="list" class="on">Carte</button>
+  <button data-tab="editor">Nuova</button>
+  <button data-tab="effects">Effetti</button>
+  <button data-tab="ctl">Controllo</button>
+</nav>
+
+<dialog id="md">
+  <div id="mdc"></div>
+  <div class="two">
+    <button id="m-edit" type="button">Modifica</button>
+    <button id="m-dup" type="button" class="sec">Duplica</button>
+    <button id="m-del" type="button" class="bad">Elimina</button>
+    <button id="m-x" type="button" class="sec">Chiudi</button>
+  </div>
+</dialog>
+
+</div>
+<script type="module" src="admin/app.js"></script>
+</body>
+</html>
