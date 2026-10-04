@@ -1,0 +1,29 @@
+{
+ "order": 10,
+ "label": "💪 Aura +Attacco",
+ "for": [
+  "aura"
+ ],
+ "amount": true,
+ "targets": [
+  [
+   "enchanted_creature",
+   "Creatura incantata"
+  ],
+  [
+   "all_creatures_self",
+   "Tutte le tue"
+  ]
+ ],
+ "json": {
+  "type": "buff",
+  "stat": "attack",
+  "amount": "{n}",
+  "target": "{t}",
+  "duration": "while_attached"
+ },
+ "text": {
+  "enchanted_creature": "La creatura incantata ha +{n} attacco",
+  "all_creatures_self": "Le tue creature hanno +{n} attacco"
+ }
+}
