@@ -85,10 +85,19 @@ async function requireAuth(req: Request): Promise<string> {
   if (error || !data.user) throw new Error('Sessione Supabase non valida');
   return data.user.id;
 }
+// Il proprietario di una partita non cambia mai: una volta letto lo ricordiamo
+// (solo risultati positivi, con tetto di dimensione) e risparmiamo una query a richiesta.
+const matchOwners = new Map<string, string>();
 async function assertMatchOwner(matchId: string, userId: string): Promise<void> {
-  const { data, error } = await supabase.from('matches').select('id, player_id').eq('id', matchId).single();
-  if (error || !data) throw new Error('Partita non trovata');
-  if (data.player_id !== userId) throw new Error('Questa partita appartiene a un altro giocatore');
+  let owner = matchOwners.get(matchId);
+  if (!owner) {
+    const { data, error } = await supabase.from('matches').select('id, player_id').eq('id', matchId).single();
+    if (error || !data) throw new Error('Partita non trovata');
+    owner = String(data.player_id);
+    if (matchOwners.size >= 1000) matchOwners.delete(matchOwners.keys().next().value as string);
+    matchOwners.set(matchId, owner);
+  }
+  if (owner !== userId) throw new Error('Questa partita appartiene a un altro giocatore');
 }
 async function ownedMatch(req: Request): Promise<string> {
   const userId = await requireAuth(req), matchId = requiredString(req.params.id, 'ID partita');
