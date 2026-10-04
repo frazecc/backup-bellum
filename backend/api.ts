@@ -1,5 +1,5 @@
 // backend/api.ts — API HTTP Bellum Penumbrum, registro 3e ordinato e checkpoint pubblici.
-import { Router, type Request, type Response } from 'express';
+import { Router, type NextFunction, type Request, type Response } from 'express';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   attack, createNewMatch, endHumanTurn, getCardData, getMatchState, moveCreature,
@@ -8,7 +8,7 @@ import {
 } from './engine.js';
 import { advancePublicCheckpoint } from './engine-core.js';
 import type {
-  AttackTarget, DeathOrderChoice, DeckFaction, PlayerIndex, PlayCardOptions,
+  AttackTarget, CardInstance, DeathOrderChoice, DeckFaction, GameState, PlayerIndex, PlayCardOptions,
   Position, TargetChoice, TrapChoice,
 } from './types.js';
 
@@ -96,6 +96,39 @@ async function ownedMatch(req: Request): Promise<string> {
   return matchId;
 }
 function respondError(res: Response, error: unknown) { res.status(400).json({ error: errorMessage(error) }); }
+
+// --- Stato pubblico (S2) ---------------------------------------------------
+// Il motore lavora sempre con lo stato completo; al browser va solo ciò che il
+// giocatore può sapere. Le liste nascoste restano della stessa lunghezza, così
+// il client continua a mostrare i conteggi (mazzo, mano coperta dell'IA).
+function hiddenCards(list: unknown, prefix: string): CardInstance[] {
+  const length = Array.isArray(list) ? list.length : 0;
+  return Array.from({ length }, (_, i) => ({ instance_id: `${prefix}-${i}`, card_id: '' }));
+}
+function publicState(state: GameState): GameState {
+  const copy = structuredClone(state);
+  const [ai, human] = copy.players;
+  ai.hand = hiddenCards(ai.hand, 'ai-hand');
+  ai.deck = hiddenCards(ai.deck, 'ai-deck');
+  ai.extra_deck = hiddenCards(ai.extra_deck, 'ai-extra');
+  human.deck = hiddenCards(human.deck, 'human-deck');
+  human.extra_deck = hiddenCards(human.extra_deck, 'human-extra');
+  copy.remaining_mostrissimi = copy.remaining_mostrissimi.map(() => '');
+  // Se risponde l'IA, gli ID elencati indicherebbero quali carte ha in mano.
+  if (copy.pending_reaction && copy.pending_reaction.responder_index === 0)
+    copy.pending_reaction = { ...copy.pending_reaction, eligible_instance_ids: [] };
+  return copy;
+}
+// Ogni risposta con { state } passa da qui: nessuna rotta può dimenticare il filtro.
+apiRouter.use((_req: Request, res: Response, next: NextFunction) => {
+  const json = res.json.bind(res);
+  res.json = (body: unknown) => {
+    if (body && typeof body === 'object' && 'state' in body)
+      return json({ ...(body as Record<string, unknown>), state: publicState((body as { state: GameState }).state) });
+    return json(body);
+  };
+  next();
+});
 apiRouter.get('/health', (_req: Request, res: Response) => res.status(200).json({ status: 'ok', service: 'bellum-penumbrum-api' }));
 apiRouter.post('/match/create', async (req: Request, res: Response) => {
   try {
