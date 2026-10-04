@@ -150,13 +150,31 @@ function check(c) {
   if (c.faction_id === 7 && c.card_type !== 'mostrissimo') warn.push('Gli Indrazzi (7) non entrano mai nei mazzi.');
   warn.push(...balance(c, S.cards));
   if (c.effect_on_death_json?.effects) warn.push('Più effetti alla morte: la guida non conferma questo formato per la morte, prova la carta in partita.');
-  if (!S.file && !isReal(S.cur)) warn.push('Nessuna immagine caricata: la carta resta "da completare" e non è giocabile.');
+  if (!S.file && !isReal(S.cur)) warn.push('Nessuna immagine caricata: al salvataggio verrà caricata un\'immagine provvisoria, la carta sarà giocabile e potrai sostituirla quando vuoi.');
   return { err, warn };
 }
 
 /* ---------- Stato ---------- */
 const S = { cards: [], subs: [], edit: null, eff: [], deaths: [], subIds: [], kwo: [], file: null, img: null, cur: null, dirty: false, view: 'grid', sel: null, badEff: [] };
 const isReal = (u) => !!u && !String(u).startsWith('data:');
+// Immagine provvisoria: stesso percorso di una vera (<CODICE>/<id>.webp), riconoscibile da ph=1 nell'URL.
+// Caricando poi l'immagine vera il file viene sovrascritto e il marcatore sparisce.
+const isTemp = (u) => isReal(u) && /[?&]ph=1(&|$)/.test(String(u));
+const isFinal = (u) => isReal(u) && !isTemp(u);
+const placeholderImage = (c) => new Promise((ok, ko) => {
+  let h = 0;
+  for (const ch of c.name || 'x') h = (h * 31 + ch.charCodeAt(0)) % 360;
+  const cv = document.createElement('canvas'), g = cv.getContext('2d');
+  cv.width = 800; cv.height = 560;
+  const bg = g.createLinearGradient(0, 0, 0, 560);
+  bg.addColorStop(0, `hsl(${h},35%,28%)`); bg.addColorStop(1, `hsl(${h},35%,14%)`);
+  g.fillStyle = bg; g.fillRect(0, 0, 800, 560);
+  g.textAlign = 'center'; g.fillStyle = '#fff';
+  g.font = '170px serif'; g.fillText(['🎴', '👹', '🕯️', '🦴', '🌀', '🔥'][h % 6], 400, 290);
+  g.font = 'bold 44px sans-serif'; g.fillText(c.name || 'Carta', 400, 400, 720);
+  g.font = '28px sans-serif'; g.globalAlpha = .7; g.fillText('IMMAGINE PROVVISORIA', 400, 460);
+  cv.toBlob((b) => (b ? ok(b) : ko(new Error('Immagine provvisoria non creata.'))), 'image/webp', 0.75);
+});
 const subNames = () => S.subIds.map((id) => S.subs.find((s) => s.id === id)?.name).filter(Boolean);
 const subsOf = (c) => (c.sn?.length ? c.sn.join(' ') : c.subtype || '');
 
@@ -171,12 +189,12 @@ function fallback(c) {
 const fmt = (t) => esc(t || '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
 
 function cardHtml(c) {
-  const cr = CREA.includes(c.card_type), real = S.img || isReal(c.image_url);
+  const cr = CREA.includes(c.card_type), real = S.img || isFinal(c.image_url);
   const cost = c.card_type === 'mostrissimo' ? `✦${c.sacrifice_cost ?? 0}` : `⚡${c.mana_cost ?? 0}`;
   const bad = c.id && engineErrors(c).length;
   return `<article class="gc f${c.faction_id || 7}" data-id="${c.id || ''}">
     <header><span>${esc(c.name || 'Nome carta')}</span><span>${cost}</span></header>
-    <div class="art"><img src="${S.img && !c.id ? S.img : isReal(c.image_url) ? esc(c.image_url) : fallback(c)}" alt="">${real ? '' : '<span class="tag">Immagine mancante</span>'}</div>
+    <div class="art"><img src="${S.img && !c.id ? S.img : isReal(c.image_url) ? esc(c.image_url) : fallback(c)}" alt="">${real ? '' : `<span class="tag">${isTemp(c.image_url) ? 'Immagine provvisoria' : 'Immagine mancante'}</span>`}</div>
     <div class="tr">${TYPES[c.card_type] || 'Tipo'}${subsOf(c) ? ' – ' + esc(subsOf(c)) : ''}</div>
     <div class="rules">${fmt(c.effect_text)}</div>
     ${c.flavor_text ? `<div class="fl">${esc(c.flavor_text)}</div>` : ''}
@@ -186,7 +204,7 @@ function cardHtml(c) {
 
 function rowHtml(c) {
   const cost = c.card_type === 'mostrissimo' ? `✦${c.sacrifice_cost ?? 0}` : `⚡${c.mana_cost}`;
-  const bd = (engineErrors(c).length ? '⚠️' : '') + (isReal(c.image_url) ? '' : '🖼️');
+  const bd = (engineErrors(c).length ? '⚠️' : '') + (isFinal(c.image_url) ? '' : '🖼️');
   return `<div class="li f${c.faction_id}" data-id="${c.id}"><div><b>${esc(c.name)}</b><small>${FAC[c.faction_id]?.[1] || '?'} – ${TYPES[c.card_type] || c.card_type} – ${cost}${CREA.includes(c.card_type) ? ` – ${c.attack}/${c.hp}` : ''}</small></div><span class="bd">${bd}</span></div>`;
 }
 
@@ -208,7 +226,7 @@ const inR = (c) => rng(c.mana_cost, 'cmin', 'cmax') && rng(c.attack, 'amin', 'am
 function draw() {
   const q = $('q').value.toLowerCase(), F = $('ff').value, T = $('ft').value, R = $('fr').value, St = $('fs').value;
   const L = S.cards.filter((c) => (!F || c.faction_id == F) && (!T || c.card_type === T) && (!R || c.rarity === R) && inR(c) &&
-    (!St || (St === 'bad' ? engineErrors(c).length : !isReal(c.image_url))) &&
+    (!St || (St === 'bad' ? engineErrors(c).length : !isFinal(c.image_url))) &&
     (!q || [c.name, c.effect_text, c.flavor_text, subsOf(c)].join(' ').toLowerCase().includes(q)));
   $('count').textContent = `${L.length} carte su ${S.cards.length}`;
   $('cards').className = S.view;
@@ -373,10 +391,11 @@ async function save(ev) {
     const row = ok(S.edit ? await sb.from('cards').update(c).eq('id', S.edit).select().single() : await sb.from('cards').insert(c).select().single());
     ok(await sb.from('card_subtype_links').delete().eq('card_id', row.id));
     if (S.subIds.length) ok(await sb.from('card_subtype_links').insert(S.subIds.map((id) => ({ card_id: row.id, subtype_id: id }))));
-    if (S.file) {
+    const temp = !S.file && !isReal(S.cur), file = temp ? await placeholderImage(c) : S.file;
+    if (file) {
       const path = `${FAC[c.faction_id][0]}/${row.id}.webp`;
-      ok(await sb.storage.from(BUCKET).upload(path, S.file, { upsert: true, contentType: 'image/webp', cacheControl: '3600' }));
-      const url = sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl + '?v=' + Date.now();
+      ok(await sb.storage.from(BUCKET).upload(path, file, { upsert: true, contentType: 'image/webp', cacheControl: '3600' }));
+      const url = sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl + '?v=' + Date.now() + (temp ? '&ph=1' : '');
       ok(await sb.from('cards').update({ image_url: url }).eq('id', row.id));
     }
     const wasEdit = !!S.edit;
@@ -394,9 +413,29 @@ function stats() {
   const rows_ = Object.entries(FAC).map(([id, [, n]]) => {
     const L = S.cards.filter((c) => c.faction_id == id), m = L.filter((c) => c.card_type === 'monster'), nm = L.filter((c) => c.card_type !== 'mostrissimo');
     const avg = nm.length ? (nm.reduce((s, c) => s + (c.mana_cost || 0), 0) / nm.length).toFixed(1) : '-';
-    return `<tr><td>${n}</td><td>${L.length}</td><td>${m.length}</td><td>${avg}</td><td>${L.filter((c) => engineErrors(c).length).length}</td><td>${L.filter((c) => !isReal(c.image_url)).length}</td></tr>`;
+    return `<tr><td>${n}</td><td>${L.length}</td><td>${m.length}</td><td>${avg}</td><td>${L.filter((c) => engineErrors(c).length).length}</td><td>${L.filter((c) => !isFinal(c.image_url)).length}</td></tr>`;
   }).join('');
-  $('stats').innerHTML = `<table><tr><th>Fazione</th><th>Carte</th><th>Mostri</th><th>Costo medio</th><th>Non valide</th><th>Senza img</th></tr>${rows_}</table>`;
+  $('stats').innerHTML = `<table><tr><th>Fazione</th><th>Carte</th><th>Mostri</th><th>Costo medio</th><th>Non valide</th><th>Senza img o provv.</th></tr>${rows_}</table>`;
+  const none = S.cards.filter((c) => FAC[c.faction_id] && !isReal(c.image_url));
+  if (none.length) {
+    $('stats').insertAdjacentHTML('beforeend', `<p><button type="button" id="fillph">Carica l'immagine provvisoria alle ${none.length} carte senza immagine</button></p>`);
+    $('fillph').onclick = () => fillPlaceholders(none);
+  }
+}
+
+async function fillPlaceholders(list) {
+  const b = $('fillph'), ok = (x) => { if (x.error) throw x.error; return x.data; };
+  b.disabled = true;
+  try {
+    for (const [i, c] of list.entries()) {
+      b.textContent = `Carico ${i + 1} di ${list.length}…`;
+      const path = `${FAC[c.faction_id][0]}/${c.id}.webp`;
+      ok(await sb.storage.from(BUCKET).upload(path, await placeholderImage(c), { upsert: true, contentType: 'image/webp', cacheControl: '3600' }));
+      const url = sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl + '?v=' + Date.now() + '&ph=1';
+      ok(await sb.from('cards').update({ image_url: url }).eq('id', c.id));
+    }
+    await loadAll();
+  } catch (e) { b.disabled = false; b.textContent = `Errore: ${e.message}. Riprova.`; }
 }
 
 function decks() {
