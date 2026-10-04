@@ -1,0 +1,40 @@
+{
+ "order": 4,
+ "label": "⚔️ Danno a creature",
+ "for": [
+  "monster",
+  "mostrissimo",
+  "maledizione",
+  "instant"
+ ],
+ "amount": true,
+ "targets": [
+  [
+   "any_creature",
+   "Una creatura"
+  ],
+  [
+   "all_creatures",
+   "Tutte (di ENTRAMBI i campi)"
+  ],
+  [
+   "all_creatures_self",
+   "Tutte le tue"
+  ],
+  [
+   "all_creatures_opponent",
+   "Tutte le avversarie"
+  ]
+ ],
+ "json": {
+  "type": "damage",
+  "amount": "{n}",
+  "target": "{t}"
+ },
+ "text": {
+  "any_creature": "Infliggi {n} danno a una creatura",
+  "all_creatures": "Infliggi {n} danno a tutte le creature",
+  "all_creatures_self": "Infliggi {n} danno a tutte le tue creature",
+  "all_creatures_opponent": "Infliggi {n} danno a tutte le creature avversarie"
+ }
+}

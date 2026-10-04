@@ -1,0 +1,11 @@
+{
+ "order": 9,
+ "label": "🚫 NOPE (annulla)",
+ "for": [
+  "instant"
+ ],
+ "json": {
+  "type": "counter"
+ },
+ "text": "Annulla l'azione dell'avversario"
+}

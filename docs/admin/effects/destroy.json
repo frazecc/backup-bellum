@@ -1,0 +1,15 @@
+{
+ "order": 7,
+ "label": "💀 Distruggi creatura",
+ "for": [
+  "monster",
+  "mostrissimo",
+  "maledizione",
+  "instant"
+ ],
+ "json": {
+  "type": "destroy",
+  "target": "any_creature"
+ },
+ "text": "Distruggi una creatura"
+}

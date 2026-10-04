@@ -1,0 +1,16 @@
+{
+ "order": 14,
+ "label": "🛡️ Terraforma +PV",
+ "for": [
+  "terraforma"
+ ],
+ "amount": true,
+ "json": {
+  "type": "buff",
+  "stat": "hp",
+  "amount": "{n}",
+  "target": "all_creatures_self",
+  "duration": "while_in_play"
+ },
+ "text": "Le tue creature hanno +{n} PV finché è in campo"
+}

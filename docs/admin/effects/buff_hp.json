@@ -1,0 +1,32 @@
+{
+ "order": 6,
+ "label": "🛡️ +PV permanenti",
+ "for": [
+  "monster",
+  "mostrissimo",
+  "maledizione",
+  "instant"
+ ],
+ "amount": true,
+ "targets": [
+  [
+   "any_creature",
+   "Una creatura"
+  ],
+  [
+   "all_creatures_self",
+   "Tutte le tue"
+  ]
+ ],
+ "json": {
+  "type": "buff",
+  "stat": "hp",
+  "amount": "{n}",
+  "target": "{t}",
+  "duration": "permanent"
+ },
+ "text": {
+  "any_creature": "Una creatura guadagna +{n} PV",
+  "all_creatures_self": "Le tue creature guadagnano +{n} PV"
+ }
+}

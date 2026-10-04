@@ -1,0 +1,16 @@
+{
+ "order": 13,
+ "label": "💪 Terraforma +Attacco",
+ "for": [
+  "terraforma"
+ ],
+ "amount": true,
+ "json": {
+  "type": "buff",
+  "stat": "attack",
+  "amount": "{n}",
+  "target": "all_creatures_self",
+  "duration": "while_in_play"
+ },
+ "text": "Le tue creature hanno +{n} attacco finché è in campo"
+}

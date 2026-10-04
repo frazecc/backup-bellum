@@ -1,0 +1,30 @@
+{
+ "order": 1,
+ "label": "📚 Pesca carte",
+ "for": [
+  "monster",
+  "mostrissimo",
+  "maledizione",
+  "instant"
+ ],
+ "amount": true,
+ "targets": [
+  [
+   "self",
+   "Tu"
+  ],
+  [
+   "opponent",
+   "Avversario"
+  ]
+ ],
+ "json": {
+  "type": "draw",
+  "amount": "{n}",
+  "target": "{t}"
+ },
+ "text": {
+  "self": "Pesca {n} {carte}",
+  "opponent": "L'avversario pesca {n} {carte}"
+ }
+}

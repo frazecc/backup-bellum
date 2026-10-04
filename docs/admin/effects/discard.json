@@ -1,0 +1,30 @@
+{
+ "order": 2,
+ "label": "🗑️ Scarta a caso",
+ "for": [
+  "monster",
+  "mostrissimo",
+  "maledizione",
+  "instant"
+ ],
+ "amount": true,
+ "targets": [
+  [
+   "opponent",
+   "Avversario"
+  ],
+  [
+   "self",
+   "Tu"
+  ]
+ ],
+ "json": {
+  "type": "discard",
+  "amount": "{n}",
+  "target": "{t}"
+ },
+ "text": {
+  "self": "Scarti {n} {carte} a caso",
+  "opponent": "L'avversario scarta {n} {carte} a caso"
+ }
+}

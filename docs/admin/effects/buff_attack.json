@@ -1,0 +1,43 @@
+{
+ "order": 5,
+ "label": "💪 +Attacco",
+ "for": [
+  "monster",
+  "mostrissimo",
+  "maledizione",
+  "instant"
+ ],
+ "amount": true,
+ "targets": [
+  [
+   "any_creature",
+   "Una creatura"
+  ],
+  [
+   "all_creatures_self",
+   "Tutte le tue"
+  ]
+ ],
+ "durations": [
+  [
+   "permanent",
+   "Permanente"
+  ],
+  [
+   "turn",
+   "Fino a fine turno"
+  ]
+ ],
+ "json": {
+  "type": "buff",
+  "stat": "attack",
+  "amount": "{n}",
+  "target": "{t}",
+  "duration": "{d}"
+ },
+ "text": {
+  "any_creature": "Una creatura guadagna +{n} attacco",
+  "all_creatures_self": "Le tue creature guadagnano +{n} attacco"
+ },
+ "textTurn": " fino a fine turno"
+}

@@ -1,0 +1,29 @@
+{
+ "order": 11,
+ "label": "🛡️ Aura +PV",
+ "for": [
+  "aura"
+ ],
+ "amount": true,
+ "targets": [
+  [
+   "enchanted_creature",
+   "Creatura incantata"
+  ],
+  [
+   "all_creatures_self",
+   "Tutte le tue"
+  ]
+ ],
+ "json": {
+  "type": "buff",
+  "stat": "hp",
+  "amount": "{n}",
+  "target": "{t}",
+  "duration": "while_attached"
+ },
+ "text": {
+  "enchanted_creature": "La creatura incantata ha +{n} PV",
+  "all_creatures_self": "Le tue creature hanno +{n} PV"
+ }
+}

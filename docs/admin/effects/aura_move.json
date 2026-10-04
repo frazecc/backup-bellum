@@ -1,0 +1,14 @@
+{
+ "order": 12,
+ "label": "🏃 Aura: movimento a costo 0",
+ "for": [
+  "aura"
+ ],
+ "json": {
+  "type": "movement_cost",
+  "amount": 0,
+  "target": "enchanted_creature",
+  "duration": "while_attached"
+ },
+ "text": "La creatura incantata si muove a costo 0"
+}

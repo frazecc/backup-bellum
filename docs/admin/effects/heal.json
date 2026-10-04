@@ -1,0 +1,50 @@
+{
+ "order": 3,
+ "label": "❤️ Cura",
+ "for": [
+  "monster",
+  "mostrissimo",
+  "maledizione",
+  "instant"
+ ],
+ "amount": true,
+ "targets": [
+  [
+   "self",
+   "I tuoi punti vita"
+  ],
+  [
+   "opponent",
+   "Punti vita avversario"
+  ],
+  [
+   "any_creature",
+   "Una creatura"
+  ],
+  [
+   "all_creatures",
+   "Tutte (di ENTRAMBI i campi)"
+  ],
+  [
+   "all_creatures_self",
+   "Tutte le tue"
+  ],
+  [
+   "all_creatures_opponent",
+   "Tutte le avversarie"
+  ]
+ ],
+ "json": {
+  "type": "heal",
+  "amount": "{n}",
+  "target": "{t}"
+ },
+ "text": {
+  "self": "Guadagni {n} punti vita",
+  "opponent": "L'avversario guadagna {n} punti vita",
+  "any_creature": "Cura {n} a una creatura",
+  "all_creatures": "Cura {n} a tutte le creature",
+  "all_creatures_self": "Cura {n} a tutte le tue creature",
+  "all_creatures_opponent": "Cura {n} a tutte le creature avversarie"
+ }
+}

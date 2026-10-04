@@ -1,0 +1,15 @@
+{
+ "order": 8,
+ "label": "🔄 Ritorna in mano (anche tua)",
+ "for": [
+  "monster",
+  "mostrissimo",
+  "maledizione",
+  "instant"
+ ],
+ "json": {
+  "type": "return_hand",
+  "target": "any_creature"
+ },
+ "text": "Una creatura torna in mano al proprietario"
+}
