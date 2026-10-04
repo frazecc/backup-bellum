@@ -32,8 +32,14 @@ export function randomColors(): DeckColors {
   const [primary, secondary, tertiary] = shuffle(deckFactions);
   return { primary, secondary, tertiary };
 }
-type DeckCard = { id: string; cost: number; type: string; faction: DeckFaction; raw: CardEffectJson | null };
-function deckPlayable(x: DeckCard): boolean {
+type DeckCard = { id: string; cost: number; type: string; faction: DeckFaction; raw: CardEffectJson | null; death: CardEffectJson | null };
+// Gli effetti alla morte partono a metà partita: un tipo non implementato (counter, nope,
+// custom, movement_cost) lancia un errore e blocca la mossa. Stesse regole dei Mostri.
+function deathPlayable(raw: CardEffectJson | null): boolean {
+  return effects(raw).every(e => supported.has(e.type) && e.duration !== 'while_attached' && e.duration !== 'while_in_play');
+}
+function deckPlayable(x: DeckCard): boolean { return effectsPlayable(x) && deathPlayable(x.death); }
+function effectsPlayable(x: DeckCard): boolean {
   const d = { card_type: x.type, effect_json: x.raw } as CardData;
   const list = effects(x.raw);
   if (x.type === 'aura') return passiveAura(d);
@@ -42,7 +48,7 @@ function deckPlayable(x: DeckCard): boolean {
   return list.every(e => supported.has(e.type) && e.duration !== 'while_attached' && e.duration !== 'while_in_play');
 }
 export async function deckPool(): Promise<DeckCard[]> {
-  const { data, error } = await db.from('cards').select('id,card_type,mana_cost,effect_json,factions!inner(code)')
+  const { data, error } = await db.from('cards').select('id,card_type,mana_cost,effect_json,effect_on_death_json,factions!inner(code)')
     .in('card_type', ['monster', 'instant', 'aura', 'terraforma', 'maledizione']);
   if (error || !data) throw new Error(`Catalogo non disponibile: ${error?.message ?? 'nessun risultato'}`);
   const pool: DeckCard[] = [];
@@ -51,7 +57,8 @@ export async function deckPool(): Promise<DeckCard[]> {
     const code = linked && typeof linked === 'object' && 'code' in linked ? String(linked.code).toUpperCase() : '';
     if (!deckFactions.includes(code as DeckFaction)) continue;
     const x: DeckCard = { id: String(row.id), cost: Number(row.mana_cost), type: String(row.card_type),
-      faction: code as DeckFaction, raw: row.effect_json as CardEffectJson | null };
+      faction: code as DeckFaction, raw: row.effect_json as CardEffectJson | null,
+      death: row.effect_on_death_json as CardEffectJson | null };
     if (Number.isInteger(x.cost) && x.cost >= 0 && deckPlayable(x)) pool.push(x);
   }
   return pool;
