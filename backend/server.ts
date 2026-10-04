@@ -1,8 +1,10 @@
 import cors from 'cors';
-import express, { type Request, type Response } from 'express';
+import express, { type NextFunction, type Request, type Response } from 'express';
 import { apiRouter } from './api.js';
 
 const app = express();
+// Su Render l'indirizzo reale del client arriva dall'intestazione del proxy.
+app.set('trust proxy', 1);
 
 app.use(
   cors({
@@ -15,6 +17,25 @@ app.use(
     allowedHeaders: ['Authorization', 'Content-Type'],
   }),
 );
+
+// Limite per indirizzo IP (S6): 600 richieste al minuto, controllo di salute escluso.
+// Messo dopo cors() così il browser può leggere anche la risposta 429.
+const ipHits = new Map<string, number[]>();
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.path === '/' || req.path === '/health') { next(); return; }
+  const now = Date.now(), key = req.ip ?? 'sconosciuto';
+  const recent = (ipHits.get(key) ?? []).filter(t => now - t < 60_000);
+  if (recent.length >= 600) {
+    ipHits.set(key, recent);
+    res.status(429).json({ error: 'Troppe richieste: aspetta qualche secondo e riprova' });
+    return;
+  }
+  recent.push(now); ipHits.set(key, recent); next();
+});
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, times] of ipHits) if (!times.length || now - times[times.length - 1] > 60_000) ipHits.delete(key);
+}, 60_000).unref();
 
 app.use(express.json({ limit: '1mb' }));
 

@@ -78,11 +78,26 @@ function targetChoiceValue(value: unknown): TargetChoice {
   return { choice_id: requiredString(body.choiceId, 'ID scelta bersaglio'),
     target_instance_id: requiredString(body.targetInstanceId, 'ID istanza bersaglio') };
 }
+// --- Limiti di richieste (S6) ---------------------------------------------
+// In memoria, per utente: 300 richieste al minuto in generale (una partita normale ne usa
+// meno di 200) e al massimo 10 nuove partite ogni 10 minuti.
+class RateLimitError extends Error {}
+const rateHits = new Map<string, number[]>();
+function rateLimit(key: string, max: number, windowMs: number): void {
+  const now = Date.now(), recent = (rateHits.get(key) ?? []).filter(t => now - t < windowMs);
+  if (recent.length >= max) { rateHits.set(key, recent); throw new RateLimitError('Troppe richieste: aspetta qualche secondo e riprova'); }
+  recent.push(now); rateHits.set(key, recent);
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, times] of rateHits) if (!times.length || now - times[times.length - 1] > 15 * 60_000) rateHits.delete(key);
+}, 60_000).unref();
 async function requireAuth(req: Request): Promise<string> {
   const header = req.header('authorization');
   if (!header?.startsWith('Bearer ')) throw new Error('Sessione assente: autenticati di nuovo');
   const { data, error } = await supabase.auth.getUser(header.slice('Bearer '.length).trim());
   if (error || !data.user) throw new Error('Sessione Supabase non valida');
+  rateLimit(`user:${data.user.id}`, 300, 60_000);
   return data.user.id;
 }
 // Il proprietario di una partita non cambia mai: una volta letto lo ricordiamo
@@ -104,7 +119,7 @@ async function ownedMatch(req: Request): Promise<string> {
   await assertMatchOwner(matchId, userId);
   return matchId;
 }
-function respondError(res: Response, error: unknown) { res.status(400).json({ error: errorMessage(error) }); }
+function respondError(res: Response, error: unknown) { res.status(error instanceof RateLimitError ? 429 : 400).json({ error: errorMessage(error) }); }
 
 // --- Stato pubblico (S2) ---------------------------------------------------
 // Il motore lavora sempre con lo stato completo; al browser va solo ciò che il
@@ -142,6 +157,7 @@ apiRouter.get('/health', (_req: Request, res: Response) => res.status(200).json(
 apiRouter.post('/match/create', async (req: Request, res: Response) => {
   try {
     const userId = await requireAuth(req), body = objectValue(req.body);
+    rateLimit(`create:${userId}`, 10, 10 * 60_000);
     const primary = deckFactionValue(body.primaryColor, 'Colore principale');
     const secondary = deckFactionValue(body.secondaryColor, 'Colore secondario');
     if (primary === secondary) throw new Error('Scegli due colori diversi');
