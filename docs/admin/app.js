@@ -33,6 +33,7 @@ const defE = (key) => ({ key, n: 1, t: EF[key].t?.[0][0], d: EF[key].d?.[0][0] }
 function build(e, ty) {
   if (e.raw) return e.raw;
   const j = EF[e.key].json(e.n, e.t, e.d);
+  if (ty === 'terraforma' && e.flt?.v) j.filter = { [e.flt.k]: e.flt.v };
   return ty === 'aura' || ty === 'terraforma' ? j : { ...j, timing: ty === 'instant' ? 'instant' : 'on_play' };
 }
 
@@ -41,7 +42,9 @@ function parseEff(j, ty) {
   const t = j.type === 'damage_creature' ? 'damage' : j.type === 'nope' ? 'counter' : j.type;
   const key = Object.keys(EF).find((k) => { const s = EF[k].spec; return s.for.includes(ty) && s.json.type === t && (!s.json.stat || s.json.stat === j.stat); });
   if (!key) return { raw: j };
-  return { key, n: j.amount ?? 1, t: j.target ?? EF[key].t?.[0][0], d: j.duration ?? EF[key].d?.[0][0] };
+  const fk = j.filter ? Object.keys(j.filter) : [];
+  if (j.filter && (ty !== 'terraforma' || fk.length !== 1 || !['subtype', 'faction'].includes(fk[0]))) return { raw: j };
+  return { key, n: j.amount ?? 1, t: j.target ?? EF[key].t?.[0][0], d: j.duration ?? EF[key].d?.[0][0], flt: fk.length ? { k: fk[0], v: j.filter[fk[0]] } : null };
 }
 
 /* ---------- Validazione ---------- */
@@ -249,7 +252,7 @@ function rows(list, name, ty) {
     const head = `<div class="row" data-l="${name}" data-i="${i}">`;
     if (e.raw) return `${head}<small>⚠️ Effetto non riconosciuto (viene conservato): ${esc(JSON.stringify(e.raw))}</small><button type="button" data-x class="sec">Rimuovi</button></div>`;
     const c = EF[e.key], when = CREA.includes(ty) ? sel('trg', TRIG, name === 'death' ? 'death' : 'etb') : `<small><b>${esc(FIXED[ty] || 'Una volta')}</b></small>`;
-    return `${head}${when}${sel('key', keysFor(name === 'death' ? 'monster' : ty).map((k) => [k, EF[k].l]), e.key)}${c.a ? `<input data-f="n" type="number" min="0" max="20" value="${e.n}" title="Quantità">` : ''}${c.t ? sel('t', c.t, e.t) : ''}${c.d ? sel('d', c.d, e.d) : ''}<button type="button" data-x class="sec">✕</button></div>`;
+    return `${head}${when}${sel('key', keysFor(name === 'death' ? 'monster' : ty).map((k) => [k, EF[k].l]), e.key)}${c.a ? `<input data-f="n" type="number" min="0" max="20" value="${e.n}" title="Quantità">` : ''}${c.t ? sel('t', c.t, e.t) : ''}${c.d ? sel('d', c.d, e.d) : ''}${ty === 'terraforma' ? sel('fk', [['all', 'Tutte le tue creature'], ['subtype', 'Solo un sottotipo'], ['faction', 'Solo una fazione']], e.flt?.k ?? 'all') + (e.flt ? sel('fv', fltValues(e.flt.k), e.flt.v) : '') : ''}<button type="button" data-x class="sec">✕</button></div>`;
   }).join('');
 }
 
@@ -279,6 +282,12 @@ function onRow(ev) {
     }
     renderEff(); refresh(); return;
   }
+  if (f === 'fk') {
+    const k = ev.target.value;
+    e.flt = k === 'all' ? null : { k, v: fltValues(k)[0]?.[0] ?? '' };
+    renderEff(); refresh(); return;
+  }
+  if (f === 'fv') { e.flt = { ...e.flt, v: ev.target.value }; refresh(); return; }
   if (f === 'key') { Object.assign(e, defE(ev.target.value)); renderEff(); }
   else e[f] = f === 'n' ? Math.max(0, Math.min(20, parseInt(ev.target.value) || 0)) : ev.target.value;
   refresh();
@@ -295,8 +304,17 @@ function types() {
   renderEff();
 }
 
+const fltText = (f) => f.k === 'subtype' ? `di tipo ${f.v}` : `di ${Object.values(FAC).find((x) => x[0] === f.v)?.[1] ?? f.v}`;
+function fltValues(k) {
+  return k === 'subtype' ? S.subs.filter((s) => s.is_active !== false).map((s) => [s.name, s.name])
+    : Object.values(FAC).filter((x) => x[0] !== 'IND').map((x) => [x[0], x[1]]);
+}
+
 function draft() {
-  const ty = $('type').value, tx = (L) => L.filter((e) => !e.raw).map((e) => EF[e.key].txt(e.n, e.t, e.d) || '').join('. ');
+  const ty = $('type').value, tx = (L) => L.filter((e) => !e.raw).map((e) => {
+    const t = EF[e.key].txt(e.n, e.t, e.d) || '';
+    return e.flt?.v ? t.replace('Le tue creature', `Le tue creature ${fltText(e.flt)}`) : t;
+  }).join('. ');
   const p = [];
   if (CREA.includes(ty) && $('kw').checked) p.push('**Iperattivo**');
   const a = tx(S.eff);
