@@ -236,18 +236,28 @@ function draw() {
 
 /* ---------- Editor ---------- */
 const sel = (f, opts, v) => `<select data-f="${f}">${opts.map(([a, b]) => `<option value="${a}"${a === v ? ' selected' : ''}>${b}</option>`).join('')}</select>`;
+// Un solo elenco di effetti. Ogni riga: Quando (trigger) → Effetto → Quantità → Bersaglio → Durata.
+// I Mostri scelgono il trigger (entra in campo / muore); per gli altri tipi il motore fissa il
+// comportamento e la riga lo mostra solo come informazione.
+const TRIG = [['etb', 'Quando entra in campo'], ['death', 'Quando muore']];
+const FIXED = {
+  maledizione: 'Una volta: alla giocata, poi va al cimitero', instant: 'Una volta: quando la Trappola si attiva',
+  aura: 'Continuo: finché è equipaggiata', terraforma: 'Continuo: finché è in campo'
+};
 function rows(list, name, ty) {
   return list.map((e, i) => {
-    if (e.raw) return `<div class="row" data-l="${name}" data-i="${i}"><small>⚠️ Effetto non riconosciuto (viene conservato): ${esc(JSON.stringify(e.raw))}</small><button type="button" data-x class="sec">Rimuovi</button></div>`;
-    const c = EF[e.key];
-    return `<div class="row" data-l="${name}" data-i="${i}">${sel('key', keysFor(ty).map((k) => [k, EF[k].l]), e.key)}${c.t ? sel('t', c.t, e.t) : ''}${c.d ? sel('d', c.d, e.d) : ''}${c.a ? `<input data-f="n" type="number" min="0" max="20" value="${e.n}">` : ''}<button type="button" data-x class="sec">✕</button></div>`;
+    const head = `<div class="row" data-l="${name}" data-i="${i}">`;
+    if (e.raw) return `${head}<small>⚠️ Effetto non riconosciuto (viene conservato): ${esc(JSON.stringify(e.raw))}</small><button type="button" data-x class="sec">Rimuovi</button></div>`;
+    const c = EF[e.key], when = CREA.includes(ty) ? sel('trg', TRIG, name === 'death' ? 'death' : 'etb') : `<small><b>${esc(FIXED[ty] || 'Una volta')}</b></small>`;
+    return `${head}${when}${sel('key', keysFor(name === 'death' ? 'monster' : ty).map((k) => [k, EF[k].l]), e.key)}${c.a ? `<input data-f="n" type="number" min="0" max="20" value="${e.n}" title="Quantità">` : ''}${c.t ? sel('t', c.t, e.t) : ''}${c.d ? sel('d', c.d, e.d) : ''}<button type="button" data-x class="sec">✕</button></div>`;
   }).join('');
 }
 
 function renderEff() {
   const ty = $('type').value;
-  $('effs').innerHTML = rows(S.eff, 'eff', ty);
-  $('death').innerHTML = rows(S.deaths, 'death', 'monster');
+  $('effs').innerHTML = rows(S.eff, 'eff', ty) + rows(S.deaths, 'death', ty);
+  $('death').innerHTML = '';
+  $('gdeath').hidden = true; // gli effetti alla morte stanno ora nello stesso elenco
 }
 
 function onRow(ev) {
@@ -261,6 +271,14 @@ function onRow(ev) {
   }
   const f = ev.target.dataset.f;
   if (!f || ev.type === 'click') return;
+  if (f === 'trg') {
+    const toDeath = ev.target.value === 'death';
+    if (toDeath !== (L === 'death')) {
+      (L === 'eff' ? S.eff : S.deaths).splice(i, 1);
+      (toDeath ? S.deaths : S.eff).push(e);
+    }
+    renderEff(); refresh(); return;
+  }
   if (f === 'key') { Object.assign(e, defE(ev.target.value)); renderEff(); }
   else e[f] = f === 'n' ? Math.max(0, Math.min(20, parseInt(ev.target.value) || 0)) : ev.target.value;
   refresh();
@@ -272,7 +290,7 @@ function types() {
   $('gstats').hidden = !c; $('gkw').hidden = !c; $('gdeath').hidden = !c; $('gtrap').hidden = ty !== 'instant';
   S.eff = S.eff.filter((e) => e.raw || (ty && EF[e.key].for.includes(ty)));
   if (!c) S.deaths = [];
-  $('elab').textContent = c ? "Effetto all'ingresso (nessuno se vuoto)" : 'Effetti';
+  $('elab').textContent = 'Effetti (nessuno se vuoto)';
   $('addE').hidden = !ty;
   renderEff();
 }
@@ -582,6 +600,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   ['name', 'fac', 'rar', 'mana', 'sac', 'atk', 'hp', 'kw', 'trap', 'fl'].forEach((id) => $(id).addEventListener('input', refresh));
   $('txt').addEventListener('input', () => { S.dirty = true; refresh(); });
   $('regen').addEventListener('click', () => { S.dirty = false; refresh(); });
+  $('addE').textContent = '+ Aggiungi effetto';
   $('addE').addEventListener('click', () => { const ty = $('type').value; if (ty) { S.eff.push(defE(keysFor(ty)[0])); renderEff(); refresh(); } });
   $('addD').addEventListener('click', () => { S.deaths.push(defE(keysFor('monster')[0])); renderEff(); refresh(); });
   ['effs', 'death'].forEach((id) => ['input', 'click'].forEach((t) => $(id).addEventListener(t, onRow)));
