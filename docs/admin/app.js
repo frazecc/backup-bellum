@@ -382,6 +382,22 @@ function fill(c, dup) {
   if (dup) $('name').focus();
 }
 
+const API = 'https://bellum-penumbrum-api.onrender.com';
+// Controllo finale col motore (stesse regole dei mazzi). Se il servizio non risponde in 8 secondi
+// (ad esempio è in avvio) si prosegue col controllo locale e il salvataggio non viene bloccato.
+async function remoteErrors(c) {
+  try {
+    const { data } = await sb.auth.getSession();
+    const token = data?.session?.access_token;
+    if (!token) return null;
+    const res = await fetch(`${API}/cards/validate`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ card: c }), signal: AbortSignal.timeout(8000)
+    });
+    return res.ok ? (await res.json()).errors ?? null : null;
+  } catch { return null; }
+}
+
 async function save(ev) {
   ev.preventDefault();
   const c = collect(), r = check(c);
@@ -389,6 +405,8 @@ async function save(ev) {
   const ok = (x) => { if (x.error) throw x.error; return x.data; };
   try {
     $('save').disabled = true;
+    const remote = await remoteErrors(c);
+    if (remote?.length) { msg(['Il motore rifiuta questa carta:', ...remote], 'err'); return; }
     const row = ok(S.edit ? await sb.from('cards').update(c).eq('id', S.edit).select().single() : await sb.from('cards').insert(c).select().single());
     ok(await sb.from('card_subtype_links').delete().eq('card_id', row.id));
     if (S.subIds.length) ok(await sb.from('card_subtype_links').insert(S.subIds.map((id) => ({ card_id: row.id, subtype_id: id }))));
