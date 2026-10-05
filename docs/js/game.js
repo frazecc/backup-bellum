@@ -146,7 +146,7 @@ function permanents() {
   }
   return found;
 }
-function bossCells(p) {
+function summonCells(p) {
   if (!p) return [];
   const found = [];
   for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
@@ -179,8 +179,15 @@ async function api(path,options={}) {
     throw e;
   } finally { clearTimeout(timer); }
 }
+// Le carte scadono dopo 5 minuti e a ogni nuova partita: una modifica dall'editor arriva ai giocatori
+// senza ricaricare la pagina. Se il ricaricamento fallisce si usa la copia già in memoria.
+const cardLoaded = new Map(), CARD_TTL = 5 * 60 * 1000;
 async function card(id) {
-  if (!cache.has(id)) cache.set(id,(await api(`/cards/${encodeURIComponent(id)}`)).card);
+  const fresh = cache.has(id) && Date.now() - (cardLoaded.get(id) ?? 0) < CARD_TTL;
+  if (!fresh) {
+    try { cache.set(id,(await api(`/cards/${encodeURIComponent(id)}`)).card); cardLoaded.set(id,Date.now()); }
+    catch (error) { if (!cache.has(id)) throw error; }
+  }
   return cache.get(id);
 }
 async function moveCost(cell) {
@@ -465,7 +472,7 @@ async function inspect(kind,id,extra={}) {
   const bar = $('detail-actions'); bar.replaceChildren();
   const add = (text,fn,disabled=false) => bar.append(button(text,fn,disabled));
   if (kind === 'hand' && active()) add(d.card_type === 'monster' ? 'Evoca' : d.card_type === 'terraforma' ? 'Colloca' : 'Gioca',() => beginCard(current.instanceId,d),!playable(d));
-  if (kind === 'boss' && active() && state.last_mostrissimo_turn?.[1] !== state.current_turn) {
+  if (kind === 'mostrissimo' && active() && state.last_mostrissimo_turn?.[1] !== state.current_turn) {
     const cost = Number(d.sacrifice_cost), own = board().flat().filter(c => isCreatureCell(c) && c.owner_index === 1).length;
     const legal = Number.isInteger(cost) && cost >= 0 && cost <= 6 && permanents().length >= cost && (board()[2].some(c => !c) || (cost > 0 && own > 0));
     add(`Evoca · ${cost} sacrifici`,() => request('mostrissimo/start',{cardId:id},'Evocazione iniziata: non puoi annullare.'),!legal);
@@ -507,7 +514,7 @@ function playable(d) {
 async function drawBoard() {
   const root = $('shared-board'); if (!root) return;
   root.replaceChildren();
-  const p = pending(), legal = p?.stage === 'paying' && p.paid.length === p.required ? bossCells(p) : [];
+  const p = pending(), legal = p?.stage === 'paying' && p.paid.length === p.required ? summonCells(p) : [];
   const d = flow?.id ? cache.get(flow.id) : null;
   for (let row = 0; row < 3; row++) {
     const line = document.createElement('div'); line.className = `board-row ${['ai-row','center-row','human-row'][row]}`;
@@ -522,7 +529,7 @@ async function drawBoard() {
       if (flow?.kind === 'move' && steps(flow.from).some(x => eq(x,pos))) b.classList.add('valid-move');
       if (flow?.kind === 'attack' && foes(flow.from).some(x => eq(x,pos))) b.classList.add('valid-target');
       if (flow?.kind === 'hand' && flow.step === 'cell' && row === 2 && !c) b.classList.add('valid-summon');
-      if (['hand','boss-target','trap-target'].includes(flow?.kind) && (flow?.step === 'target' || flow?.kind !== 'hand') && d && targetAllowed(d,c,flow?.kind === 'trap-target' ? reaction()?.event : null)) b.classList.add('valid-target');
+      if (['hand','mostrissimo-target','trap-target'].includes(flow?.kind) && (flow?.step === 'target' || flow?.kind !== 'hand') && d && targetAllowed(d,c,flow?.kind === 'trap-target' ? reaction()?.event : null)) b.classList.add('valid-target');
       if (legal.some(x => eq(x,pos))) b.classList.add('valid-summon');
       b.setAttribute('aria-label',c ? `${definition?.name ?? 'Permanente'} ${c.owner_index === 1 ? 'Tu' : 'IA'}${isCreatureCell(c) ? ` ATK ${c.attack} HP ${c.hp}` : ', Terraforma non attaccabile'}${isCreatureCell(c) && c.auras?.length ? `, ${c.auras.length} Aura` : ''}` : `Cella [${row},${col}]`);
       b.innerHTML = c && definition ? cellHTML(definition,c) + (isCreatureCell(c) && c.auras?.length ? `<span class="cell-aura-count" title="Aure assegnate">✧ ${c.auras.length}</span>` : '') + `<span class="cell-coordinate">[${row},${col}]</span>` : '';
@@ -552,7 +559,7 @@ async function drawHand() {
     root.append(b);
   }
 }
-async function drawBoss() {
+async function drawMostrissimi() {
   let panel = $('mostrissimo-panel');
   if (!panel) {
     panel = document.createElement('section'); panel.id = 'mostrissimo-panel'; panel.className = 'panel'; panel.setAttribute('aria-label','Offerta Mostrissimi');
@@ -568,7 +575,7 @@ async function drawBoss() {
     const d = await card(inst.card_id), b = document.createElement('button');
     b.type = 'button'; b.className = 'boss-card'; b.innerHTML = cardHTML(d,true);
     b.setAttribute('aria-label',`Apri ${d.name}, ${d.sacrifice_cost} sacrifici`);
-    b.disabled = busy || !!reaction() || obligatory(); b.onclick = () => inspect('boss',inst.card_id); strip.append(b);
+    b.disabled = busy || !!reaction() || obligatory(); b.onclick = () => inspect('mostrissimo',inst.card_id); strip.append(b);
   }
   const p = pending(); if (!p) return;
   const zone = document.createElement('div'); zone.className = 'tribute-zone is-info'; panel.append(zone);
@@ -586,16 +593,14 @@ async function drawBoss() {
     }
     zone.append(list);
   } else {
-    const msg = document.createElement('p'); msg.className = 'tribute-hint'; msg.textContent = flow?.kind === 'boss-target' ? 'Tocca il bersaglio ETB evidenziato.' : 'Tocca una cella evidenziata.'; zone.append(msg);
+    const msg = document.createElement('p'); msg.className = 'tribute-hint'; msg.textContent = flow?.kind === 'mostrissimo-target' ? 'Tocca il bersaglio ETB evidenziato.' : 'Tocca una cella evidenziata.'; zone.append(msg);
   }
 }
 function controls() {
   const disable = (id,v) => { if ($(id)) $(id).disabled = !!v; };
-  disable('new-match-button',busy || obligatory()); disable('end-turn-button',!active()); disable('refresh-button',busy || !matchId); disable('direct-attack-button',true);
+  disable('new-match-button',busy || obligatory()); disable('end-turn-button',!active()); disable('refresh-button',busy || !matchId);
   disable('cancel-selection-button',busy || obligatory() || !flow || (!!pending() && flow?.kind !== 'trap-target'));
-  disable('choose-attack-button',true); disable('choose-move-button',true);
-  $('creature-action-panel')?.classList.add('hidden');
-  if ($('selection-instructions')) $('selection-instructions').textContent = deathOrder() ? 'Scegli l’ordine delle creature morte.' : deathTarget() ? 'Scegli il bersaglio dell’effetto alla morte.' : flow?.kind === 'trap-target' ? reaction()?.event?.kind === 'monster_etb' ? 'Scegli la creatura che ha generato l’ETB.' : 'Scegli il bersaglio della Trappola.' : reaction() ? 'Rispondi alla finestra reattiva o passa.' : flow?.kind === 'boss-target' ? 'Scegli il bersaglio ETB.' : pending() ? 'Evocazione obbligatoria in corso.' : flow?.kind === 'hand' && flow.step === 'cell' ? 'Scegli una cella.' : flow?.kind === 'hand' && flow.step === 'target' ? 'Scegli un bersaglio.' : flow?.kind === 'attack' ? 'Scegli il nemico.' : flow?.kind === 'move' ? 'Scegli una cella adiacente.' : 'Leggi nome e tipo delle carte; tocca per aprire il testo completo.';
+  if ($('selection-instructions')) $('selection-instructions').textContent = deathOrder() ? 'Scegli l’ordine delle creature morte.' : deathTarget() ? 'Scegli il bersaglio dell’effetto alla morte.' : flow?.kind === 'trap-target' ? reaction()?.event?.kind === 'monster_etb' ? 'Scegli la creatura che ha generato l’ETB.' : 'Scegli il bersaglio della Trappola.' : reaction() ? 'Rispondi alla finestra reattiva o passa.' : flow?.kind === 'mostrissimo-target' ? 'Scegli il bersaglio ETB.' : pending() ? 'Evocazione obbligatoria in corso.' : flow?.kind === 'hand' && flow.step === 'cell' ? 'Scegli una cella.' : flow?.kind === 'hand' && flow.step === 'target' ? 'Scegli un bersaglio.' : flow?.kind === 'attack' ? 'Scegli il nemico.' : flow?.kind === 'move' ? 'Scegli una cella adiacente.' : 'Leggi nome e tipo delle carte; tocca per aprire il testo completo.';
 }
 function showDeckColors() {
   const human = state?.deck_colors?.[1], ai = state?.deck_colors?.[0];
@@ -608,12 +613,12 @@ async function render() {
   set('match-status',state?.status === 'finished' ? 'Terminata' : state ? 'In corso' : 'Nessuna partita');
   set('turn-status',state ? `${state.current_turn} · ${state.active_player_index === 1 ? 'Tu' : 'IA'}` : '—');
   set('phase-status',state?.phase === 'upkeep' ? 'MANATENIMENTO' : state?.phase === 'main' ? 'Principale' : state?.phase ?? '—');
-  set('player-life',me()?.life ?? 20); set('player-mana',`${me()?.current_mana ?? 0} / ${me()?.max_mana ?? 0}`);
+  set('player-life',me()?.life ?? 20); set('player-current-mana',me()?.current_mana ?? 0); set('player-max-mana',me()?.max_mana ?? 0);
   set('player-hand-count',me()?.hand?.length ?? 0); set('player-deck-count',me()?.deck?.length ?? 0); set('player-graveyard-count',me()?.graveyard?.length ?? 0);
   set('opponent-life',them()?.life ?? 20); set('opponent-current-mana',them()?.current_mana ?? 0); set('opponent-max-mana',them()?.max_mana ?? 0);
   set('opponent-hand-count',them()?.hand?.length ?? 0); set('opponent-deck-count',them()?.deck?.length ?? 0); set('opponent-graveyard-count',them()?.graveyard?.length ?? 0);
   showDeckColors(); drawOpponentHand();
-  await drawBoard(); await drawHand(); await drawBoss(); controls(); await renderReaction(); await renderDeathChoice();
+  await drawBoard(); await drawHand(); await drawMostrissimi(); controls(); await renderReaction(); await renderDeathChoice();
 }
 async function logs() {
   if (!$('match-logs') || !matchId) return;
@@ -655,7 +660,7 @@ async function boardClick(pos) {
   }
   if (!turn()) return;
   const p = pending();
-  if (flow?.kind === 'boss-target') {
+  if (flow?.kind === 'mostrissimo-target') {
     if (!p || p.stage !== 'paying' || p.paid.length !== p.required) { flow = null; await render(); return notice('Evocazione non più valida.','error'); }
     const d = await card(p.card_id);
     if (!targetAllowed(d,c)) return notice('Bersaglio ETB non valido.','error');
@@ -667,10 +672,10 @@ async function boardClick(pos) {
       if (c?.owner_index === 1) return inspect('tribute',c.card_id,{instanceId:c.instance_id});
       return notice('Scegli un tuo permanente nell’elenco dei sacrifici.','error');
     }
-    if (c || !bossCells(p).some(x => eq(x,pos))) return notice('Cella non valida.','error');
+    if (c || !summonCells(p).some(x => eq(x,pos))) return notice('Cella non valida.','error');
     const d = await card(p.card_id);
     if (targetEffect(d) && targets(d).length) {
-      flow = {kind:'boss-target',position:pos,id:d.id}; await render(); notice('Cella scelta. Tocca il bersaglio ETB evidenziato.','success'); return;
+      flow = {kind:'mostrissimo-target',position:pos,id:d.id}; await render(); notice('Cella scelta. Tocca il bersaglio ETB evidenziato.','success'); return;
     }
     return request('mostrissimo/complete',{position:pos},'Mostrissimo dichiarato.');
   }
@@ -800,6 +805,7 @@ async function submitColors() {
   await newMatch(primaryColor,secondaryColor);
 }
 async function newMatch(primaryColor,secondaryColor) {
+  cardLoaded.clear();
   if (busy || obligatory()) return; busy = true; controls();
   $('deck-color-confirm').disabled = true;
   notice('Creazione partita…');
