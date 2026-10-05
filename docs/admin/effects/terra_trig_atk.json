@@ -1,0 +1,29 @@
+{
+ "order": 15,
+ "label": "🎯 Terraforma: ogni mostro che evochi +Attacco",
+ "for": [
+  "terraforma"
+ ],
+ "amount": true,
+ "when": "Ogni volta che evochi un tuo mostro",
+ "durations": [
+  [
+   "permanent",
+   "Permanente"
+  ],
+  [
+   "turn",
+   "Fino a fine turno"
+  ]
+ ],
+ "json": {
+  "type": "buff",
+  "stat": "attack",
+  "amount": "{n}",
+  "target": "triggering_creature",
+  "duration": "{d}",
+  "trigger": "own_monster_summoned"
+ },
+ "text": "Ogni volta che evochi un tuo mostro, quel mostro ottiene +{n} attacco",
+ "textTurn": " fino a fine turno"
+}
