@@ -84,6 +84,14 @@ function flushDeaths(c: Context) {
   log(c, 1, 'death_order_window', `Scegli l’ordine di ${group.length} creature morte.`, { window_id: c.s.pending_death_order.choice_id });
 }
 
+// Filtro dei bonus delle Terraforme: sottotipo e/o fazione della creatura (entrambi se indicati).
+async function matchesFilter(cardId: string, f: { subtype?: string; faction?: string }): Promise<boolean> {
+  const d = await getCardData(cardId);
+  if (f.subtype && !(d.subtype_names ?? []).some(n => n.toLowerCase() === f.subtype!.toLowerCase())) return false;
+  if (f.faction && d.faction_code !== f.faction) return false;
+  return true;
+}
+
 // Ogni fonte ha il proprio totale serializzato: i delta preservano il danno preesistente.
 // Nessuna riconciliazione dichiara eventi o apre finestre Trappola.
 async function reconcilePassives(c: Context) {
@@ -110,6 +118,7 @@ async function reconcilePassives(c: Context) {
       const n = Number(e.amount);
       if (!Number.isInteger(n) || n < 0 || n > 20) throw new Error('Bonus Terraforma non valido');
       for (const recipient of units(s, land.cell.owner_index)) {
+        if (e.filter && !(await matchesFilter(recipient.cell.card_id, e.filter))) continue;
         const t = totals.get(recipient.cell.instance_id)!;
         if (e.stat === 'attack') t.landAttack += n; else t.landHp += n;
       }

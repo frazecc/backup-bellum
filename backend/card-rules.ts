@@ -19,6 +19,7 @@ const TARGETS = new Map<string, string[]>([
   ['buff', ['any_creature', 'all_creatures_self', 'enchanted_creature']],
 ]);
 const DURATIONS = ['permanent', 'turn', 'while_attached', 'while_in_play'];
+const FACTIONS = ['CHI', 'INF', 'PES', 'BUL', 'GRO', 'CLO'];
 
 const object = (value: unknown): Json | null =>
   value && typeof value === 'object' && !Array.isArray(value) ? value as Json : null;
@@ -49,6 +50,16 @@ function effectErrors(e: Json, type: string, trigger: unknown): string[] {
   if (type === 'terraforma' && t !== 'buff') out.push('Le Terraforme ammettono solo bonus.');
   const target = (e.target as string | undefined) ?? (t === 'draw' ? 'self' : t === 'discard' ? 'opponent' : null);
   if (target && !allowed.includes(target)) out.push(`${t}: il bersaglio "${target}" blocca la partita.`);
+  if (e.filter !== undefined) {
+    const f = object(e.filter);
+    if (type !== 'terraforma' || t !== 'buff') out.push('I filtri per sottotipo o fazione valgono solo per i bonus delle Terraforme.');
+    else if (!f || (f.subtype === undefined && f.faction === undefined) || Object.keys(f).some(k => k !== 'subtype' && k !== 'faction'))
+      out.push('Filtro non valido: indica un sottotipo e/o una fazione.');
+    else {
+      if (f.subtype !== undefined && (typeof f.subtype !== 'string' || !f.subtype.trim() || f.subtype.length > 60)) out.push('Filtro: sottotipo non valido.');
+      if (f.faction !== undefined && !FACTIONS.includes(String(f.faction))) out.push('Filtro: fazione non valida.');
+    }
+  }
   if (t === 'buff') {
     const d = String(e.duration);
     if (!DURATIONS.includes(d)) out.push('Bonus: durata non supportata.');

@@ -70,5 +70,17 @@ async function fetchCardData(id: string): Promise<CardData> {
   const { data, error } = await db.from('cards').select('id,name,faction_id,card_type,mana_cost,sacrifice_cost,attack,hp,subtype,rarity,effect_text,effect_json,effect_on_death_json,flavor_text,image_url,keywords,factions!left(code)').eq('id', id).single();
   if (error || !data) throw new Error(`Carta non trovata: ${error?.message ?? id}`);
   const f = Array.isArray(data.factions) ? data.factions[0] : data.factions;
-  return { ...data, faction_code: f && typeof f === 'object' && 'code' in f ? String(f.code) : 'IND' } as CardData;
+  return { ...data, faction_code: f && typeof f === 'object' && 'code' in f ? String(f.code) : 'IND', subtype_names: await subtypeNames(id) } as CardData;
+}
+// Lettura separata e tollerante: se fallisce la carta resta utilizzabile, solo senza filtri per sottotipo.
+async function subtypeNames(id: string): Promise<string[]> {
+  try {
+    const { data, error } = await db.from('card_subtype_links').select('card_subtypes(name)').eq('card_id', id);
+    if (error || !data) throw new Error(error?.message ?? 'nessun risultato');
+    return data.flatMap(row => {
+      const linked = (row as { card_subtypes?: unknown }).card_subtypes;
+      const list = Array.isArray(linked) ? linked : linked ? [linked] : [];
+      return list.map(x => String((x as { name?: unknown }).name ?? '').trim()).filter(Boolean);
+    });
+  } catch (error) { console.warn(`Sottotipi non letti per ${id}:`, error); return []; }
 }
