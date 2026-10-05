@@ -35,6 +35,8 @@ export type EffectDefinition = {
   stat?: 'hp' | 'attack';
   duration?: 'turn' | 'permanent' | 'while_attached' | 'while_in_play';
   reaction_trigger?: ReactionTrigger;
+  // Solo Terraforme: il bonus vale per le creature con questo sottotipo e/o questa fazione.
+  filter?: { subtype?: string; faction?: DeckFaction };
 };
 export type CardEffectJson =
   | EffectDefinition
@@ -56,6 +58,8 @@ export type CardData = {
   effect_on_death_json: CardEffectJson | null;
   flavor_text: string | null;
   image_url: string | null;
+  // Nomi dei sottotipi dalla tabella dei collegamenti (cards.subtype è un testo unico con spazi).
+  subtype_names?: string[];
 };
 
 export type CardInstance = { instance_id: string; card_id: string };
