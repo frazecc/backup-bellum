@@ -29,6 +29,20 @@ function effectList(raw: unknown): Json[] {
   return Array.isArray(o.effects) ? o.effects.map(x => object(x) ?? {}) : [o];
 }
 
+function filterErrors(e: Json, type: string, t: string): string[] {
+  const out: string[] = [];
+  if (e.filter === undefined) return out;
+  const f = object(e.filter);
+  if (type !== 'terraforma' || t !== 'buff') out.push('I filtri per sottotipo o fazione valgono solo per i bonus delle Terraforme.');
+  else if (!f || (f.subtype === undefined && f.faction === undefined) || Object.keys(f).some(k => k !== 'subtype' && k !== 'faction'))
+    out.push('Filtro non valido: indica un sottotipo e/o una fazione.');
+  else {
+    if (f.subtype !== undefined && (typeof f.subtype !== 'string' || !f.subtype.trim() || f.subtype.length > 60)) out.push('Filtro: sottotipo non valido.');
+    if (f.faction !== undefined && !FACTIONS.includes(String(f.faction))) out.push('Filtro: fazione non valida.');
+  }
+  return out;
+}
+
 function effectErrors(e: Json, type: string, trigger: unknown): string[] {
   const out: string[] = [];
   const t = e.type === 'damage_creature' ? 'damage' : e.type === 'nope' ? 'counter' : String(e.type);
@@ -44,22 +58,27 @@ function effectErrors(e: Json, type: string, trigger: unknown): string[] {
     if (type !== 'aura' || amount !== 0) out.push('Il movimento a costo 0 vale solo per le Aure.');
     return out;
   }
+  if (e.trigger !== undefined) {
+    // Terraforma che si attiva ogni volta che il proprietario evoca un Mostro: bonus al Mostro evocato.
+    if (type !== 'terraforma' || t !== 'buff' || e.trigger !== 'own_monster_summoned')
+      out.push('I trigger valgono solo per i bonus delle Terraforme: "ogni volta che evochi un tuo mostro".');
+    else {
+      if (e.target !== 'triggering_creature') out.push('Un effetto con trigger colpisce il Mostro evocato.');
+      if (e.stat !== 'hp' && e.stat !== 'attack') out.push('Bonus: scegli attacco o PV.');
+      if (!(e.duration === 'permanent' || (e.duration === 'turn' && e.stat === 'attack')))
+        out.push('Il bonus del trigger è permanente (a fine turno solo per l\'attacco).');
+      if (!Number.isInteger(amount)) out.push('Bonus: serve la quantità.');
+    }
+    out.push(...filterErrors(e, type, t));
+    return out;
+  }
   const allowed = TARGETS.get(t);
   if (!allowed) { out.push(`Effetto "${String(e.type)}" non supportato dal motore.`); return out; }
   if (type === 'aura' && t !== 'buff') out.push('Le Aure ammettono solo bonus o movimento a costo 0.');
   if (type === 'terraforma' && t !== 'buff') out.push('Le Terraforme ammettono solo bonus.');
   const target = (e.target as string | undefined) ?? (t === 'draw' ? 'self' : t === 'discard' ? 'opponent' : null);
   if (target && !allowed.includes(target)) out.push(`${t}: il bersaglio "${target}" blocca la partita.`);
-  if (e.filter !== undefined) {
-    const f = object(e.filter);
-    if (type !== 'terraforma' || t !== 'buff') out.push('I filtri per sottotipo o fazione valgono solo per i bonus delle Terraforme.');
-    else if (!f || (f.subtype === undefined && f.faction === undefined) || Object.keys(f).some(k => k !== 'subtype' && k !== 'faction'))
-      out.push('Filtro non valido: indica un sottotipo e/o una fazione.');
-    else {
-      if (f.subtype !== undefined && (typeof f.subtype !== 'string' || !f.subtype.trim() || f.subtype.length > 60)) out.push('Filtro: sottotipo non valido.');
-      if (f.faction !== undefined && !FACTIONS.includes(String(f.faction))) out.push('Filtro: fazione non valida.');
-    }
-  }
+  out.push(...filterErrors(e, type, t));
   if (t === 'buff') {
     const d = String(e.duration);
     if (!DURATIONS.includes(d)) out.push('Bonus: durata non supportata.');

@@ -16,7 +16,7 @@ export type EffectType =
 export type EffectTarget =
   | 'self' | 'opponent' | 'any_creature' | 'enchanted_creature'
   | 'all_creatures' | 'all_creatures_self' | 'all_creatures_opponent'
-  | 'spell' | 'event';
+  | 'spell' | 'event' | 'triggering_creature';
 
 export type ReactionTriggerEvent =
   | 'opponent_upkeep_start'
@@ -37,6 +37,8 @@ export type EffectDefinition = {
   reaction_trigger?: ReactionTrigger;
   // Solo Terraforme: il bonus vale per le creature con questo sottotipo e/o questa fazione.
   filter?: { subtype?: string; faction?: DeckFaction };
+  // Solo Terraforme: l'effetto si attiva ogni volta che il proprietario evoca un Mostro (bersaglio: quel Mostro).
+  trigger?: 'own_monster_summoned';
 };
 export type CardEffectJson =
   | EffectDefinition
@@ -174,7 +176,7 @@ export type ResolveEffectWork = {
   owner: PlayerIndex;
   card_id: string;
   source_instance_id: string | null;
-  source: 'on_play' | 'on_death' | 'trap' | 'aura_upkeep';
+  source: 'on_play' | 'on_death' | 'trap' | 'aura_upkeep' | 'terraforma_trigger';
   effect_index: number;
   target_instance_id: string | null;
   require_source_on_board: boolean;

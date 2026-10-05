@@ -226,7 +226,11 @@ async function applyEffect(c: Context, task: ResolveEffectWork) {
     if (selected) await destroyCell(c, selected.position, p);
     else throw new Error('Distruzione senza bersaglio valido');
   } else if (e.type === 'buff') {
-    const recipients = e.target === 'all_creatures' || e.target === 'all_creatures_self' ? units(s, p).map(x => x.cell) : selected ? [selected.cell] : [];
+    const summoned = e.target === 'triggering_creature' && task.target_instance_id ? findCreature(s, task.target_instance_id) : null;
+    if (e.target === 'triggering_creature' && !summoned) {
+      log(c, p, 'effect_no_target', `${d.name}: il Mostro evocato non è più in campo, bonus annullato.`, { card_id: d.id }); return;
+    }
+    const recipients = e.target === 'all_creatures' || e.target === 'all_creatures_self' ? units(s, p).map(x => x.cell) : summoned ? [summoned.cell] : selected ? [selected.cell] : [];
     if (e.duration === 'while_attached' || e.duration === 'while_in_play') throw new Error('Un bonus continuo non si risolve come evento');
     for (const cell of recipients) {
       if (e.stat === 'hp' && e.duration === 'permanent') { cell.max_hp += n; cell.hp += n; }
@@ -303,6 +307,24 @@ function failSummon(c: Context, message: string) {
   c.s.mostrissimo_result = { outcome: 'failed', message };
   log(c, -1, 'mostrissimo_failed', message);
 }
+// Terraforme in campo con trigger "quando evochi un tuo Mostro": un compito per ogni effetto che
+// corrisponde (filtro compreso). Va chiamata PRIMA di queueOnPlay: prepend() inserisce in testa,
+// quindi gli effetti all'ingresso del Mostro si risolvono per primi e i trigger subito dopo.
+async function queueTerraformaTriggers(c: Context, p: PlayerIndex, summoned: CardInstance) {
+  const s = c.s, work: PendingWork[] = [];
+  for (const land of cells(s).filter(x => x.cell.kind === 'terraforma' && x.cell.owner_index === p)) {
+    const d = await getCardData(land.cell.card_id);
+    for (const [effect_index, e] of effects(d.effect_json).entries()) {
+      if (e.trigger !== 'own_monster_summoned') continue;
+      if (e.filter && !(await matchesFilter(summoned.card_id, e.filter))) continue;
+      work.push({
+        kind: 'resolve_effect', owner: p, card_id: land.cell.card_id, source_instance_id: land.cell.instance_id,
+        source: 'terraforma_trigger', effect_index, target_instance_id: summoned.instance_id, require_source_on_board: true,
+      });
+    }
+  }
+  prepend(s, ...work);
+}
 function queueOnPlay(s: GameState, p: PlayerIndex, d: CardData, sourceId: string, targetId: string | null, creature: boolean) {
   const list = effects(d.effect_json);
   const work: PendingWork[] = list.map((fx, effect_index) => creature ? {
@@ -361,6 +383,7 @@ async function applyEvent(c: Context, e: PendingEvent) {
     }
     s.players[p].color_counters[d.faction_code] = (s.players[p].color_counters[d.faction_code] ?? 0) + 1;
     log(c, p, 'play_card', `${label(p)} gioca ${d.name}.`, { card_id: d.id, instance_id: paid.instance_id, position: e.options.position ?? null });
+    if (d.card_type === 'monster') await queueTerraformaTriggers(c, p, { instance_id: paid.instance_id, card_id: d.id });
     if (d.card_type === 'monster' || d.card_type === 'maledizione') queueOnPlay(s, p, d, paid.instance_id, e.options.targetInstanceId ?? null, d.card_type === 'monster');
   } else if (e.kind === 'move') {
     const unit = at(s, e.from);

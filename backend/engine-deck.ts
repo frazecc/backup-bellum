@@ -15,7 +15,13 @@ export function passiveAura(d: CardData) {
 }
 export function passiveLand(d: CardData) {
   const list = effects(d.effect_json);
-  return list.length > 0 && list.every(e => e.type === 'buff' && e.duration === 'while_in_play' && e.target === 'all_creatures_self' && (e.stat === 'hp' || e.stat === 'attack') && Number.isInteger(e.amount) && Number(e.amount) >= 0 && Number(e.amount) <= 20);
+  // Due forme ammesse: bonus continuo a tutte le tue creature, oppure bonus al Mostro evocato ogni volta che ne evochi uno.
+  return list.length > 0 && list.every(e => e.type === 'buff' && (e.stat === 'hp' || e.stat === 'attack')
+    && Number.isInteger(e.amount) && Number(e.amount) >= 0 && Number(e.amount) <= 20
+    && (e.trigger === undefined
+      ? e.duration === 'while_in_play' && e.target === 'all_creatures_self'
+      : e.trigger === 'own_monster_summoned' && e.target === 'triggering_creature'
+        && (e.duration === 'permanent' || (e.duration === 'turn' && e.stat === 'attack'))));
 }
 export function playableEffects(d: CardData) {
   const list = effects(d.effect_json);
