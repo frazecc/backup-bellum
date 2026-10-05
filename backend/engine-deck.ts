@@ -5,6 +5,7 @@ import type {
 } from './types.js';
 import { effects, shuffle, supported } from './engine-board.js';
 import { db } from './engine-storage.js';
+import { engineErrors } from './card-rules.js';
 
 export function passiveAura(d: CardData) {
   const list = effects(d.effect_json);
@@ -48,11 +49,13 @@ function effectsPlayable(x: DeckCard): boolean {
   return list.every(e => supported.has(e.type) && e.duration !== 'while_attached' && e.duration !== 'while_in_play');
 }
 export async function deckPool(): Promise<DeckCard[]> {
-  const { data, error } = await db.from('cards').select('id,card_type,mana_cost,effect_json,effect_on_death_json,factions!inner(code)')
+  const { data, error } = await db.from('cards').select('id,card_type,mana_cost,attack,hp,sacrifice_cost,effect_json,effect_on_death_json,factions!inner(code)')
     .in('card_type', ['monster', 'instant', 'aura', 'terraforma', 'maledizione']);
   if (error || !data) throw new Error(`Catalogo non disponibile: ${error?.message ?? 'nessun risultato'}`);
-  const pool: DeckCard[] = [];
+  const pool: DeckCard[] = [], skipped: string[] = [];
   for (const row of data) {
+    const problems = engineErrors(row);
+    if (problems.length) { skipped.push(`${row.id}: ${problems[0]}`); continue; }
     const linked = Array.isArray(row.factions) ? row.factions[0] : row.factions;
     const code = linked && typeof linked === 'object' && 'code' in linked ? String(linked.code).toUpperCase() : '';
     if (!deckFactions.includes(code as DeckFaction)) continue;
@@ -61,6 +64,7 @@ export async function deckPool(): Promise<DeckCard[]> {
       death: row.effect_on_death_json as CardEffectJson | null };
     if (Number.isInteger(x.cost) && x.cost >= 0 && deckPlayable(x)) pool.push(x);
   }
+  if (skipped.length) console.warn(`Carte escluse dai mazzi (${skipped.length}):\n${skipped.join('\n')}`);
   return pool;
 }
 export function deck(pool: DeckCard[], colors: DeckColors): CardInstance[] {
@@ -104,9 +108,12 @@ export function deck(pool: DeckCard[], colors: DeckColors): CardInstance[] {
   return shuffle(best.map(x => ({ instance_id: randomUUID(), card_id: x.id })));
 }
 export async function offer() {
-  const { data, error } = await db.from('cards').select('id').eq('card_type', 'mostrissimo');
+  const { data, error } = await db.from('cards').select('id,card_type,mana_cost,attack,hp,sacrifice_cost,effect_json,effect_on_death_json').eq('card_type', 'mostrissimo');
   if (error || !data) throw new Error(`Catalogo Mostrissimi non disponibile: ${error?.message ?? 'nessun risultato'}`);
-  const ids = shuffle(data.map(x => String(x.id)));
+  // Se troppi Mostrissimi risultassero non validi si usa l'elenco completo: meglio una partita che non parte mai.
+  const valid = data.filter(x => engineErrors(x).length === 0);
+  if (valid.length < data.length) console.warn(`Mostrissimi non validi: ${data.filter(x => !valid.includes(x)).map(x => x.id).join(', ')}`);
+  const ids = shuffle((valid.length >= 3 ? valid : data).map(x => String(x.id)));
   if (!ids.length) throw new Error('Il catalogo non contiene Mostrissimi');
   return { shared: ids.slice(0, 3).map(card_id => ({ card_id, instance_id: randomUUID() })), remaining: ids.slice(3) };
 }

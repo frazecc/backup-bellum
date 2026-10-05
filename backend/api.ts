@@ -7,6 +7,7 @@ import {
   startMostrissimoSummon, payMostrissimoSacrifice, completeMostrissimoSummon,
 } from './engine.js';
 import { advancePublicCheckpoint } from './engine-core.js';
+import { engineErrors } from './card-rules.js';
 import type {
   AttackTarget, CardInstance, DeathOrderChoice, DeckFaction, GameState, PlayerIndex, PlayCardOptions,
   Position, TargetChoice, TrapChoice,
@@ -248,6 +249,11 @@ apiRouter.get('/match/:id/logs', async (req: Request, res: Response) => {
     });
     res.json({ logs: ordered });
   } catch (error) { respondError(res, error); }
+});
+// Controllo di validità usato dall'editor prima di salvare: stesse regole dei mazzi.
+apiRouter.post('/cards/validate', async (req: Request, res: Response) => {
+  try { await requireAuth(req); res.json({ errors: engineErrors(objectValue(req.body).card) }); }
+  catch (error) { respondError(res, error); }
 });
 apiRouter.get('/cards/:id', async (req: Request, res: Response) => {
   try { await requireAuth(req);
