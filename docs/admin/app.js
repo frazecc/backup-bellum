@@ -21,7 +21,7 @@ const BR = localStorage.getItem('bpa_br') || 'main';
 function compile(s) {
   const fill = (t, n) => String(t).replace(/\{carte\}/g, n == 1 ? 'carta' : 'carte').replace(/\{n\}/g, n);
   return {
-    l: s.label, for: s.for, a: !!s.amount, t: s.targets?.length ? s.targets : null, d: s.durations?.length ? s.durations : null, spec: s,
+    l: s.label, for: s.for, when: s.when, a: !!s.amount, t: s.targets?.length ? s.targets : null, d: s.durations?.length ? s.durations : null, spec: s,
     json: (n, t, d) => Object.fromEntries(Object.entries(s.json).map(([k, v]) => [k, v === '{n}' ? n : v === '{t}' ? t : v === '{d}' ? d : v])),
     txt: (n, t, d) => { const x = fill(typeof s.text === 'string' ? s.text : s.text?.[t] ?? s.text?.default ?? '', n); return d === 'turn' && s.textTurn ? x + s.textTurn : x; }
   };
@@ -40,7 +40,7 @@ function build(e, ty) {
 function parseEff(j, ty) {
   if (!j || typeof j !== 'object') return null;
   const t = j.type === 'damage_creature' ? 'damage' : j.type === 'nope' ? 'counter' : j.type;
-  const key = Object.keys(EF).find((k) => { const s = EF[k].spec; return s.for.includes(ty) && s.json.type === t && (!s.json.stat || s.json.stat === j.stat); });
+  const key = Object.keys(EF).find((k) => { const s = EF[k].spec; return s.for.includes(ty) && s.json.type === t && (!s.json.stat || s.json.stat === j.stat) && (s.json.trigger ?? null) === (j.trigger ?? null); });
   if (!key) return { raw: j };
   const fk = j.filter ? Object.keys(j.filter) : [];
   if (j.filter && (ty !== 'terraforma' || fk.length !== 1 || !['subtype', 'faction'].includes(fk[0]))) return { raw: j };
@@ -53,7 +53,7 @@ const TG = {
   heal: ['self', 'opponent', ...CT.map((x) => x[0])], damage: CT.map((x) => x[0]),
   return_hand: ['any_creature'], destroy: ['any_creature'],
   // all_creatures escluso: il motore applica i bonus solo alle creature di chi gioca la carta.
-  buff: ['any_creature', 'all_creatures_self', 'enchanted_creature']
+  buff: ['any_creature', 'all_creatures_self', 'enchanted_creature', 'triggering_creature']
 };
 
 function specErr(s, id) {
@@ -112,6 +112,8 @@ function effErr(e, ty, trg) {
   if (ty === 'terraforma' && t !== 'buff') E.push('Le Terraforme ammettono solo bonus.');
   const tg = e.target ?? (t === 'draw' ? 'self' : t === 'discard' ? 'opponent' : null);
   if (tg && !TG[t].includes(tg)) E.push(`${t}: il bersaglio "${tg}" blocca la partita.`);
+  if (e.trigger !== undefined && (ty !== 'terraforma' || t !== 'buff' || e.trigger !== 'own_monster_summoned')) E.push('I trigger valgono solo per i bonus delle Terraforme: "ogni volta che evochi un tuo mostro".');
+  if (tg === 'triggering_creature' && (ty !== 'terraforma' || e.trigger !== 'own_monster_summoned')) E.push('Il bersaglio "mostro evocato" richiede una Terraforma con trigger.');
   if (t === 'buff') {
     if (!['permanent', 'turn', 'while_attached', 'while_in_play'].includes(e.duration)) E.push('Bonus: durata non supportata.');
     if (e.stat === 'hp' && e.duration === 'turn') E.push('Bonus PV a fine turno non supportato.');
@@ -251,8 +253,8 @@ function rows(list, name, ty) {
   return list.map((e, i) => {
     const head = `<div class="row" data-l="${name}" data-i="${i}">`;
     if (e.raw) return `${head}<small>⚠️ Effetto non riconosciuto (viene conservato): ${esc(JSON.stringify(e.raw))}</small><button type="button" data-x class="sec">Rimuovi</button></div>`;
-    const c = EF[e.key], when = CREA.includes(ty) ? sel('trg', TRIG, name === 'death' ? 'death' : 'etb') : `<small><b>${esc(FIXED[ty] || 'Una volta')}</b></small>`;
-    return `${head}${when}${sel('key', keysFor(name === 'death' ? 'monster' : ty).map((k) => [k, EF[k].l]), e.key)}${c.a ? `<input data-f="n" type="number" min="0" max="20" value="${e.n}" title="Quantità">` : ''}${c.t ? sel('t', c.t, e.t) : ''}${c.d ? sel('d', c.d, e.d) : ''}${ty === 'terraforma' ? sel('fk', [['all', 'Tutte le tue creature'], ['subtype', 'Solo un sottotipo'], ['faction', 'Solo una fazione']], e.flt?.k ?? 'all') + (e.flt ? sel('fv', fltValues(e.flt.k), e.flt.v) : '') : ''}<button type="button" data-x class="sec">✕</button></div>`;
+    const c = EF[e.key], when = CREA.includes(ty) ? sel('trg', TRIG, name === 'death' ? 'death' : 'etb') : `<small><b>${esc(c.when || FIXED[ty] || 'Una volta')}</b></small>`;
+    return `${head}${when}${sel('key', keysFor(name === 'death' ? 'monster' : ty).map((k) => [k, EF[k].l]), e.key)}${c.a ? `<input data-f="n" type="number" min="0" max="20" value="${e.n}" title="Quantità">` : ''}${c.t ? sel('t', c.t, e.t) : ''}${c.d ? sel('d', c.d, e.d) : ''}${ty === 'terraforma' ? sel('fk', [['all', c.when ? 'Qualsiasi mostro evocato' : 'Tutte le tue creature'], ['subtype', 'Solo un sottotipo'], ['faction', 'Solo una fazione']], e.flt?.k ?? 'all') + (e.flt ? sel('fv', fltValues(e.flt.k), e.flt.v) : '') : ''}<button type="button" data-x class="sec">✕</button></div>`;
   }).join('');
 }
 
@@ -313,7 +315,8 @@ function fltValues(k) {
 function draft() {
   const ty = $('type').value, tx = (L) => L.filter((e) => !e.raw).map((e) => {
     const t = EF[e.key].txt(e.n, e.t, e.d) || '';
-    return e.flt?.v ? t.replace('Le tue creature', `Le tue creature ${fltText(e.flt)}`) : t;
+    const from = EF[e.key].when ? 'un tuo mostro' : 'Le tue creature';
+    return e.flt?.v ? t.replace(from, `${from} ${fltText(e.flt)}`) : t;
   }).join('. ');
   const p = [];
   if (CREA.includes(ty) && $('kw').checked) p.push('**Iperattivo**');
