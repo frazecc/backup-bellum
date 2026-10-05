@@ -27,7 +27,18 @@ export async function commit(id: string, s: GameState, logs: MatchLogEntry[]): P
     p_match_id: id, p_expected_revision: s.state_revision, p_next_state: s, p_log_entries: orderedLogs,
   });
   if (error) throw new Error(`Salvataggio partita: ${error.message}`);
+  if (s.status === 'finished') await recordDuration(id);
   return data as GameState;
+}
+// P4: la funzione SQL commit_match_state non scrive la durata. Si registra una sola volta,
+// alla chiusura della partita (dalla creazione alla fine). Un errore qui non blocca la mossa.
+async function recordDuration(id: string): Promise<void> {
+  try {
+    const { data } = await db.from('matches').select('created_at,duration_seconds').eq('id', id).single();
+    if (!data || Number(data.duration_seconds) > 0) return;
+    const seconds = Math.max(1, Math.round((Date.now() - new Date(String(data.created_at)).getTime()) / 1000));
+    await db.from('matches').update({ duration_seconds: seconds }).eq('id', id).eq('duration_seconds', 0);
+  } catch (error) { console.warn('Durata partita non registrata:', error); }
 }
 
 export async function saveGameState(id: string, s: GameState): Promise<GameState> { return commit(id, s, []); }
@@ -35,7 +46,27 @@ export async function logMatchAction(id: string, entry: MatchLogEntry): Promise<
   const { error } = await db.from('match_logs').insert({ match_id: id, log_data: entry });
   if (error) throw new Error(`Log partita: ${error.message}`);
 }
+// Cache del catalogo (P1): il motore chiede la stessa carta decine di volte per azione.
+// Le carte cambiano solo dall'editor, quindi una scadenza breve basta: una modifica compare
+// entro CARD_CACHE_TTL_MS (default 60 s). Le richieste simultanee per la stessa carta
+// condividono un'unica query; gli errori non vengono memorizzati.
+const CARD_CACHE_TTL_MS = Number(process.env.CARD_CACHE_TTL_MS ?? 60_000);
+const cardCache = new Map<string, { data: CardData; expires: number }>();
+const cardLoading = new Map<string, Promise<CardData>>();
 export async function getCardData(id: string): Promise<CardData> {
+  const hit = cardCache.get(id);
+  // Copia profonda: nessun chiamante può alterare la carta in cache.
+  if (hit && hit.expires > Date.now()) return structuredClone(hit.data);
+  let loading = cardLoading.get(id);
+  if (!loading) {
+    loading = fetchCardData(id)
+      .then(data => { cardCache.set(id, { data, expires: Date.now() + CARD_CACHE_TTL_MS }); return data; })
+      .finally(() => cardLoading.delete(id));
+    cardLoading.set(id, loading);
+  }
+  return structuredClone(await loading);
+}
+async function fetchCardData(id: string): Promise<CardData> {
   const { data, error } = await db.from('cards').select('id,name,faction_id,card_type,mana_cost,sacrifice_cost,attack,hp,subtype,rarity,effect_text,effect_json,effect_on_death_json,flavor_text,image_url,keywords,factions!left(code)').eq('id', id).single();
   if (error || !data) throw new Error(`Carta non trovata: ${error?.message ?? id}`);
   const f = Array.isArray(data.factions) ? data.factions[0] : data.factions;

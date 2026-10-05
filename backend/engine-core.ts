@@ -771,11 +771,13 @@ async function advanceAi(c: Context) {
   progress.stage = 'end'; prepend(s, { kind: 'advance_ai' });
 }
 
+// Id delle fazioni nella tabella factions, per le statistiche in matches (P4).
+const FACTION_IDS: Record<DeckFaction, number> = { CHI: 1, INF: 2, PES: 3, BUL: 4, GRO: 5, CLO: 6 };
 export async function createNewMatch(userId: string, primary: DeckFaction, secondary: DeckFaction): Promise<{ matchId: string; state: GameState }> {
   const humanColors = chosenColors(primary, secondary), aiColors = randomColors();
   const [pool, catalogue] = await Promise.all([deckPool(), offer()]);
   const humanCards = deck(pool, humanColors), aiCards = deck(pool, aiColors);
-  const { data, error } = await db.from('matches').insert({ player_id: userId, opponent_type: 'ai', opponent_name: 'IA Bellum Penumbrum', player_won: null, turns_count: 0, duration_seconds: 0 }).select('id').single();
+  const { data, error } = await db.from('matches').insert({ player_id: userId, opponent_type: 'ai', opponent_name: 'IA Bellum Penumbrum', player_won: null, turns_count: 0, duration_seconds: 0, player_faction_id: FACTION_IDS[primary], opponent_faction_id: FACTION_IDS[aiColors.primary] }).select('id').single();
   if (error || !data) throw new Error(`Creazione partita: ${error?.message ?? 'nessun ID'}`);
   const matchId = String(data.id), ai = player(0, null, aiCards), human = player(1, userId, humanCards);
   for (let i = 0; i < 4; i++) ai.hand.push(ai.deck.shift()!);
