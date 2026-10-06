@@ -30,7 +30,13 @@ const steps = p => around(p).filter(q => q.row !== 0 && !at(q));
 const escape = x => String(x ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
 const creature = d => ['monster','mostrissimo'].includes(d.card_type);
 const effects = d => Array.isArray(d?.effect_json?.effects) ? d.effect_json.effects : d?.effect_json?.type ? [d.effect_json] : [];
-const targetEffect = d => effects(d).find(e => e?.target === 'any_creature' || e?.type === 'return_hand');
+const targetEffect = d => effects(d).find(e => !e?.trigger && (e?.target === 'any_creature' || e?.target === 'any_target' || e?.type === 'return_hand'));
+// Danno a scelta: il giocatore avversario (IA, indice 0) si sceglie toccando i suoi PV. Id fittizio player:0.
+const AI_TARGET = 'player:0';
+const playerTargetEffect = d => ['aura','terraforma'].includes(d?.card_type) ? undefined : effects(d).find(e => !e?.trigger && e?.target === 'any_target' && ['damage','damage_creature'].includes(e.type));
+const hasTargets = d => !!playerTargetEffect(d) || targets(d).length > 0;
+// Si attaccano creature nemiche e Terraforme nemiche con PV; solo le creature bloccano l'attacco diretto.
+const attackable = p => around(p).filter(q => { const c = at(q); return c?.owner_index === 0 && (isCreatureCell(c) || (c.kind === 'terraforma' && c.hp !== undefined)); });
 const factions = ['','CHI','INF','PES','BUL','GRO','CLO','IND'];
 const deckFactionNames = {CHI:'Chiericanza',INF:'Infamia',PES:'Pestilenza',BUL:'Bullismo',GRO:'Grossanza',CLO:'Clownerie'};
 const types = {monster:'MOSTRO',mostrissimo:'MOSTRISSIMO',maledizione:'MALEDIZIONE',instant:'TRAPPOLA',terraforma:'TERRAFORMA',aura:'AURA'};
@@ -50,7 +56,7 @@ function cellHTML(d, c) {
   const isCreature = isCreatureCell(c), atk = c.attack ?? d.attack ?? 0, hp = c.hp ?? d.hp ?? 0;
   const hurt = isCreature && Number(c.max_hp) > 0 && Number(hp) < Number(c.max_hp) ? ' hurt' : '';
   const buff = isCreature && Number(atk) > Number(d.attack ?? 0) ? ' buff' : '';
-  return `<article class="cell-card faction-${faction(d)}${c.kind === 'terraforma' ? ' is-terra' : ''}"><div class="cc-art">${artHTML(d)}</div><div class="cc-bar"><span class="cc-name">${escape(d.name)}</span><div class="cc-row"><span class="cc-cost">${costText(d)}</span>${hasText(d) ? TEXT_ICON.replace('CLS','cc-ico') : ''}</div></div>${isCreature ? `<div class="cc-stats"><span class="cc-atk${buff}">⚔ ${atk}</span><span class="cc-hp${hurt}">❤ ${hp}</span></div>` : ''}</article>`;
+  return `<article class="cell-card faction-${faction(d)}${c.kind === 'terraforma' ? ' is-terra' : ''}"><div class="cc-art">${artHTML(d)}</div><div class="cc-bar"><span class="cc-name">${escape(d.name)}</span><div class="cc-row"><span class="cc-cost">${costText(d)}</span>${hasText(d) ? TEXT_ICON.replace('CLS','cc-ico') : ''}</div></div>${isCreature ? `<div class="cc-stats"><span class="cc-atk${buff}">⚔ ${atk}</span><span class="cc-hp${hurt}">❤ ${hp}</span></div>` : c.kind === 'terraforma' && c.hp !== undefined ? `<div class="cc-stats"><span class="cc-hp${Number(c.hp) < Number(c.max_hp) ? ' hurt' : ''}">❤ ${c.hp}</span></div>` : ''}</article>`;
 }
 function handCardHTML(d) {
   const isCreature = creature(d), text = hasText(d);
@@ -124,6 +130,7 @@ function targetAllowed(d,c,event=null) {
   const e = targetEffect(d);
   if (!e) return false;
   if (event?.kind === 'monster_etb' && c.instance_id !== event.source_instance_id) return false;
+  if (e.target === 'any_target') return true;
   if (['damage','damage_creature'].includes(e.type) && e.timing !== 'instant') return c.owner_index === 0;
   if (e.type === 'heal' && e.timing !== 'instant') return c.owner_index === 1;
   return true;
@@ -274,8 +281,8 @@ async function renderDeathChoice() {
     deathDraft = {choiceId:null,instanceIds:[]};
     const d = await card(selected.task.card_id);
     if (deathTarget()?.choice_id !== selected.choice_id) return;
-    title.textContent = 'Bersaglio dell’effetto alla morte';
-    text.textContent = `${d.name}: scegli una creatura bersaglio. La scelta è obbligatoria e si risolve prima dell’effetto successivo.`;
+    title.textContent = 'Bersaglio dell’effetto';
+    text.textContent = `${d.name}: scegli il bersaglio. La scelta è obbligatoria e si risolve prima dell’effetto successivo.`;
     for (const instanceId of selected.eligible_instance_ids ?? []) {
       let found = null;
       for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
@@ -290,6 +297,12 @@ async function renderDeathChoice() {
         return request('death/target',{choiceId:selected.choice_id,targetInstanceId:instanceId},'Effetto alla morte risolto.');
       });
       options.append(b);
+    }
+    if ((selected.eligible_instance_ids ?? []).includes(AI_TARGET)) {
+      options.append(button(`IA · giocatore avversario · PV ${them()?.life ?? '?'}`,() => {
+        if (busy || deathTarget()?.choice_id !== selected.choice_id) return;
+        return request('death/target',{choiceId:selected.choice_id,targetInstanceId:AI_TARGET},'Effetto risolto.');
+      }));
     }
     if (!options.childElementCount) text.textContent = 'Nessun bersaglio visibile: aggiorna la partita per recuperare lo stato.';
   }
@@ -417,7 +430,7 @@ async function beginTrap(inst,d) {
   if (targetEffect(d)) {
     flow = {kind:'trap-target',windowId:r.window_id,instanceId:inst.instance_id,id:d.id};
     reactionDialog().classList.add('hidden');
-    await render(); notice(r.event?.kind === 'monster_etb' ? 'Scegli la creatura che ha generato l’ETB.' : `Scegli la creatura bersaglio di ${d.name}.`, 'success'); return;
+    await render(); notice(r.event?.kind === 'monster_etb' ? 'Scegli la creatura che ha generato l’ETB.' : `Scegli il bersaglio di ${d.name}${playerTargetEffect(d) ? ' (tocca i PV dell’IA per colpire il giocatore)' : ''}.`, 'success'); return;
   }
   await chooseTrap({windowId:r.window_id,action:'play',cardInstanceId:inst.instance_id});
 }
@@ -462,6 +475,8 @@ function wireGraveyards() {
     box.style.cursor = 'pointer'; box.addEventListener('click',() => openGraveyard(owner).catch(fail));
     box.addEventListener('keydown',e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openGraveyard(owner).catch(fail); } });
   }
+  const life = $('opponent-life')?.closest('.hud-value');
+  if (life && !life.dataset.playerTargetReady) { life.dataset.playerTargetReady = 'true'; life.addEventListener('click',() => playerClick().catch(fail)); }
 }
 async function inspect(kind,id,extra={}) {
   if (busy || obligatory() || (reaction() && kind !== 'grave')) return;
@@ -483,6 +498,7 @@ async function inspect(kind,id,extra={}) {
       if (direct) return request('attack',{attackerPosition:current.position,target:{type:'player',playerIndex:0}},'Attacco dichiarato.');
       flow = {kind:'attack',from:current.position}; close(); render().catch(fail); notice('Tocca il nemico evidenziato.','success');
     });
+    if (direct && attackable(current.position).length) add('Attacca Terraforma · 0 mana',() => { flow = {kind:'attack',from:current.position}; close(); render().catch(fail); notice('Tocca la Terraforma nemica evidenziata.','success'); });
     const cost = await moveCost(current.cell);
     if (current !== view) return;
     add(`Muovi · ${cost} mana`,() => { flow = {kind:'move',from:current.position}; close(); render().catch(fail); notice('Tocca una cella libera adiacente.','success'); },Number(me()?.current_mana ?? 0) < cost || !steps(current.position).length);
@@ -508,7 +524,7 @@ function playable(d) {
   if (!active() || d.card_type === 'mostrissimo' || d.card_type === 'instant' || Number(d.mana_cost) > me().current_mana) return false;
   if ((d.card_type === 'monster' || d.card_type === 'terraforma') && !board()[2].some(c => !c)) return false;
   if (d.card_type === 'aura' && !targets(d).length) return false;
-  if (!creature(d) && d.card_type !== 'aura' && targetEffect(d) && !targets(d).length) return false;
+  if (!creature(d) && d.card_type !== 'aura' && targetEffect(d) && !hasTargets(d)) return false;
   return true;
 }
 async function drawBoard() {
@@ -527,11 +543,11 @@ async function drawBoard() {
       if (c?.kind === 'terraforma') b.classList.add('terraforma-cell');
       if (isCreatureCell(c) && c.tired) b.classList.add('tired');
       if (flow?.kind === 'move' && steps(flow.from).some(x => eq(x,pos))) b.classList.add('valid-move');
-      if (flow?.kind === 'attack' && foes(flow.from).some(x => eq(x,pos))) b.classList.add('valid-target');
+      if (flow?.kind === 'attack' && attackable(flow.from).some(x => eq(x,pos))) b.classList.add('valid-target');
       if (flow?.kind === 'hand' && flow.step === 'cell' && row === 2 && !c) b.classList.add('valid-summon');
       if (['hand','mostrissimo-target','trap-target'].includes(flow?.kind) && (flow?.step === 'target' || flow?.kind !== 'hand') && d && targetAllowed(d,c,flow?.kind === 'trap-target' ? reaction()?.event : null)) b.classList.add('valid-target');
       if (legal.some(x => eq(x,pos))) b.classList.add('valid-summon');
-      b.setAttribute('aria-label',c ? `${definition?.name ?? 'Permanente'} ${c.owner_index === 1 ? 'Tu' : 'IA'}${isCreatureCell(c) ? ` ATK ${c.attack} HP ${c.hp}` : ', Terraforma non attaccabile'}${isCreatureCell(c) && c.auras?.length ? `, ${c.auras.length} Aura` : ''}` : `Cella [${row},${col}]`);
+      b.setAttribute('aria-label',c ? `${definition?.name ?? 'Permanente'} ${c.owner_index === 1 ? 'Tu' : 'IA'}${isCreatureCell(c) ? ` ATK ${c.attack} HP ${c.hp}` : `, Terraforma${c.hp !== undefined ? `, PV ${c.hp}` : ' non attaccabile'}`}${isCreatureCell(c) && c.auras?.length ? `, ${c.auras.length} Aura` : ''}` : `Cella [${row},${col}]`);
       b.innerHTML = c && definition ? cellHTML(definition,c) + (isCreatureCell(c) && c.auras?.length ? `<span class="cell-aura-count" title="Aure assegnate">✧ ${c.auras.length}</span>` : '') + `<span class="cell-coordinate">[${row},${col}]</span>` : '';
       b.disabled = busy || obligatory();
       b.onclick = () => boardClick(pos).catch(fail); line.append(b);
@@ -618,7 +634,7 @@ async function render() {
   set('opponent-life',them()?.life ?? 20); set('opponent-current-mana',them()?.current_mana ?? 0); set('opponent-max-mana',them()?.max_mana ?? 0);
   set('opponent-hand-count',them()?.hand?.length ?? 0); set('opponent-deck-count',them()?.deck?.length ?? 0); set('opponent-graveyard-count',them()?.graveyard?.length ?? 0);
   showDeckColors(); drawOpponentHand();
-  await drawBoard(); await drawHand(); await drawMostrissimi(); controls(); await renderReaction(); await renderDeathChoice();
+  await drawBoard(); await drawHand(); await drawMostrissimi(); controls(); await renderReaction(); await renderDeathChoice(); await markPlayerTarget();
 }
 async function logs() {
   if (!$('match-logs') || !matchId) return;
@@ -645,6 +661,31 @@ async function request(path,body,message) {
     fail(e);
     try { state = (await api(`/match/${encodeURIComponent(matchId)}`)).state; flow = null; } catch(refreshError) { console.warn(refreshError); }
   } finally { busy = false; await render().catch(fail); queuePresentation(); }
+}
+// Il giocatore avversario come bersaglio (danni a scelta): si tocca il riquadro dei suoi PV.
+async function playerTargetable() {
+  if (!state || busy || obligatory()) return false;
+  const r = reaction();
+  if (r && flow?.kind === 'trap-target') return !!playerTargetEffect(await card(flow.id)) && r.event?.kind !== 'monster_etb';
+  if (flow?.kind === 'mostrissimo-target') { const p = pending(); return !!p && !!playerTargetEffect(await card(p.card_id)); }
+  if (flow?.kind === 'hand' && flow.step === 'target') return !!playerTargetEffect(await card(flow.id));
+  return false;
+}
+async function markPlayerTarget() {
+  const box = $('opponent-life')?.closest('.hud-value'); if (!box) return;
+  const on = await playerTargetable();
+  box.classList.toggle('valid-target',on);
+  box.style.cursor = on ? 'pointer' : ''; box.style.outline = on ? '2px solid #e8c46a' : ''; box.style.pointerEvents = on ? 'auto' : '';
+}
+async function playerClick() {
+  if (!(await playerTargetable())) return;
+  const r = reaction();
+  if (r && flow?.kind === 'trap-target') return chooseTrap({windowId:r.window_id,action:'play',cardInstanceId:flow.instanceId,targetInstanceId:AI_TARGET});
+  if (flow?.kind === 'mostrissimo-target') return request('mostrissimo/complete',{position:flow.position,targetInstanceId:AI_TARGET},'Mostrissimo dichiarato.');
+  if (flow?.kind === 'hand') {
+    const d = await card(flow.id);
+    return request('play-card',{cardInstanceId:flow.instanceId,options:{...(flow.position ? {position:flow.position} : {}),targetInstanceId:AI_TARGET}},creature(d) ? 'Creatura dichiarata.' : 'Carta dichiarata.');
+  }
 }
 async function boardClick(pos) {
   if (busy || obligatory()) return;
@@ -674,7 +715,7 @@ async function boardClick(pos) {
     }
     if (c || !summonCells(p).some(x => eq(x,pos))) return notice('Cella non valida.','error');
     const d = await card(p.card_id);
-    if (targetEffect(d) && targets(d).length) {
+    if (targetEffect(d) && hasTargets(d)) {
       flow = {kind:'mostrissimo-target',position:pos,id:d.id}; await render(); notice('Cella scelta. Tocca il bersaglio ETB evidenziato.','success'); return;
     }
     return request('mostrissimo/complete',{position:pos},'Mostrissimo dichiarato.');
@@ -684,7 +725,7 @@ async function boardClick(pos) {
     if (flow.step === 'cell') {
       if (c || pos.row !== 2) return notice('Scegli una cella libera della tua riga.','error');
       flow.position = pos;
-      if (d.card_type === 'monster' && targetEffect(d) && targets(d).length) { flow.step = 'target'; await render(); notice('Cella scelta. Tocca il bersaglio ETB.','success'); return; }
+      if (d.card_type === 'monster' && targetEffect(d) && hasTargets(d)) { flow.step = 'target'; await render(); notice('Cella scelta. Tocca il bersaglio ETB.','success'); return; }
       return request('play-card',{cardInstanceId:flow.instanceId,options:{position:pos}},'Carta dichiarata.');
     }
     if (flow.step === 'target') {
@@ -697,7 +738,7 @@ async function boardClick(pos) {
     return request('move',{from:flow.from,to:pos},'Movimento dichiarato.');
   }
   if (flow?.kind === 'attack') {
-    if (!foes(flow.from).some(x => eq(x,pos))) return notice('Scegli una creatura IA adiacente.','error');
+    if (!attackable(flow.from).some(x => eq(x,pos))) return notice('Scegli un nemico adiacente evidenziato.','error');
     return request('attack',{attackerPosition:flow.from,target:{type:'creature',position:pos}},'Attacco dichiarato.');
   }
   if (c) return inspect('unit',c.card_id,{position:pos,cell:c});
