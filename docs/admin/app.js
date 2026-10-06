@@ -50,10 +50,10 @@ function parseEff(j, ty) {
 /* ---------- Validazione ---------- */
 const TG = {
   draw: ['self', 'opponent'], discard: ['self', 'opponent'],
-  heal: ['self', 'opponent', ...CT.map((x) => x[0])], damage: CT.map((x) => x[0]),
+  heal: ['self', 'opponent', ...CT.map((x) => x[0])], damage: [...CT.map((x) => x[0]), 'any_target', 'opponent'],
   return_hand: ['any_creature'], destroy: ['any_creature'],
   // all_creatures escluso: il motore applica i bonus solo alle creature di chi gioca la carta.
-  buff: ['any_creature', 'all_creatures_self', 'enchanted_creature', 'triggering_creature']
+  buff: ['any_creature', 'all_creatures_self', 'enchanted_creature', 'triggering_creature', 'source_creature']
 };
 
 function specErr(s, id) {
@@ -95,28 +95,69 @@ async function loadEffects() {
   if (!Object.keys(EF).length) msg(['Nessun effetto caricato: controlla la cartella docs/admin/effects/.'], 'err');
 }
 
-function effErr(e, ty, trg) {
+const CARD_TRG = { aura: 'equipped_creature_attacks', terraforma: 'own_monster_summoned' };
+function filterErr(e, ty, t) {
+  const E = [];
+  if (e.filter === undefined) return E;
+  const f = e.filter && typeof e.filter === 'object' && !Array.isArray(e.filter) ? e.filter : null;
+  if (ty !== 'terraforma' || t !== 'buff') E.push('I filtri per sottotipo o fazione valgono solo per i bonus delle Terraforme.');
+  else if (!f || (f.subtype === undefined && f.faction === undefined) || Object.keys(f).some((k) => k !== 'subtype' && k !== 'faction')) E.push('Filtro non valido: indica un sottotipo e/o una fazione.');
+  else {
+    if (f.subtype !== undefined && (typeof f.subtype !== 'string' || !f.subtype.trim() || f.subtype.length > 60)) E.push('Filtro: sottotipo non valido.');
+    if (f.faction !== undefined && !['CHI', 'INF', 'PES', 'BUL', 'GRO', 'CLO'].includes(f.faction)) E.push('Filtro: fazione non valida.');
+  }
+  return E;
+}
+
+// Stesse regole del backend (card-rules.ts): il controllo del motore prima del salvataggio è quello che decide.
+function effErr(e, ty, trg, death = false) {
   const E = [];
   const t = e.type === 'damage_creature' ? 'damage' : e.type === 'nope' ? 'counter' : e.type;
-  if (e.amount !== undefined && !(Number.isInteger(e.amount) && e.amount >= 0 && e.amount <= 20)) E.push(`${t}: la quantità deve essere tra 0 e 20.`);
+  const amount = e.amount;
+  if (amount !== undefined && !(Number.isInteger(amount) && amount >= 0 && amount <= 20)) E.push(`${t}: la quantità deve essere tra 0 e 20.`);
   if (t === 'counter') {
-    if (ty !== 'instant' || !CTRG.includes(trg)) E.push('NOPE: serve una Trappola con evento "carta dalla mano", "ingresso mostro" o "prima del Mostrissimo".');
+    if (ty !== 'instant' || !CTRG.includes(trg)) E.push('NOPE: serve una Trappola con evento \"carta dalla mano\", \"ingresso mostro\" o \"prima del Mostrissimo\".');
     return E;
   }
   if (t === 'movement_cost') {
-    if (ty !== 'aura' || e.amount !== 0) E.push('Il movimento a costo 0 vale solo per le Aure.');
+    if (ty !== 'aura' || amount !== 0) E.push('Il movimento a costo 0 vale solo per le Aure.');
     return E;
   }
-  if (!TG[t]) { E.push(`Effetto "${e.type}" non supportato dal motore.`); return E; }
+  if (e.trigger !== undefined) {
+    if (CARD_TRG[ty] !== e.trigger) E.push(ty === 'aura' ? 'Le Aure usano il trigger \"quando la creatura attacca\".' : ty === 'terraforma' ? 'Le Terraforme usano il trigger \"ogni volta che evochi un tuo mostro\".' : 'I trigger valgono solo per Aure e Terraforme.');
+    else if (!Number.isInteger(amount)) E.push('Serve la quantità.');
+    else if (t === 'heal' || t === 'draw') { if (e.target !== 'self') E.push(`${t}: con un trigger il bersaglio è il proprietario.`); }
+    else if (t === 'discard') { if (e.target !== 'opponent') E.push('Scarta: con un trigger scarta l\'avversario.'); }
+    else if (t === 'damage') { if (e.target !== 'any_target' && e.target !== 'opponent') E.push('Danno: con un trigger il bersaglio è l\'avversario o a scelta.'); }
+    else if (t === 'buff') {
+      if (e.target !== 'triggering_creature') E.push('Un bonus con trigger colpisce la creatura che ha attivato il trigger.');
+      if (e.stat !== 'hp' && e.stat !== 'attack') E.push('Bonus: scegli attacco o PV.');
+      if (!(e.duration === 'permanent' || (e.duration === 'turn' && e.stat === 'attack'))) E.push('Il bonus del trigger è permanente (a fine turno solo per l\'attacco).');
+    } else E.push(`${t}: effetto non ammesso con un trigger.`);
+    E.push(...filterErr(e, ty, t));
+    return E;
+  }
+  if (e.target === 'triggering_creature') E.push('Il bersaglio \"creatura che ha attivato il trigger\" richiede un trigger.');
+  if (e.target === 'any_target' && t !== 'damage') E.push('Il bersaglio a scelta tra giocatore e creature vale solo per i danni.');
+  if (e.target === 'source_creature' && (t !== 'buff' || !CREA.includes(ty) || death)) E.push('\"Questa creatura\" vale solo per i bonus all\'ingresso di Mostri e Mostrissimi.');
+  if (!TG[t]) { E.push(`Effetto \"${e.type}\" non supportato dal motore.`); return E; }
   if (ty === 'aura' && t !== 'buff') E.push('Le Aure ammettono solo bonus o movimento a costo 0.');
   if (ty === 'terraforma' && t !== 'buff') E.push('Le Terraforme ammettono solo bonus.');
   const tg = e.target ?? (t === 'draw' ? 'self' : t === 'discard' ? 'opponent' : null);
-  if (tg && !TG[t].includes(tg)) E.push(`${t}: il bersaglio "${tg}" blocca la partita.`);
-  if (e.trigger !== undefined && (ty !== 'terraforma' || t !== 'buff' || e.trigger !== 'own_monster_summoned')) E.push('I trigger valgono solo per i bonus delle Terraforme: "ogni volta che evochi un tuo mostro".');
-  if (tg === 'triggering_creature' && (ty !== 'terraforma' || e.trigger !== 'own_monster_summoned')) E.push('Il bersaglio "mostro evocato" richiede una Terraforma con trigger.');
+  if (tg && !TG[t].includes(tg)) E.push(`${t}: il bersaglio \"${tg}\" blocca la partita.`);
+  E.push(...filterErr(e, ty, t));
   if (t === 'buff') {
-    if (!['permanent', 'turn', 'while_attached', 'while_in_play'].includes(e.duration)) E.push('Bonus: durata non supportata.');
-    if (e.stat === 'hp' && e.duration === 'turn') E.push('Bonus PV a fine turno non supportato.');
+    const d = String(e.duration);
+    if (!['permanent', 'turn', 'while_attached', 'while_in_play'].includes(d)) E.push('Bonus: durata non supportata.');
+    if (e.stat !== 'hp' && e.stat !== 'attack') E.push('Bonus: scegli attacco o PV.');
+    if (e.stat === 'hp' && d === 'turn') E.push('Bonus PV a fine turno non supportato.');
+    const passive = d === 'while_attached' || d === 'while_in_play';
+    if (ty === 'aura' && d !== 'while_attached') E.push('Le Aure usano solo bonus \"finché è attaccata\".');
+    else if (ty === 'terraforma' && d !== 'while_in_play') E.push('Le Terraforme usano solo bonus \"finché è in campo\".');
+    else if (ty !== 'aura' && ty !== 'terraforma' && passive) E.push('I bonus \"finché attaccata\" o \"finché in campo\" valgono solo per Aure e Terraforme.');
+    if (ty === 'aura' && tg && !['enchanted_creature', 'all_creatures_self'].includes(tg)) E.push('Le Aure danno bonus alla creatura incantata o a tutte le tue.');
+    if (ty === 'terraforma' && tg !== 'all_creatures_self') E.push('Le Terraforme danno bonus a tutte le tue creature.');
+    if (passive && !Number.isInteger(amount)) E.push('Bonus: serve la quantità.');
   }
   return E;
 }
@@ -127,12 +168,13 @@ function engineErrors(c) {
   if (!Number.isInteger(c.mana_cost) || c.mana_cost < 0) E.push('Costo mana non valido.');
   if (CREA.includes(ty) && (!Number.isInteger(c.attack) || !Number.isInteger(c.hp))) E.push('Attacco e PV sono obbligatori.');
   if (ty === 'mostrissimo' && !(Number.isInteger(c.sacrifice_cost) && c.sacrifice_cost >= 0)) E.push('Sacrifici non validi.');
+  if (ty === 'terraforma' && !(Number.isInteger(c.hp) && c.hp >= 1)) E.push('Le Terraforme hanno PV (almeno 1): si possono attaccare e distruggere.');
   const j = c.effect_json, L = !j ? [] : j.effects || [j], trg = j?.reaction_trigger?.event;
   if (['maledizione', 'instant', 'aura', 'terraforma'].includes(ty) && !L.length) E.push('Questo tipo richiede almeno un effetto.');
   if (ty === 'instant' && !TRG.includes(trg)) E.push('La Trappola richiede un evento valido.');
   L.forEach((e) => E.push(...effErr(e, ty, trg)));
   const D = c.effect_on_death_json;
-  (D ? D.effects || [D] : []).forEach((e) => E.push(...effErr(e, 'monster')));
+  (D ? D.effects || [D] : []).forEach((e) => E.push(...effErr(e, 'monster', undefined, true)));
   return E;
 }
 
@@ -204,7 +246,7 @@ function cardHtml(c) {
     <div class="tr">${TYPES[c.card_type] || 'Tipo'}${subsOf(c) ? ' – ' + esc(subsOf(c)) : ''}</div>
     <div class="rules">${fmt(c.effect_text)}</div>
     ${c.flavor_text ? `<div class="fl">${esc(c.flavor_text)}</div>` : ''}
-    <footer><span>${RAR[c.rarity] || ''}</span><b>${cr ? `⚔ ${c.attack ?? 0}  ❤ ${c.hp ?? 0}` : ''}</b></footer>
+    <footer><span>${RAR[c.rarity] || ''}</span><b>${cr ? `⚔ ${c.attack ?? 0}  ❤ ${c.hp ?? 0}` : c.card_type === 'terraforma' ? `❤ ${c.hp ?? 0}` : ''}</b></footer>
     ${bad ? '<span class="tag" style="top:auto;bottom:4px">Non valida</span>' : ''}</article>`;
 }
 
@@ -298,7 +340,7 @@ function onRow(ev) {
 function types() {
   const ty = $('type').value, c = CREA.includes(ty);
   $('gmana').hidden = ty === 'mostrissimo'; $('gsac').hidden = ty !== 'mostrissimo';
-  $('gstats').hidden = !c; $('gkw').hidden = !c; $('gdeath').hidden = !c; $('gtrap').hidden = ty !== 'instant';
+  $('gstats').hidden = !c && ty !== 'terraforma'; $('atk').disabled = ty === 'terraforma'; $('gkw').hidden = !c; $('gdeath').hidden = !c; $('gtrap').hidden = ty !== 'instant';
   S.eff = S.eff.filter((e) => e.raw || (ty && EF[e.key].for.includes(ty)));
   if (!c) S.deaths = [];
   $('elab').textContent = 'Effetti (nessuno se vuoto)';
@@ -340,7 +382,7 @@ function collect() {
   return {
     name: $('name').value.trim(), faction_id: +$('fac').value || null, card_type: ty,
     mana_cost: ty === 'mostrissimo' ? 0 : num('mana'), sacrifice_cost: ty === 'mostrissimo' ? num('sac') : 0,
-    attack: cr ? num('atk') : null, hp: cr ? num('hp') : null,
+    attack: cr ? num('atk') : null, hp: cr || ty === 'terraforma' ? num('hp') : null,
     keywords: cr ? [...($('kw').checked ? ['iperattivo'] : []), ...S.kwo] : [],
     effect_json: ej, effect_on_death_json: cr && S.deaths.length ? deathJson() : null,
     effect_text: $('txt').value.trim(), flavor_text: $('fl').value.trim() || null,
