@@ -10,6 +10,10 @@
  "amount": true,
  "targets": [
   [
+   "source_creature",
+   "Questa creatura"
+  ],
+  [
    "any_creature",
    "Una creatura"
   ],
@@ -36,6 +40,7 @@
   "duration": "{d}"
  },
  "text": {
+  "source_creature": "Questa creatura ottiene +{n} attacco",
   "any_creature": "Una creatura guadagna +{n} attacco",
   "all_creatures_self": "Le tue creature guadagnano +{n} attacco"
  },

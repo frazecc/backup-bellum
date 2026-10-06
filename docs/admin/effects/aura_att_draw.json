@@ -1,0 +1,16 @@
+{
+ "order": 22,
+ "label": "💥 Aura: quando attacca, pesca",
+ "for": [
+  "aura"
+ ],
+ "amount": true,
+ "when": "Ogni volta che la creatura equipaggiata attacca",
+ "json": {
+  "type": "draw",
+  "amount": "{n}",
+  "target": "self",
+  "trigger": "equipped_creature_attacks"
+ },
+ "text": "Ogni volta che la creatura attacca, pesca {n} {carte}"
+}

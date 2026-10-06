@@ -1,0 +1,18 @@
+{
+ "order": 26,
+ "label": "💥 Aura: quando attacca, +PV",
+ "for": [
+  "aura"
+ ],
+ "amount": true,
+ "when": "Ogni volta che la creatura equipaggiata attacca",
+ "json": {
+  "type": "buff",
+  "stat": "hp",
+  "amount": "{n}",
+  "target": "triggering_creature",
+  "duration": "permanent",
+  "trigger": "equipped_creature_attacks"
+ },
+ "text": "Ogni volta che la creatura attacca, ottiene +{n} PV"
+}

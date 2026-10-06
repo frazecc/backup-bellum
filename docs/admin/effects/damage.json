@@ -10,6 +10,14 @@
  "amount": true,
  "targets": [
   [
+   "any_target",
+   "Avversario o una creatura (a scelta)"
+  ],
+  [
+   "opponent",
+   "Giocatore avversario"
+  ],
+  [
    "any_creature",
    "Una creatura"
   ],
@@ -32,6 +40,8 @@
   "target": "{t}"
  },
  "text": {
+  "any_target": "Infliggi {n} danno a un bersaglio a tua scelta (avversario o creatura)",
+  "opponent": "Infliggi {n} danno all'avversario",
   "any_creature": "Infliggi {n} danno a una creatura",
   "all_creatures": "Infliggi {n} danno a tutte le creature",
   "all_creatures_self": "Infliggi {n} danno a tutte le tue creature",

@@ -1,0 +1,29 @@
+{
+ "order": 24,
+ "label": "💥 Aura: quando attacca, danni",
+ "for": [
+  "aura"
+ ],
+ "amount": true,
+ "when": "Ogni volta che la creatura equipaggiata attacca",
+ "targets": [
+  [
+   "any_target",
+   "Avversario o una creatura (a scelta)"
+  ],
+  [
+   "opponent",
+   "Giocatore avversario"
+  ]
+ ],
+ "json": {
+  "type": "damage",
+  "amount": "{n}",
+  "target": "{t}",
+  "trigger": "equipped_creature_attacks"
+ },
+ "text": {
+  "any_target": "Ogni volta che la creatura attacca, infliggi {n} danno a un bersaglio a tua scelta (avversario o creatura)",
+  "opponent": "Ogni volta che la creatura attacca, infliggi {n} danno all'avversario"
+ }
+}

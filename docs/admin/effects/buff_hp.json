@@ -10,6 +10,10 @@
  "amount": true,
  "targets": [
   [
+   "source_creature",
+   "Questa creatura"
+  ],
+  [
    "any_creature",
    "Una creatura"
   ],
@@ -26,6 +30,7 @@
   "duration": "permanent"
  },
  "text": {
+  "source_creature": "Questa creatura ottiene +{n} PV",
   "any_creature": "Una creatura guadagna +{n} PV",
   "all_creatures_self": "Le tue creature guadagnano +{n} PV"
  }

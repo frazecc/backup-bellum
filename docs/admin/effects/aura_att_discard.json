@@ -1,0 +1,16 @@
+{
+ "order": 23,
+ "label": "💥 Aura: quando attacca, l'avversario scarta",
+ "for": [
+  "aura"
+ ],
+ "amount": true,
+ "when": "Ogni volta che la creatura equipaggiata attacca",
+ "json": {
+  "type": "discard",
+  "amount": "{n}",
+  "target": "opponent",
+  "trigger": "equipped_creature_attacks"
+ },
+ "text": "Ogni volta che la creatura attacca, l'avversario scarta {n} {carte} a caso"
+}

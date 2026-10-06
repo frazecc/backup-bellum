@@ -1,0 +1,29 @@
+{
+ "order": 25,
+ "label": "💥 Aura: quando attacca, +Attacco",
+ "for": [
+  "aura"
+ ],
+ "amount": true,
+ "when": "Ogni volta che la creatura equipaggiata attacca",
+ "json": {
+  "type": "buff",
+  "stat": "attack",
+  "amount": "{n}",
+  "target": "triggering_creature",
+  "duration": "{d}",
+  "trigger": "equipped_creature_attacks"
+ },
+ "text": "Ogni volta che la creatura attacca, ottiene +{n} attacco",
+ "durations": [
+  [
+   "permanent",
+   "Permanente"
+  ],
+  [
+   "turn",
+   "Fino a fine turno"
+  ]
+ ],
+ "textTurn": " fino a fine turno"
+}

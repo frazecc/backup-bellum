@@ -1,0 +1,16 @@
+{
+ "order": 17,
+ "label": "🎯 Terraforma: ogni mostro che evochi, cura",
+ "for": [
+  "terraforma"
+ ],
+ "amount": true,
+ "when": "Ogni volta che evochi un tuo mostro",
+ "json": {
+  "type": "heal",
+  "amount": "{n}",
+  "target": "self",
+  "trigger": "own_monster_summoned"
+ },
+ "text": "Ogni volta che evochi un tuo mostro, guadagni {n} punti vita"
+}

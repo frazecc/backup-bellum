@@ -1,0 +1,16 @@
+{
+ "order": 18,
+ "label": "🎯 Terraforma: ogni mostro che evochi, pesca",
+ "for": [
+  "terraforma"
+ ],
+ "amount": true,
+ "when": "Ogni volta che evochi un tuo mostro",
+ "json": {
+  "type": "draw",
+  "amount": "{n}",
+  "target": "self",
+  "trigger": "own_monster_summoned"
+ },
+ "text": "Ogni volta che evochi un tuo mostro, pesca {n} {carte}"
+}

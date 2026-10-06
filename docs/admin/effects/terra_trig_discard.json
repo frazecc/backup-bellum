@@ -1,0 +1,16 @@
+{
+ "order": 19,
+ "label": "🎯 Terraforma: ogni mostro che evochi, l'avversario scarta",
+ "for": [
+  "terraforma"
+ ],
+ "amount": true,
+ "when": "Ogni volta che evochi un tuo mostro",
+ "json": {
+  "type": "discard",
+  "amount": "{n}",
+  "target": "opponent",
+  "trigger": "own_monster_summoned"
+ },
+ "text": "Ogni volta che evochi un tuo mostro, l'avversario scarta {n} {carte} a caso"
+}

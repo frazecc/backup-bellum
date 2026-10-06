@@ -1,0 +1,16 @@
+{
+ "order": 21,
+ "label": "💥 Aura: quando attacca, cura",
+ "for": [
+  "aura"
+ ],
+ "amount": true,
+ "when": "Ogni volta che la creatura equipaggiata attacca",
+ "json": {
+  "type": "heal",
+  "amount": "{n}",
+  "target": "self",
+  "trigger": "equipped_creature_attacks"
+ },
+ "text": "Ogni volta che la creatura attacca, guadagni {n} punti vita"
+}
