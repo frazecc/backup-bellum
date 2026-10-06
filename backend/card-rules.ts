@@ -12,12 +12,15 @@ const TARGETS = new Map<string, string[]>([
   ['draw', ['self', 'opponent']],
   ['discard', ['self', 'opponent']],
   ['heal', ['self', 'opponent', ...CREATURE_TARGETS]],
-  ['damage', CREATURE_TARGETS],
+  // any_target: a scelta del proprietario, il giocatore avversario o una creatura (alleata o nemica).
+  ['damage', [...CREATURE_TARGETS, 'any_target', 'opponent']],
   ['return_hand', ['any_creature']],
   ['destroy', ['any_creature']],
   // all_creatures escluso: il motore applica i bonus solo alle creature di chi gioca la carta.
-  ['buff', ['any_creature', 'all_creatures_self', 'enchanted_creature']],
+  ['buff', ['any_creature', 'all_creatures_self', 'enchanted_creature', 'source_creature']],
 ]);
+// Trigger ammessi per tipo di carta (Aure: attacco della creatura equipaggiata; Terraforme: evocazione di un Mostro).
+const CARD_TRIGGERS: Record<string, string> = { aura: 'equipped_creature_attacks', terraforma: 'own_monster_summoned' };
 const DURATIONS = ['permanent', 'turn', 'while_attached', 'while_in_play'];
 const FACTIONS = ['CHI', 'INF', 'PES', 'BUL', 'GRO', 'CLO'];
 
@@ -43,7 +46,7 @@ function filterErrors(e: Json, type: string, t: string): string[] {
   return out;
 }
 
-function effectErrors(e: Json, type: string, trigger: unknown): string[] {
+function effectErrors(e: Json, type: string, trigger: unknown, death = false): string[] {
   const out: string[] = [];
   const t = e.type === 'damage_creature' ? 'damage' : e.type === 'nope' ? 'counter' : String(e.type);
   const amount = e.amount as number | undefined;
@@ -59,19 +62,26 @@ function effectErrors(e: Json, type: string, trigger: unknown): string[] {
     return out;
   }
   if (e.trigger !== undefined) {
-    // Terraforma che si attiva ogni volta che il proprietario evoca un Mostro: bonus al Mostro evocato.
-    if (type !== 'terraforma' || t !== 'buff' || e.trigger !== 'own_monster_summoned')
-      out.push('I trigger valgono solo per i bonus delle Terraforme: "ogni volta che evochi un tuo mostro".');
-    else {
-      if (e.target !== 'triggering_creature') out.push('Un effetto con trigger colpisce il Mostro evocato.');
+    // Effetto con trigger: Aure ("quando la creatura equipaggiata attacca") e Terraforme ("ogni volta che evochi un tuo mostro").
+    if (CARD_TRIGGERS[type] !== e.trigger)
+      out.push(type === 'aura' ? 'Le Aure usano il trigger "quando la creatura attacca".' : type === 'terraforma' ? 'Le Terraforme usano il trigger "ogni volta che evochi un tuo mostro".' : 'I trigger valgono solo per Aure e Terraforme.');
+    else if (!Number.isInteger(amount)) out.push('Serve la quantità.');
+    else if (t === 'heal' || t === 'draw') { if (e.target !== 'self') out.push(`${t}: con un trigger il bersaglio è il proprietario.`); }
+    else if (t === 'discard') { if (e.target !== 'opponent') out.push('Scarta: con un trigger scarta l\'avversario.'); }
+    else if (t === 'damage') { if (e.target !== 'any_target' && e.target !== 'opponent') out.push('Danno: con un trigger il bersaglio è l\'avversario o a scelta.'); }
+    else if (t === 'buff') {
+      if (e.target !== 'triggering_creature') out.push('Un bonus con trigger colpisce la creatura che ha attivato il trigger.');
       if (e.stat !== 'hp' && e.stat !== 'attack') out.push('Bonus: scegli attacco o PV.');
       if (!(e.duration === 'permanent' || (e.duration === 'turn' && e.stat === 'attack')))
         out.push('Il bonus del trigger è permanente (a fine turno solo per l\'attacco).');
-      if (!Number.isInteger(amount)) out.push('Bonus: serve la quantità.');
-    }
+    } else out.push(`${t}: effetto non ammesso con un trigger.`);
     out.push(...filterErrors(e, type, t));
     return out;
   }
+  if (e.target === 'triggering_creature') out.push('Il bersaglio "creatura che ha attivato il trigger" richiede un trigger.');
+  if (e.target === 'any_target' && t !== 'damage') out.push('Il bersaglio a scelta tra giocatore e creature vale solo per i danni.');
+  if (e.target === 'source_creature' && (t !== 'buff' || !CREATURES.includes(type) || death))
+    out.push('"Questa creatura" vale solo per i bonus all\'ingresso di Mostri e Mostrissimi.');
   const allowed = TARGETS.get(t);
   if (!allowed) { out.push(`Effetto "${String(e.type)}" non supportato dal motore.`); return out; }
   if (type === 'aura' && t !== 'buff') out.push('Le Aure ammettono solo bonus o movimento a costo 0.');
@@ -106,12 +116,13 @@ export function engineErrors(card: unknown): string[] {
   if (CREATURES.includes(type) && (!Number.isInteger(c.attack) || !Number.isInteger(c.hp))) out.push('Attacco e PV sono obbligatori.');
   const sacrifice = c.sacrifice_cost as number;
   if (type === 'mostrissimo' && !(Number.isInteger(sacrifice) && sacrifice >= 0)) out.push('Sacrifici non validi.');
+  if (type === 'terraforma' && !(Number.isInteger(c.hp) && (c.hp as number) >= 1)) out.push('Le Terraforme hanno PV (almeno 1): si possono attaccare e distruggere.');
   const main = effectList(c.effect_json), trigger = object(c.effect_json)?.reaction_trigger;
   const event = object(trigger)?.event;
   if (['maledizione', 'instant', 'aura', 'terraforma'].includes(type) && !main.length) out.push('Questo tipo richiede almeno un effetto.');
   if (type === 'instant' && !TRIGGERS.includes(String(event))) out.push('La Trappola richiede un evento valido.');
   for (const e of main) out.push(...effectErrors(e, type, event));
   // Gli effetti alla morte si risolvono a metà partita, con le regole dei Mostri.
-  for (const e of effectList(c.effect_on_death_json)) out.push(...effectErrors(e, 'monster', undefined));
+  for (const e of effectList(c.effect_on_death_json)) out.push(...effectErrors(e, 'monster', undefined, true));
   return out;
 }

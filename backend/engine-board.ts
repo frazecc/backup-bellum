@@ -18,7 +18,7 @@ export const put = (s: GameState, p: Position, c: BoardCell | null) => { s.board
 export const instance = (c: CardInstance): CardInstance => ({ instance_id: c.instance_id, card_id: c.card_id });
 export const effects = (raw: CardEffectJson | null): EffectDefinition[] => raw && 'effects' in raw && Array.isArray(raw.effects) ? raw.effects : raw && 'type' in raw ? [raw] : [];
 export const reactionTrigger = (d: CardData): ReactionTriggerEvent | undefined => d.effect_json?.reaction_trigger?.event;
-export const targeted = (e: EffectDefinition) => e.target === 'any_creature' || e.type === 'return_hand';
+export const targeted = (e: EffectDefinition) => e.target === 'any_creature' || e.target === 'any_target' || e.type === 'return_hand';
 export const supported = new Set(['draw', 'discard', 'heal', 'damage', 'damage_creature', 'return_hand', 'destroy', 'buff']);
 export const phaseNumber = (p: TurnPhase) => ({ start: 0, upkeep: 1, main: 2, end: 3 })[p];
 
@@ -54,6 +54,7 @@ export function enemyNeighbours(s: GameState, p: Position, owner: PlayerIndex) {
   return around(p).filter(q => { const c = at(s, q); return c?.kind === 'creature' && c.owner_index === other(owner); });
 }
 export function eligible(s: GameState, owner: PlayerIndex, e: EffectDefinition) {
+  if (e.target === 'any_target') return units(s);
   if ((e.type === 'damage' || e.type === 'damage_creature') && e.timing !== 'instant') return units(s, other(owner));
   if (e.type === 'heal' && e.timing !== 'instant') return units(s, owner);
   return units(s);
@@ -61,6 +62,23 @@ export function eligible(s: GameState, owner: PlayerIndex, e: EffectDefinition) 
 export function target(s: GameState, owner: PlayerIndex, effect: EffectDefinition, id: string | null) {
   const x = id ? findCreature(s, id) : null;
   return x && eligible(s, owner, effect).some(v => v.cell.instance_id === id) ? x : null;
+}
+// Bersaglio "giocatore" nelle scelte: l'avversario di chi gioca la carta, con id fittizio player:<indice>.
+export const playerTargetId = (p: PlayerIndex) => `player:${p}`;
+const isDamage = (e: EffectDefinition) => e.type === 'damage' || e.type === 'damage_creature';
+// Tutti gli id scegliibili per un effetto mirato: creature e, per i danni a scelta, il giocatore avversario.
+export function targetChoices(s: GameState, owner: PlayerIndex, e: EffectDefinition): string[] {
+  const ids = eligible(s, owner, e).map(x => x.cell.instance_id);
+  return isDamage(e) && e.target === 'any_target' ? [...ids, playerTargetId(other(owner))] : ids;
+}
+export function validTarget(s: GameState, owner: PlayerIndex, e: EffectDefinition, id: string | null) {
+  if (!id) return false;
+  if (isDamage(e) && e.target === 'any_target' && id === playerTargetId(other(owner))) return true;
+  return !!target(s, owner, e, id);
+}
+// Terraforme nemiche con PV, ortogonalmente adiacenti: si possono attaccare ma non bloccano l'attacco diretto.
+export function enemyTerraformas(s: GameState, p: Position, owner: PlayerIndex) {
+  return around(p).filter(q => { const c = at(s, q); return c?.kind === 'terraforma' && c.owner_index === other(owner) && c.hp !== undefined; });
 }
 export function prepend(s: GameState, ...items: PendingWork[]) { s.work_queue.unshift(...items); }
 export function keyword(d: CardData, value: string) {

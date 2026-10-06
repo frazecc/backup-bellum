@@ -4,18 +4,18 @@
 // creature; danni e rimozioni solo sulle avversarie) e sceglie l'attacco migliore invece del primo adiacente.
 import { randomUUID } from 'node:crypto';
 import type {
-  AiProgress, AttackTarget, CardData, CardInstance, CreatureCell, DeathOrderChoice,
+  AiProgress, AttackTarget, BoardCell, CardData, CardInstance, CreatureCell, DeathOrderChoice,
   DeathTriggerSource, DeckFaction, GameState, MatchLogEntry, PendingEvent,
   PendingWork, PlayerIndex, PlayCardOptions, Position, ReactionTriggerEvent,
   ResolveEffectWork, TargetChoice, TrapChoice, PublicAnnouncement,
 } from './types.js';
 import {
-  adjacent, allowed, around, at, blank, cells, effects, eligible, enemyNeighbours,
+  adjacent, allowed, around, at, blank, cells, effects, eligible, enemyNeighbours, enemyTerraformas,
   find, findAura, findCreature, home, instance, keyword, label, other,
-  phaseNumber, prepend, put, reactionTrigger, supported, target, targeted, units, valid,
+  phaseNumber, playerTargetId, prepend, put, reactionTrigger, supported, target, targetChoices, targeted, units, valid, validTarget,
 } from './engine-board.js';
 import { commit, db, getCardData, load, logMatchAction } from './engine-storage.js';
-import { chosenColors, deck, deckPool, offer, playableEffects, player, randomColors } from './engine-deck.js';
+import { availableFactions, chosenColors, deck, deckPool, offer, playableEffects, player, randomColors } from './engine-deck.js';
 export { getCardData, logMatchAction, saveGameState } from './engine-storage.js';
 
 type Context = { id: string; s: GameState; logs: MatchLogEntry[]; deaths: DeathTriggerSource[] };
@@ -180,8 +180,10 @@ async function applyEffect(c: Context, task: ResolveEffectWork) {
   if (s.anti_loop_counter > 20) { cleanupLoop(c); return; }
   const p = task.owner, foe = other(p), n = Number(e.amount ?? 1);
   if (!Number.isInteger(n) || n < 0 || n > 20) throw new Error('Quantità effetto non valida');
-  const selected = targeted(e) ? target(s, p, e, task.target_instance_id) : null;
-  if (targeted(e) && !selected) {
+  const isDamage = e.type === 'damage' || e.type === 'damage_creature';
+  const playerHit = isDamage && e.target === 'any_target' && task.target_instance_id === playerTargetId(foe);
+  const selected = targeted(e) && !playerHit ? target(s, p, e, task.target_instance_id) : null;
+  if (targeted(e) && !playerHit && !selected) {
     log(c, p, 'effect_no_target', `${d.name}: bersaglio non più valido, effetto annullato.`, { card_id: d.id }); return;
   }
   if (e.type === 'draw') {
@@ -203,8 +205,11 @@ async function applyEffect(c: Context, task: ResolveEffectWork) {
       for (const owner of owners) for (const { cell } of units(s, owner)) cell.hp = Math.min(cell.max_hp, cell.hp + n);
     } else s.players[e.target === 'opponent' ? foe : p].life += n;
     log(c, p, 'effect_heal', `${d.name}: cura ${n}.`);
-  } else if (e.type === 'damage' || e.type === 'damage_creature') {
-    if (e.target === 'all_creatures' || e.target === 'all_creatures_self' || e.target === 'all_creatures_opponent') {
+  } else if (isDamage) {
+    if (playerHit || e.target === 'opponent') {
+      s.players[foe].life -= n;
+      log(c, p, 'effect_damage_player', `${d.name}: ${n} danno/i ${foe === 1 ? 'a te' : 'all’IA'}.`, { amount: n, target_player_index: foe });
+    } else if (e.target === 'all_creatures' || e.target === 'all_creatures_self' || e.target === 'all_creatures_opponent') {
       const owners = e.target === 'all_creatures' ? [0, 1] as const : [e.target === 'all_creatures_self' ? p : foe];
       const snapshot = owners.flatMap(owner => units(s, owner));
       for (const x of snapshot) x.cell.hp -= n;
@@ -230,7 +235,11 @@ async function applyEffect(c: Context, task: ResolveEffectWork) {
     if (e.target === 'triggering_creature' && !summoned) {
       log(c, p, 'effect_no_target', `${d.name}: il Mostro evocato non è più in campo, bonus annullato.`, { card_id: d.id }); return;
     }
-    const recipients = e.target === 'all_creatures' || e.target === 'all_creatures_self' ? units(s, p).map(x => x.cell) : summoned ? [summoned.cell] : selected ? [selected.cell] : [];
+    const own = e.target === 'source_creature' && task.source_instance_id ? findCreature(s, task.source_instance_id) : null;
+    if (e.target === 'source_creature' && !own) {
+      log(c, p, 'effect_no_target', `${d.name}: la creatura non è più in campo, bonus annullato.`, { card_id: d.id }); return;
+    }
+    const recipients = e.target === 'all_creatures' || e.target === 'all_creatures_self' ? units(s, p).map(x => x.cell) : summoned ? [summoned.cell] : own ? [own.cell] : selected ? [selected.cell] : [];
     if (e.duration === 'while_attached' || e.duration === 'while_in_play') throw new Error('Un bonus continuo non si risolve come evento');
     for (const cell of recipients) {
       if (e.stat === 'hp' && e.duration === 'permanent') { cell.max_hp += n; cell.hp += n; }
@@ -246,22 +255,28 @@ async function applyEffect(c: Context, task: ResolveEffectWork) {
   checkWinner(c, 'PV esauriti dopo un effetto.');
 }
 async function resolveEffectOrChoose(c: Context, task: ResolveEffectWork) {
-  if (task.source === 'on_death' && task.target_instance_id === null) {
+  const interactive = task.source === 'on_death' || task.source === 'terraforma_trigger' || task.source === 'aura_attack';
+  if (interactive && task.target_instance_id === null) {
     const d = await getCardData(task.card_id);
-    const fx = effects(d.effect_on_death_json)[task.effect_index];
+    const fx = effects(task.source === 'on_death' ? d.effect_on_death_json : d.effect_json)[task.effect_index];
     if (fx && targeted(fx)) {
-      const choices = eligible(c.s, task.owner, fx).map(x => x.cell.instance_id);
+      const choices = targetChoices(c.s, task.owner, fx);
       if (choices.length && task.owner === 1) {
         c.s.pending_target_choice = { choice_id: randomUUID(), chooser_index: 1, task, eligible_instance_ids: choices };
-        log(c, 1, 'death_target_window', `${d.name}: scegli il bersaglio dell’effetto alla morte.`, { card_id: d.id, window_id: c.s.pending_target_choice.choice_id });
+        log(c, 1, 'death_target_window', `${d.name}: scegli il bersaglio dell’effetto.`, { card_id: d.id, window_id: c.s.pending_target_choice.choice_id });
         return;
       }
       if (choices.length) {
-        const options = eligible(c.s, task.owner, fx);
-        const preferred = fx.type === 'heal' || fx.type === 'buff'
-          ? options.filter(x => x.cell.owner_index === task.owner).sort((a, b) => (b.cell.max_hp - b.cell.hp) - (a.cell.max_hp - a.cell.hp))
-          : options.filter(x => x.cell.owner_index !== task.owner).sort((a, b) => a.cell.hp - b.cell.hp);
-        task = { ...task, target_instance_id: (preferred[0] ?? options[0]).cell.instance_id };
+        let picked: string | undefined;
+        if (fx.target === 'any_target') picked = aiDamageTarget(c.s, Number(fx.amount ?? 1)) ?? undefined;
+        else {
+          const options = eligible(c.s, task.owner, fx);
+          const preferred = fx.type === 'heal' || fx.type === 'buff'
+            ? options.filter(x => x.cell.owner_index === task.owner).sort((a, b) => (b.cell.max_hp - b.cell.hp) - (a.cell.max_hp - a.cell.hp))
+            : options.filter(x => x.cell.owner_index !== task.owner).sort((a, b) => a.cell.hp - b.cell.hp);
+          picked = (preferred[0] ?? options[0]).cell.instance_id;
+        }
+        task = { ...task, target_instance_id: picked ?? choices[0] };
       }
     }
   }
@@ -319,11 +334,27 @@ async function queueTerraformaTriggers(c: Context, p: PlayerIndex, summoned: Car
       if (e.filter && !(await matchesFilter(summoned.card_id, e.filter))) continue;
       work.push({
         kind: 'resolve_effect', owner: p, card_id: land.cell.card_id, source_instance_id: land.cell.instance_id,
-        source: 'terraforma_trigger', effect_index, target_instance_id: summoned.instance_id, require_source_on_board: true,
+        source: 'terraforma_trigger', effect_index, target_instance_id: e.target === 'triggering_creature' ? summoned.instance_id : null, require_source_on_board: true,
       });
     }
   }
   prepend(s, ...work);
+}
+// Aure con trigger "quando la creatura equipaggiata attacca": un compito per ogni effetto, subito dopo l'attacco.
+async function queueAuraAttackTriggers(c: Context, attacker: CreatureCell) {
+  if (c.s.status !== 'running') return;
+  const work: PendingWork[] = [];
+  for (const aura of attacker.auras) {
+    const d = await getCardData(aura.card_id);
+    for (const [effect_index, e] of effects(d.effect_json).entries()) {
+      if (e.trigger !== 'equipped_creature_attacks') continue;
+      work.push({
+        kind: 'resolve_effect', owner: aura.owner_index, card_id: aura.card_id, source_instance_id: aura.instance_id,
+        source: 'aura_attack', effect_index, target_instance_id: e.target === 'triggering_creature' ? attacker.instance_id : null, require_source_on_board: true,
+      });
+    }
+  }
+  prepend(c.s, ...work);
 }
 function queueOnPlay(s: GameState, p: PlayerIndex, d: CardData, sourceId: string, targetId: string | null, creature: boolean) {
   const list = effects(d.effect_json);
@@ -367,7 +398,8 @@ async function applyEvent(c: Context, e: PendingEvent) {
         log(c, p, 'event_cancelled', `${d.name}: cella non più libera.`); return;
       }
       s.players[p].graveyard = s.players[p].graveyard.filter(x => x.instance_id !== paid.instance_id);
-      if (d.card_type === 'terraforma') put(s, e.options.position, { ...paid, kind: 'terraforma', owner_index: p });
+      if (d.card_type === 'terraforma') put(s, e.options.position, { ...paid, kind: 'terraforma', owner_index: p,
+        ...(Number.isInteger(d.hp) && Number(d.hp) > 0 ? { hp: Number(d.hp), max_hp: Number(d.hp) } : {}) });
       else put(s, e.options.position, { ...paid, kind: 'creature', owner_index: p,
         attack: Number(d.attack ?? 0), hp: Number(d.hp ?? 1), max_hp: Number(d.hp ?? 1),
         tired: !keyword(d, 'iperattivo'), auras: [] });
@@ -402,12 +434,13 @@ async function applyEvent(c: Context, e: PendingEvent) {
     }
     if (e.target.type === 'creature') {
       const victim = at(s, e.target.position);
-      if (victim?.kind !== 'creature' || victim.instance_id !== e.target_instance_id || victim.owner_index !== other(p) || !adjacent(e.from, e.target.position)) {
+      if (!victim || (victim.kind === 'terraforma' && victim.hp === undefined) || victim.instance_id !== e.target_instance_id || victim.owner_index !== other(p) || !adjacent(e.from, e.target.position)) {
         log(c, p, 'event_cancelled', 'Attacco annullato: bersaglio non valido.'); return;
       }
-      victim.hp -= attacker.attack; attacker.tired = true;
-      log(c, p, 'attack_creature', `${label(p)} infligge ${attacker.attack} danno/i.`, { instance_id: attacker.instance_id, target_instance_id: victim.instance_id, position: e.from });
+      victim.hp = (victim.hp ?? 0) - attacker.attack; attacker.tired = true;
+      log(c, p, 'attack_creature', `${label(p)} infligge ${attacker.attack} danno/i${victim.kind === 'terraforma' ? ' a una Terraforma' : ''}.`, { instance_id: attacker.instance_id, target_instance_id: victim.instance_id, position: e.from });
       if (victim.hp <= 0) await destroyCell(c, e.target.position, p);
+      await queueAuraAttackTriggers(c, attacker);
     } else {
       if (e.target.playerIndex !== other(p) || enemyNeighbours(s, e.from, p).length) {
         log(c, p, 'event_cancelled', 'Attacco diretto annullato: bersagli validi presenti.'); return;
@@ -415,6 +448,7 @@ async function applyEvent(c: Context, e: PendingEvent) {
       s.players[other(p)].life -= attacker.attack; attacker.tired = true;
       log(c, p, 'attack_player', `${label(p)} attacca direttamente: ${attacker.attack} danno/i.`, { instance_id: attacker.instance_id, target_player_index: other(p) });
       checkWinner(c, 'PV esauriti.');
+      await queueAuraAttackTriggers(c, attacker);
     }
   } else if (e.kind === 'mostrissimo_sacrifice') {
     const pending = s.pending_mostrissimo;
@@ -454,7 +488,7 @@ async function applyEvent(c: Context, e: PendingEvent) {
     if (!findCreature(s, e.source_instance_id)) { log(c, p, 'etb_source_gone', 'ETB saltato: creatura non più sul campo.'); return; }
     const d = await getCardData(e.card_id), fx = effects(d.effect_json)[e.effect_index];
     if (!fx) return;
-    if (targeted(fx) && !target(s, p, fx, e.target_instance_id)) {
+    if (targeted(fx) && !validTarget(s, p, fx, e.target_instance_id)) {
       log(c, p, 'etb_no_target', `${d.name}: ETB senza bersaglio valido.`); return;
     }
     prepend(s, { kind: 'resolve_effect', owner: p, card_id: e.card_id, source_instance_id: e.source_instance_id,
@@ -472,7 +506,7 @@ async function validTraps(c: Context, e: PendingEvent) {
     const list = effects(d.effect_json);
     if (!list.length || list.some(fx => !supported.has(fx.type) && fx.type !== 'counter' && fx.type !== 'nope')) continue;
     if (list.some(fx => fx.type === 'counter' || fx.type === 'nope') && !(await noPeAllowed(d, e))) continue;
-    if (list.some(fx => targeted(fx) && !eligible(c.s, responder, fx).length)) continue;
+    if (list.some(fx => targeted(fx) && !targetChoices(c.s, responder, fx).length)) continue;
     if (e.kind === 'monster_etb' && list.some(fx => targeted(fx) && !target(c.s, responder, fx, e.source_instance_id))) continue;
     if (e.kind === 'monster_etb' && !findCreature(c.s, e.source_instance_id)) continue;
     result.push(inst);
@@ -482,6 +516,7 @@ async function validTraps(c: Context, e: PendingEvent) {
 function aiTrapTarget(s: GameState, d: CardData) {
   const fx = effects(d.effect_json).find(targeted);
   if (!fx) return null;
+  if (fx.target === 'any_target') return aiDamageTarget(s, Number(fx.amount ?? 1));
   const options = eligible(s, 0, fx);
   const enemies = options.filter(x => x.cell.owner_index === 1), friends = options.filter(x => x.cell.owner_index === 0);
   if (fx.type === 'heal' || fx.type === 'buff') return friends.sort((a, b) => fx.type === 'heal' ? (b.cell.max_hp - b.cell.hp) - (a.cell.max_hp - a.cell.hp) : b.cell.attack - a.cell.attack)[0]?.cell.instance_id ?? null;
@@ -493,10 +528,10 @@ function aiValidTrapTarget(s: GameState, e: PendingEvent, d: CardData): string |
   const aimed = effects(d.effect_json).filter(targeted);
   if (!aimed.length) return null;
   if (e.kind === 'monster_etb')
-    return aimed.every(fx => !!target(s, 0, fx, e.source_instance_id)) ? e.source_instance_id : null;
+    return aimed.every(fx => validTarget(s, 0, fx, e.source_instance_id)) ? e.source_instance_id : null;
   const preferred = aiTrapTarget(s, d);
-  if (preferred && aimed.every(fx => !!target(s, 0, fx, preferred))) return preferred;
-  return units(s).find(x => aimed.every(fx => !!target(s, 0, fx, x.cell.instance_id)))?.cell.instance_id ?? null;
+  if (preferred && aimed.every(fx => validTarget(s, 0, fx, preferred))) return preferred;
+  return units(s).find(x => aimed.every(fx => validTarget(s, 0, fx, x.cell.instance_id)))?.cell.instance_id ?? null;
 }
 async function playTrap(c: Context, e: PendingEvent, trapId: string, targetId: string | null) {
   const p = other(e.actor), owner = c.s.players[p];
@@ -508,7 +543,7 @@ async function playTrap(c: Context, e: PendingEvent, trapId: string, targetId: s
   const chosenTarget = targetId ?? (e.kind === 'monster_etb' ? e.source_instance_id : null);
   if (e.kind === 'monster_etb' && list.some(targeted) && chosenTarget !== e.source_instance_id)
     throw new Error('La Trappola ETB deve bersagliare la creatura che ha generato la finestra');
-  for (const fx of list) if (targeted(fx) && !target(c.s, p, fx, chosenTarget)) throw new Error('Bersaglio della Trappola non valido');
+  for (const fx of list) if (targeted(fx) && !validTarget(c.s, p, fx, chosenTarget)) throw new Error('Bersaglio della Trappola non valido');
   const nope = list.some(x => x.type === 'counter' || x.type === 'nope');
   if (nope && !(await noPeAllowed(d, e))) throw new Error('NOPE non compatibile con questo evento');
   owner.current_mana -= d.mana_cost;
@@ -656,9 +691,20 @@ function startTurn(c: Context, p: PlayerIndex) {
 // Bersaglio legale ≠ mossa conveniente: cure e bonus vanno solo su creature dell'IA, danni e
 // rimozioni solo su creature avversarie. Se il lato giusto è vuoto non si ripiega sull'altro: null.
 const creatureValue = (cell: CreatureCell) => cell.attack * 2 + cell.hp;
+// Danno a scelta: prima il colpo letale sul giocatore, poi la creatura avversaria più pericolosa che si può
+// uccidere; se non ce ne sono, il giocatore avversario. Mai creature dell'IA.
+function aiDamageTarget(s: GameState, n: number): string | null {
+  if (s.players[1].life <= n) return playerTargetId(1);
+  const killable = units(s, 1).filter(x => x.cell.hp <= n).sort((x, y) => creatureValue(y.cell) - creatureValue(x.cell));
+  return killable[0]?.cell.instance_id ?? playerTargetId(1);
+}
 function aiChooseTarget(s: GameState, d: CardData) {
-  const aimed = effects(d.effect_json).filter(targeted);
+  const aimed = effects(d.effect_json).filter(x => targeted(x) && x.trigger === undefined);
   if (!aimed.length) return null;
+  if (aimed[0].target === 'any_target') {
+    const picked = aiDamageTarget(s, Number(aimed[0].amount ?? 1));
+    return picked && aimed.every(fx => validTarget(s, 0, fx, picked)) ? picked : null;
+  }
   const friendly = aimed[0].type === 'heal' || aimed[0].type === 'buff';
   const valid = (id: string) => aimed.every(fx => !!target(s, 0, fx, id));
   const options = eligible(s, 0, aimed[0]).filter(x => x.cell.owner_index === (friendly ? 0 : 1) && valid(x.cell.instance_id));
@@ -777,7 +823,7 @@ async function advanceAi(c: Context) {
       if (!host) continue;
       options.targetInstanceId = host;
     } else {
-      const fx = effects(d.effect_json).find(targeted);
+      const fx = effects(d.effect_json).find(x => targeted(x) && x.trigger === undefined);
       if (fx) {
         const t = aiChooseTarget(s, d);
         if (t) options.targetInstanceId = t;
@@ -806,8 +852,9 @@ async function advanceAi(c: Context) {
 // Id delle fazioni nella tabella factions, per le statistiche in matches (P4).
 const FACTION_IDS: Record<DeckFaction, number> = { CHI: 1, INF: 2, PES: 3, BUL: 4, GRO: 5, CLO: 6 };
 export async function createNewMatch(userId: string, primary: DeckFaction, secondary: DeckFaction): Promise<{ matchId: string; state: GameState }> {
-  const humanColors = chosenColors(primary, secondary), aiColors = randomColors();
   const [pool, catalogue] = await Promise.all([deckPool(), offer()]);
+  const available = availableFactions(pool);
+  const humanColors = chosenColors(primary, secondary, available), aiColors = randomColors(available);
   const humanCards = deck(pool, humanColors), aiCards = deck(pool, aiColors);
   const { data, error } = await db.from('matches').insert({ player_id: userId, opponent_type: 'ai', opponent_name: 'IA Bellum Penumbrum', player_won: null, turns_count: 0, duration_seconds: 0, player_faction_id: FACTION_IDS[primary], opponent_faction_id: FACTION_IDS[aiColors.primary] }).select('id').single();
   if (error || !data) throw new Error(`Creazione partita: ${error?.message ?? 'nessun ID'}`);
@@ -833,9 +880,9 @@ export async function playCard(id: string, p: PlayerIndex, cardInstanceId: strin
     if ((d.card_type === 'monster' || d.card_type === 'terraforma') && (!options.position || !valid(options.position) || options.position.row !== home(p) || at(s, options.position))) throw new Error('Scegli una cella libera della tua riga');
     if (d.card_type === 'aura' && (!options.targetInstanceId || !findCreature(s, options.targetInstanceId))) throw new Error('Seleziona una creatura alleata o nemica per l’Aura');
     if (!playableEffects(d)) throw new Error('Effetto carta non ancora supportato');
-    if (d.card_type !== 'aura') for (const fx of effects(d.effect_json).filter(targeted)) {
-      if (options.targetInstanceId && !target(s, p, fx, options.targetInstanceId)) throw new Error('Bersaglio non valido');
-      if (!options.targetInstanceId && eligible(s, p, fx).length && !(d.card_type === 'monster' && fx.type === 'heal' && units(s, p).length === 0)) throw new Error('Seleziona una creatura bersaglio');
+    if (d.card_type !== 'aura') for (const fx of effects(d.effect_json).filter(x => targeted(x) && x.trigger === undefined)) {
+      if (options.targetInstanceId && !validTarget(s, p, fx, options.targetInstanceId)) throw new Error('Bersaglio non valido');
+      if (!options.targetInstanceId && targetChoices(s, p, fx).length && !(d.card_type === 'monster' && fx.type === 'heal' && units(s, p).length === 0)) throw new Error('Seleziona una creatura bersaglio');
       if (!options.targetInstanceId && d.card_type !== 'monster') throw new Error('Questa carta richiede un bersaglio');
     }
     owner.hand = owner.hand.filter(x => x.instance_id !== inst.instance_id);
@@ -863,11 +910,12 @@ export async function attack(id: string, p: PlayerIndex, from: Position, targetP
     const attacker = at(s, from);
     if (attacker?.kind !== 'creature' || attacker.owner_index !== p || attacker.tired) throw new Error('Creatura non tua oppure stanca');
     const options = enemyNeighbours(s, from, p);
-    let victim: CreatureCell | null = null;
+    const attackable = [...options, ...enemyTerraformas(s, from, p)];
+    let victim: BoardCell | null = null;
     if (targetPosition.type === 'creature') {
-      if (!valid(targetPosition.position) || !options.some(q => q.row === targetPosition.position.row && q.col === targetPosition.position.col)) throw new Error('Bersaglio non ortogonalmente adiacente');
+      if (!valid(targetPosition.position) || !attackable.some(q => q.row === targetPosition.position.row && q.col === targetPosition.position.col)) throw new Error('Bersaglio non ortogonalmente adiacente');
       const chosen = at(s, targetPosition.position);
-      if (chosen?.kind !== 'creature') throw new Error('Solo le creature possono essere attaccate');
+      if (!chosen || (chosen.kind === 'terraforma' && chosen.hp === undefined)) throw new Error('Questo bersaglio non può essere attaccato');
       victim = chosen;
     } else if (targetPosition.playerIndex !== other(p) || options.length) throw new Error('Attacco diretto vietato');
     prepend(s, { kind: 'declare_event', event: { kind: 'attack', actor: p, instance_id: attacker.instance_id, from, target: targetPosition, ...(victim ? { target_instance_id: victim.instance_id } : {}) } });

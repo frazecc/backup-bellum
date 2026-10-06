@@ -1,27 +1,33 @@
 // backend/engine-deck.ts — catalogo, mazzi a tre colori e regole di giocabilità.
 import { randomUUID } from 'node:crypto';
 import type {
-  CardData, CardEffectJson, CardInstance, DeckColors, DeckFaction, PlayerIndex, PlayerState,
+  CardData, CardEffectJson, CardInstance, DeckColors, DeckFaction, EffectDefinition, PlayerIndex, PlayerState,
 } from './types.js';
 import { effects, shuffle, supported } from './engine-board.js';
 import { db } from './engine-storage.js';
 import { engineErrors } from './card-rules.js';
 
+// Effetto con trigger valido per Aure ("equipped_creature_attacks") e Terraforme ("own_monster_summoned").
+function triggeredOk(e: EffectDefinition, trigger: string) {
+  if (e.trigger !== trigger || !Number.isInteger(e.amount) || Number(e.amount) < 0 || Number(e.amount) > 20) return false;
+  if (e.type === 'heal' || e.type === 'draw') return e.target === 'self';
+  if (e.type === 'discard') return e.target === 'opponent';
+  if (e.type === 'damage') return e.target === 'any_target' || e.target === 'opponent';
+  if (e.type === 'buff') return e.target === 'triggering_creature' && (e.stat === 'hp' || e.stat === 'attack')
+    && (e.duration === 'permanent' || (e.duration === 'turn' && e.stat === 'attack'));
+  return false;
+}
 export function passiveAura(d: CardData) {
   const list = effects(d.effect_json);
-  return list.length > 0 && list.every(e =>
+  return list.length > 0 && list.every(e => triggeredOk(e, 'equipped_creature_attacks') || e.trigger === undefined && (
     e.type === 'buff' && e.duration === 'while_attached' && (e.target === 'enchanted_creature' || e.target === 'all_creatures_self') && (e.stat === 'hp' || e.stat === 'attack') && Number.isInteger(e.amount) && Number(e.amount) >= 0 && Number(e.amount) <= 20
-    || e.type === 'movement_cost' && e.duration === 'while_attached' && e.target === 'enchanted_creature' && e.amount === 0);
+    || e.type === 'movement_cost' && e.duration === 'while_attached' && e.target === 'enchanted_creature' && e.amount === 0));
 }
 export function passiveLand(d: CardData) {
   const list = effects(d.effect_json);
-  // Due forme ammesse: bonus continuo a tutte le tue creature, oppure bonus al Mostro evocato ogni volta che ne evochi uno.
-  return list.length > 0 && list.every(e => e.type === 'buff' && (e.stat === 'hp' || e.stat === 'attack')
-    && Number.isInteger(e.amount) && Number(e.amount) >= 0 && Number(e.amount) <= 20
-    && (e.trigger === undefined
-      ? e.duration === 'while_in_play' && e.target === 'all_creatures_self'
-      : e.trigger === 'own_monster_summoned' && e.target === 'triggering_creature'
-        && (e.duration === 'permanent' || (e.duration === 'turn' && e.stat === 'attack'))));
+  return list.length > 0 && list.every(e => triggeredOk(e, 'own_monster_summoned') || e.trigger === undefined
+    && e.type === 'buff' && e.duration === 'while_in_play' && e.target === 'all_creatures_self' && (e.stat === 'hp' || e.stat === 'attack')
+    && Number.isInteger(e.amount) && Number(e.amount) >= 0 && Number(e.amount) <= 20);
 }
 export function playableEffects(d: CardData) {
   const list = effects(d.effect_json);
@@ -29,14 +35,22 @@ export function playableEffects(d: CardData) {
 }
 
 const deckFactions: DeckFaction[] = ['CHI', 'INF', 'PES', 'BUL', 'GRO', 'CLO'];
-export function chosenColors(primary: DeckFaction, secondary: DeckFaction): DeckColors {
+// Solo le fazioni con almeno 2 carte giocabili possono entrare in un mazzo: finché una fazione non ha carte
+// non viene scelta a caso come terzo colore (né per l'IA) e il giocatore riceve un messaggio chiaro.
+export function availableFactions(pool: DeckCard[]): DeckFaction[] {
+  return deckFactions.filter(f => pool.filter(x => x.faction === f).length >= 2);
+}
+export function chosenColors(primary: DeckFaction, secondary: DeckFaction, available: DeckFaction[] = deckFactions): DeckColors {
   if (!deckFactions.includes(primary) || !deckFactions.includes(secondary) || primary === secondary)
     throw new Error('Seleziona due colori distinti tra le sei fazioni');
-  const tertiary = shuffle(deckFactions.filter(x => x !== primary && x !== secondary))[0];
+  for (const f of [primary, secondary]) if (!available.includes(f)) throw new Error(`La fazione ${f} non ha ancora abbastanza carte: scegli un altro colore`);
+  const tertiary = shuffle(available.filter(x => x !== primary && x !== secondary))[0];
+  if (!tertiary) throw new Error('Servono almeno tre fazioni con carte per costruire i mazzi');
   return { primary, secondary, tertiary };
 }
-export function randomColors(): DeckColors {
-  const [primary, secondary, tertiary] = shuffle(deckFactions);
+export function randomColors(available: DeckFaction[] = deckFactions): DeckColors {
+  const [primary, secondary, tertiary] = shuffle([...available]);
+  if (!tertiary) throw new Error('Servono almeno tre fazioni con carte per costruire i mazzi');
   return { primary, secondary, tertiary };
 }
 type DeckCard = { id: string; cost: number; type: string; faction: DeckFaction; raw: CardEffectJson | null; death: CardEffectJson | null };
@@ -120,7 +134,7 @@ export async function offer() {
   const valid = data.filter(x => engineErrors(x).length === 0);
   if (valid.length < data.length) console.warn(`Mostrissimi non validi: ${data.filter(x => !valid.includes(x)).map(x => x.id).join(', ')}`);
   const ids = shuffle((valid.length >= 3 ? valid : data).map(x => String(x.id)));
-  if (!ids.length) throw new Error('Il catalogo non contiene Mostrissimi');
+  // Senza Mostrissimi in catalogo la partita parte comunque, con l'offerta condivisa vuota.
   return { shared: ids.slice(0, 3).map(card_id => ({ card_id, instance_id: randomUUID() })), remaining: ids.slice(3) };
 }
 export function player(index: PlayerIndex, userId: string | null, deckCards: CardInstance[]): PlayerState {
