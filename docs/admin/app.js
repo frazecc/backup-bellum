@@ -40,11 +40,11 @@ function build(e, ty) {
 function parseEff(j, ty) {
   if (!j || typeof j !== 'object') return null;
   const t = j.type === 'damage_creature' ? 'damage' : j.type === 'nope' ? 'counter' : j.type;
-  const key = Object.keys(EF).find((k) => { const s = EF[k].spec; return s.for.includes(ty) && s.json.type === t && (!s.json.stat || s.json.stat === j.stat) && (s.json.trigger ?? null) === (j.trigger ?? null); });
+  const key = Object.keys(EF).find((k) => { const s = EF[k].spec; return s.for.includes(ty) && s.json.type === t && (!s.json.stat || s.json.stat === j.stat) && (s.json.trigger ?? null) === (j.trigger ?? null) && ('keep' in s.json) === ('keep' in j); });
   if (!key) return { raw: j };
   const fk = j.filter ? Object.keys(j.filter) : [];
   if (j.filter && (ty !== 'terraforma' || fk.length !== 1 || !['subtype', 'faction'].includes(fk[0]))) return { raw: j };
-  return { key, n: j.amount ?? 1, t: j.target ?? EF[key].t?.[0][0], d: j.duration ?? EF[key].d?.[0][0], flt: fk.length ? { k: fk[0], v: j.filter[fk[0]] } : null };
+  return { key, n: j.amount ?? j.keep ?? 1, t: j.target ?? EF[key].t?.[0][0], d: j.duration ?? EF[key].d?.[0][0], flt: fk.length ? { k: fk[0], v: j.filter[fk[0]] } : null };
 }
 
 /* ---------- Validazione ---------- */
@@ -115,6 +115,7 @@ function effErr(e, ty, trg, death = false) {
   const t = e.type === 'damage_creature' ? 'damage' : e.type === 'nope' ? 'counter' : e.type;
   const amount = e.amount;
   if (amount !== undefined && !(Number.isInteger(amount) && amount >= 0 && amount <= 20)) E.push(`${t}: la quantità deve essere tra 0 e 20.`);
+  if (e.keep !== undefined && (t !== 'discard' || !Number.isInteger(e.keep) || e.keep < 0 || e.keep > 20 || e.trigger !== undefined)) E.push('Scarto \"tutta la mano tranne N\": solo per lo scarto, con N tra 0 e 20 e senza trigger.');
   if (t === 'counter') {
     if (ty !== 'instant' || !CTRG.includes(trg)) E.push('NOPE: serve una Trappola con evento \"carta dalla mano\", \"ingresso mostro\" o \"prima del Mostrissimo\".');
     return E;
