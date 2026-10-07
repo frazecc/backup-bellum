@@ -52,6 +52,8 @@ function effectErrors(e: Json, type: string, trigger: unknown, death = false): s
   const amount = e.amount as number | undefined;
   if (amount !== undefined && !(Number.isInteger(amount) && amount >= 0 && amount <= 20))
     out.push(`${t}: la quantità deve essere tra 0 e 20.`);
+  if (e.keep !== undefined && (t !== 'discard' || !Number.isInteger(e.keep) || (e.keep as number) < 0 || (e.keep as number) > 20 || e.trigger !== undefined))
+    out.push('Scarto "tutta la mano tranne N": solo per lo scarto, con N tra 0 e 20 e senza trigger.');
   if (t === 'counter') {
     if (type !== 'instant' || !COUNTER_TRIGGERS.includes(String(trigger)))
       out.push('NOPE: serve una Trappola con evento "carta dalla mano", "ingresso mostro" o "prima del Mostrissimo".');

@@ -193,7 +193,9 @@ async function applyEffect(c: Context, task: ResolveEffectWork) {
   } else if (e.type === 'discard') {
     const recipient = e.target === 'self' ? p : foe;
     let count = 0;
-    while (count < n && s.players[recipient].hand.length) {
+    // "keep": scarta tutta la mano tranne N carte (a caso), invece di una quantità fissa.
+    const toDiscard = e.keep !== undefined ? Math.max(0, s.players[recipient].hand.length - Number(e.keep)) : n;
+    while (count < toDiscard && s.players[recipient].hand.length) {
       const i = Math.floor(Math.random() * s.players[recipient].hand.length);
       s.players[recipient].graveyard.push(s.players[recipient].hand.splice(i, 1)[0]); count++;
     }
@@ -563,7 +565,7 @@ async function playTrap(c: Context, e: PendingEvent, trapId: string, targetId: s
 async function declare(c: Context, e: PendingEvent) {
   if (e.kind === 'monster_etb') {
     const d = await getCardData(e.card_id), fx = effects(d.effect_json)[e.effect_index];
-    if (!findCreature(c.s, e.source_instance_id) || !fx || targeted(fx) && !target(c.s, e.actor, fx, e.target_instance_id)) {
+    if (!findCreature(c.s, e.source_instance_id) || !fx || targeted(fx) && !validTarget(c.s, e.actor, fx, e.target_instance_id)) {
       prepend(c.s, { kind: 'apply_event', event: e }); return;
     }
   }
@@ -957,8 +959,8 @@ export async function completeMostrissimoSummon(id: string, p: PlayerIndex, posi
     const d = await getCardData(pending.card_id);
     if (!playableEffects(d)) throw new Error('Effetto del Mostrissimo non supportato');
     const aimed = effects(d.effect_json).filter(targeted);
-    if (targetId && !aimed.every(fx => !!target(s, p, fx, targetId))) throw new Error('Bersaglio non valido');
-    if (!targetId && aimed.some(fx => eligible(s, p, fx).length)) throw new Error('Seleziona una creatura bersaglio');
+    if (targetId && !aimed.every(fx => validTarget(s, p, fx, targetId))) throw new Error('Bersaglio non valido');
+    if (!targetId && aimed.some(fx => targetChoices(s, p, fx).length)) throw new Error('Seleziona un bersaglio');
     pending.stage = 'before_entry'; pending.position = position; pending.target_instance_id = targetId;
     prepend(s, { kind: 'declare_event', event: { kind: 'mostrissimo_before_entry', actor: p, card_id: d.id, offered_instance_id: pending.offered_instance_id, position, target_instance_id: targetId } });
   });
