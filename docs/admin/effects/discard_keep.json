@@ -1,0 +1,17 @@
+{
+ "order": 2.5,
+ "label": "🗑️ Scarta tutta la mano tranne N carte",
+ "for": [
+  "monster",
+  "mostrissimo",
+  "maledizione",
+  "instant"
+ ],
+ "amount": true,
+ "json": {
+  "type": "discard",
+  "keep": "{n}",
+  "target": "opponent"
+ },
+ "text": "L'avversario scarta tutta la mano, tranne {n} {carte} (a caso)"
+}
