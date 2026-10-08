@@ -15,7 +15,7 @@ import {
   phaseNumber, playerTargetId, prepend, put, reactionTrigger, supported, target, targetChoices, targeted, units, valid, validTarget,
 } from './engine-board.js';
 import { commit, db, getCardData, load, logMatchAction } from './engine-storage.js';
-import { availableFactions, chosenColors, deck, deckPool, offer, playableEffects, player, randomColors } from './engine-deck.js';
+import { availableFactions, bossFactions, chosenColors, deck, deckPool, offer, playableEffects, player, randomColors } from './engine-deck.js';
 export { getCardData, logMatchAction, saveGameState } from './engine-storage.js';
 
 type Context = { id: string; s: GameState; logs: MatchLogEntry[]; deaths: DeathTriggerSource[] };
@@ -111,7 +111,8 @@ async function reconcilePassives(c: Context) {
       }
     }
   }
-  for (const land of cells(s).filter(x => x.cell.kind === 'terraforma')) {
+  // Bonus continui: Terraforme e creature (Mostri e Mostrissimi) con un effetto "finché è in campo".
+  for (const land of cells(s).filter(x => x.cell.kind === 'terraforma' || x.cell.kind === 'creature')) {
     const d = await getCardData(land.cell.card_id);
     for (const e of effects(d.effect_json)) {
       if (e.type !== 'buff' || e.duration !== 'while_in_play' || e.target !== 'all_creatures_self' || !e.stat) continue;
@@ -153,7 +154,10 @@ async function destroyCell(c: Context, position: Position, killer: PlayerIndex, 
   const d = await getCardData(cell.card_id);
   log(c, cell.owner_index, reason === 'sacrifice' ? 'permanent_sacrificed' : 'permanent_destroyed', `${d.name} lascia il campo.`, { card_id: d.id, instance_id: cell.instance_id, position });
   const indices = effects(d.effect_on_death_json).map((_, index) => index);
-  if (cell.kind === 'creature') c.deaths.push({ instance_id: cell.instance_id, card_id: d.id, owner_index: cell.owner_index, effect_indices: indices });
+  if (cell.kind === 'creature') {
+    c.deaths.push({ instance_id: cell.instance_id, card_id: d.id, owner_index: cell.owner_index, effect_indices: indices });
+    await queueTerraformaTriggers(c, cell.owner_index, 'own_creature_dies');
+  }
   else prepend(c.s, ...deathTasks([{ instance_id: cell.instance_id, card_id: d.id, owner_index: cell.owner_index, effect_indices: indices }]));
   if (reconcile) await reconcilePassives(c);
   void killer;
@@ -324,19 +328,24 @@ function failSummon(c: Context, message: string) {
   c.s.mostrissimo_result = { outcome: 'failed', message };
   log(c, -1, 'mostrissimo_failed', message);
 }
-// Terraforme in campo con trigger "quando evochi un tuo Mostro": un compito per ogni effetto che
-// corrisponde (filtro compreso). Va chiamata PRIMA di queueOnPlay: prepend() inserisce in testa,
-// quindi gli effetti all'ingresso del Mostro si risolvono per primi e i trigger subito dopo.
-async function queueTerraformaTriggers(c: Context, p: PlayerIndex, summoned: CardInstance) {
+// Terraforme in campo con un trigger del proprietario: un compito per ogni effetto che corrisponde.
+//  * own_monster_summoned: evochi una creatura (Mostro o Mostrissimo); "subject" è la creatura evocata,
+//    il filtro per sottotipo/fazione si controlla su di lei e i bonus la colpiscono;
+//  * own_turn_start: inizia il turno del proprietario;
+//  * own_creature_dies: muore una creatura del proprietario.
+// Va chiamata PRIMA di queueOnPlay: prepend() inserisce in testa, quindi gli effetti all'ingresso della
+// creatura si risolvono per primi e i trigger subito dopo.
+async function queueTerraformaTriggers(c: Context, p: PlayerIndex, trigger: 'own_monster_summoned' | 'own_turn_start' | 'own_creature_dies', subject?: CardInstance) {
   const s = c.s, work: PendingWork[] = [];
   for (const land of cells(s).filter(x => x.cell.kind === 'terraforma' && x.cell.owner_index === p)) {
     const d = await getCardData(land.cell.card_id);
     for (const [effect_index, e] of effects(d.effect_json).entries()) {
-      if (e.trigger !== 'own_monster_summoned') continue;
-      if (e.filter && !(await matchesFilter(summoned.card_id, e.filter))) continue;
+      if (e.trigger !== trigger) continue;
+      if (trigger === 'own_monster_summoned' && e.filter && subject && !(await matchesFilter(subject.card_id, e.filter))) continue;
       work.push({
         kind: 'resolve_effect', owner: p, card_id: land.cell.card_id, source_instance_id: land.cell.instance_id,
-        source: 'terraforma_trigger', effect_index, target_instance_id: e.target === 'triggering_creature' ? summoned.instance_id : null, require_source_on_board: true,
+        source: 'terraforma_trigger', effect_index,
+        target_instance_id: e.target === 'triggering_creature' && subject ? subject.instance_id : null, require_source_on_board: true,
       });
     }
   }
@@ -359,17 +368,18 @@ async function queueAuraAttackTriggers(c: Context, attacker: CreatureCell) {
   prepend(c.s, ...work);
 }
 function queueOnPlay(s: GameState, p: PlayerIndex, d: CardData, sourceId: string, targetId: string | null, creature: boolean) {
+  // Gli effetti continui ("finché è in campo") non sono effetti all'ingresso: li gestisce reconcilePassives.
   const list = effects(d.effect_json);
-  const work: PendingWork[] = list.map((fx, effect_index) => creature ? {
+  const work: PendingWork[] = list.flatMap((fx, effect_index) => fx.duration === 'while_in_play' ? [] : [creature ? {
     kind: 'declare_event', event: {
       kind: 'monster_etb', actor: p, source_instance_id: sourceId,
       card_id: d.id, effect_index,
       target_instance_id: targetId ?? (fx.type === 'heal' && fx.target === 'any_creature' && units(s, p).length === 1 ? sourceId : null),
     },
-  } : {
+  } as PendingWork : {
     kind: 'resolve_effect', owner: p, card_id: d.id, source_instance_id: sourceId,
     source: 'on_play', effect_index, target_instance_id: targetId, require_source_on_board: false,
-  });
+  } as PendingWork]);
   if (creature && s.pending_mostrissimo?.offered_instance_id === sourceId)
     work.push({ kind: 'finish_mostrissimo', actor: p, card_id: d.id });
   prepend(s, ...work);
@@ -386,6 +396,7 @@ async function applyEvent(c: Context, e: PendingEvent) {
     log(c, p, 'upkeep', `${label(p)} ottiene ${player.current_mana}/${player.max_mana} mana e pesca ${count} carta/e.`);
     if (s.status !== 'running') return;
     prepend(s, { kind: 'declare_event', event: { kind: 'upkeep_end', actor: p } });
+    await queueTerraformaTriggers(c, p, 'own_turn_start');
   } else if (e.kind === 'upkeep_end') {
     s.phase = 'main';
     log(c, p, 'upkeep_end', `Termina il MANATENIMENTO di ${label(p)}.`);
@@ -417,7 +428,7 @@ async function applyEvent(c: Context, e: PendingEvent) {
     }
     s.players[p].color_counters[d.faction_code] = (s.players[p].color_counters[d.faction_code] ?? 0) + 1;
     log(c, p, 'play_card', `${label(p)} gioca ${d.name}.`, { card_id: d.id, instance_id: paid.instance_id, position: e.options.position ?? null });
-    if (d.card_type === 'monster') await queueTerraformaTriggers(c, p, { instance_id: paid.instance_id, card_id: d.id });
+    if (d.card_type === 'monster') await queueTerraformaTriggers(c, p, 'own_monster_summoned', { instance_id: paid.instance_id, card_id: d.id });
     if (d.card_type === 'monster' || d.card_type === 'maledizione') queueOnPlay(s, p, d, paid.instance_id, e.options.targetInstanceId ?? null, d.card_type === 'monster');
   } else if (e.kind === 'move') {
     const unit = at(s, e.from);
@@ -484,6 +495,7 @@ async function applyEvent(c: Context, e: PendingEvent) {
     pending.stage = 'etb'; pending.position = e.position; pending.target_instance_id = e.target_instance_id;
     s.mostrissimo_result = { outcome: 'summoned', message: `${d.name} è stato evocato.` };
     log(c, p, 'mostrissimo_summoned', `${label(p)} evoca ${d.name}.`, { card_id: d.id, instance_id: offered.instance_id, position: e.position });
+    await queueTerraformaTriggers(c, p, 'own_monster_summoned', { instance_id: offered.instance_id, card_id: d.id });
     queueOnPlay(s, p, d, offered.instance_id, e.target_instance_id, true);
     if (!effects(d.effect_json).length) delete s.pending_mostrissimo;
   } else if (e.kind === 'monster_etb') {
@@ -855,8 +867,8 @@ async function advanceAi(c: Context) {
 const FACTION_IDS: Record<DeckFaction, number> = { CHI: 1, INF: 2, PES: 3, BUL: 4, GRO: 5, CLO: 6 };
 export async function createNewMatch(userId: string, primary: DeckFaction, secondary: DeckFaction): Promise<{ matchId: string; state: GameState }> {
   const [pool, catalogue] = await Promise.all([deckPool(), offer()]);
-  const available = availableFactions(pool);
-  const humanColors = chosenColors(primary, secondary, available), aiColors = randomColors(available);
+  const available = availableFactions(pool), bosses = bossFactions(pool);
+  const humanColors = chosenColors(primary, secondary, available, bosses), aiColors = randomColors(available, bosses);
   const humanCards = deck(pool, humanColors), aiCards = deck(pool, aiColors);
   const { data, error } = await db.from('matches').insert({ player_id: userId, opponent_type: 'ai', opponent_name: 'IA Bellum Penumbrum', player_won: null, turns_count: 0, duration_seconds: 0, player_faction_id: FACTION_IDS[primary], opponent_faction_id: FACTION_IDS[aiColors.primary] }).select('id').single();
   if (error || !data) throw new Error(`Creazione partita: ${error?.message ?? 'nessun ID'}`);

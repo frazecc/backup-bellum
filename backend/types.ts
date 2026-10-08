@@ -39,7 +39,8 @@ export type EffectDefinition = {
   filter?: { subtype?: string; faction?: DeckFaction };
   // Solo Terraforme: l'effetto si attiva ogni volta che il proprietario evoca un Mostro (bersaglio: quel Mostro).
   // Aure: l'effetto si attiva ogni volta che la creatura equipaggiata attacca (bersaglio: quella creatura).
-  trigger?: 'own_monster_summoned' | 'equipped_creature_attacks';
+  // Terraforme: evochi una creatura (own_monster_summoned), inizia il tuo turno (own_turn_start), una tua creatura muore (own_creature_dies).
+  trigger?: 'own_monster_summoned' | 'own_turn_start' | 'own_creature_dies' | 'equipped_creature_attacks';
   // Solo scarto: scarta tutta la mano tranne N carte (a caso), al posto di una quantità fissa.
   keep?: number;
 };
