@@ -176,6 +176,7 @@ function engineErrors(c) {
   if (!Number.isInteger(c.mana_cost) || c.mana_cost < 0) E.push('Costo mana non valido.');
   if (CREA.includes(ty) && (!Number.isInteger(c.attack) || !Number.isInteger(c.hp))) E.push('Attacco e PV sono obbligatori.');
   if (ty === 'mostrissimo' && !(Number.isInteger(c.sacrifice_cost) && c.sacrifice_cost >= 0)) E.push('Sacrifici non validi.');
+  if (c.is_boss && !(ty === 'monster' && c.mana_cost === 6)) E.push('Un boss è un Mostro da 6 mana.');
   if (ty === 'terraforma' && !(Number.isInteger(c.hp) && c.hp >= 1)) E.push('Le Terraforme hanno PV (almeno 1): si possono attaccare e distruggere.');
   const j = c.effect_json, L = !j ? [] : j.effects || [j], trg = j?.reaction_trigger?.event;
   if (['maledizione', 'instant', 'aura', 'terraforma'].includes(ty) && !L.length) E.push('Questo tipo richiede almeno un effetto.');
@@ -348,7 +349,9 @@ function onRow(ev) {
 function types() {
   const ty = $('type').value, c = CREA.includes(ty);
   $('gmana').hidden = ty === 'mostrissimo'; $('gsac').hidden = ty !== 'mostrissimo';
-  $('gstats').hidden = !c && ty !== 'terraforma'; $('atk').disabled = ty === 'terraforma'; $('gkw').hidden = !c; $('gdeath').hidden = !c; $('gtrap').hidden = ty !== 'instant';
+  $('gstats').hidden = !c && ty !== 'terraforma'; $('atk').disabled = ty === 'terraforma'; $('gkw').hidden = !c; $('gdeath').hidden = !c;
+  if ($('gboss')) { $('gboss').hidden = ty !== 'monster'; if (ty !== 'monster') $('isboss').checked = false; }
+  $('gtrap').hidden = ty !== 'instant';
   S.eff = S.eff.filter((e) => e.raw || (ty && EF[e.key].for.includes(ty)));
   if (!c) S.deaths = [];
   $('elab').textContent = 'Effetti (nessuno se vuoto)';
@@ -394,7 +397,8 @@ function collect() {
     keywords: cr ? [...($('kw').checked ? ['iperattivo'] : []), ...S.kwo] : [],
     effect_json: ej, effect_on_death_json: cr && S.deaths.length ? deathJson() : null,
     effect_text: $('txt').value.trim(), flavor_text: $('fl').value.trim() || null,
-    rarity: $('rar').value, subtype: subNames().join(' ') || null
+    rarity: $('rar').value, subtype: subNames().join(' ') || null,
+    is_boss: ty === 'monster' && !!$('isboss')?.checked
   };
 }
 
@@ -455,6 +459,7 @@ function fill(c, dup) {
   $('et').textContent = dup ? 'Duplica carta: scrivi un nuovo nome' : `Modifica: ${c.name}`;
   $('save').textContent = dup ? 'Salva carta' : 'Salva modifiche';
   $('name').value = dup ? '' : c.name; $('fac').value = c.faction_id; $('type').value = c.card_type; $('rar').value = c.rarity || 'common';
+  if ($('isboss')) $('isboss').checked = !dup && !!c.is_boss;
   $('mana').value = c.mana_cost ?? 0; $('sac').value = c.sacrifice_cost ?? 0; $('atk').value = c.attack ?? 0; $('hp').value = c.hp ?? 1;
   const kws = Array.isArray(c.keywords) ? c.keywords : [];
   $('kw').checked = kws.some((k) => String(k).toLowerCase() === 'iperattivo');
@@ -653,6 +658,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const fe = Object.entries(FAC).map(([k, v]) => [k, v[1]]), te = Object.entries(TYPES), re = Object.entries(RAR);
   opts($('ff'), fe, 'Tutte le fazioni'); opts($('ft'), te, 'Tutti i tipi'); opts($('fr'), re, 'Tutte le rarità');
   opts($('fac'), fe, 'Scegli…'); opts($('type'), te, 'Scegli…'); opts($('rar'), re);
+  // Campo "Boss" (solo per i Mostri): il mazzo ha un solo boss, un Mostro da 6 mana del colore principale.
+  if ($('gstats') && !$('gboss')) {
+    const lab = document.createElement('label'); lab.id = 'gboss'; lab.hidden = true;
+    lab.innerHTML = '<input type="checkbox" id="isboss"> Boss del colore (Mostro da 6 mana: uno solo nel mazzo, del colore principale)';
+    $('gstats').insertAdjacentElement('afterend', lab);
+    $('isboss').addEventListener('change', () => refresh());
+  }
   document.querySelectorAll('nav button').forEach((b) => b.addEventListener('click', () => { tab(b.dataset.tab); if (b.dataset.tab === 'editor' && !S.edit) refresh(); }));
   ['q', 'ff', 'ft', 'fr', 'fs', 'cmin', 'cmax', 'amin', 'amax', 'hmin', 'hmax'].forEach((id) => $(id).addEventListener('input', draw));
   $('vw').addEventListener('click', () => { S.view = S.view === 'grid' ? 'list' : 'grid'; $('vw').textContent = `Vista: ${S.view === 'grid' ? 'griglia' : 'lista'}`; draw(); });
