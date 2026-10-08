@@ -191,15 +191,15 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
   background: linear-gradient(145deg, #292c37, #191b24); grid-column: auto; grid-row: auto;
 }
 #stage #mostrissimo-panel > h2 { flex: none; margin: 0 0 calc(3 * var(--p)); color: #f0d28f; font-size: calc(11.5 * var(--p)); font-weight: 800; text-align: center; letter-spacing: .03em; }
-#stage #mostrissimo-panel .boss-offer {
+#stage #mostrissimo-panel .mostrissimo-offer {
   display: flex; flex-direction: column; align-items: stretch; justify-content: stretch; gap: calc(4 * var(--p));
   flex: 1 1 0; width: 100%; min-width: 0; min-height: 0; max-width: 100%; max-height: none; padding: 0; overflow: hidden;
 }
-#stage #mostrissimo-panel .boss-card {
+#stage #mostrissimo-panel .mostrissimo-card {
   position: relative; flex: 1 1 0; display: block; width: 100%; min-width: 0; min-height: 0; height: auto; max-height: none; aspect-ratio: auto;
   padding: 0; overflow: hidden; border: 2px solid #cbbd9b; border-radius: calc(5 * var(--p)); background: #25232e;
 }
-#stage #mostrissimo-panel .boss-card > .board-card > .board-card-titlebar > .board-card-cost {
+#stage #mostrissimo-panel .mostrissimo-card > .board-card > .board-card-titlebar > .board-card-cost {
   min-width: calc(24 * var(--p)); min-height: calc(24 * var(--p)); font-size: calc(12.5 * var(--p));
 }
 /* Sacrifici da pagare: scheda sopra la plancia (non sposta il layout) */

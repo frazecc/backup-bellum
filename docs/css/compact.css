@@ -12,7 +12,7 @@
 .game-screen .hand-section:not(#mostrissimo-panel){text-align:center}
 .game-screen .hand-section .section-heading{justify-content:center}
 .game-screen .hand{justify-content:safe center}
-.game-screen #mostrissimo-panel .boss-offer{justify-content:safe center}
+.game-screen #mostrissimo-panel .mostrissimo-offer{justify-content:safe center}
 
 /* La scacchiera deve stare nel riquadro disponibile ed essere quadrata. */
 .game-screen .battlefield{justify-content:flex-start}
@@ -57,16 +57,16 @@
 .game-screen .hand-card.playable>.board-card{border-color:#ffe49b;box-shadow:0 0 0 1px #fff4cc,0 0 10px #f5d970}
 
 /* Offerta: ritratti minimali con costo in sacrifici immediatamente visibile. */
-.game-screen #mostrissimo-panel .boss-card{position:relative;overflow:hidden;border:1px solid #cbbd9b;border-radius:.3rem}
-.game-screen #mostrissimo-panel .boss-card>.board-card{display:block;position:relative;width:100%;height:100%;border:0;border-radius:0;overflow:hidden}
-.game-screen #mostrissimo-panel .boss-card>.board-card>.board-card-art{position:absolute;inset:0;width:100%;height:100%}
-.game-screen #mostrissimo-panel .boss-card>.board-card>.board-card-art img{width:100%;height:100%;object-fit:cover}
-.game-screen #mostrissimo-panel .boss-card>.board-card>.board-card-titlebar{display:block!important;position:absolute;z-index:2;top:.1rem;right:.1rem;width:auto;padding:0;border:0;background:none}
-.game-screen #mostrissimo-panel .boss-card>.board-card>.board-card-titlebar>.board-card-name{display:none}
-.game-screen #mostrissimo-panel .boss-card>.board-card>.board-card-titlebar>.board-card-cost{display:grid;min-width:1.6rem;min-height:1.6rem;place-items:center;padding:.1rem;border:1px solid #fff1be;border-radius:50%;background:#291d39ef;color:#fff;font-weight:900;font-size:.78rem;text-shadow:0 1px #000}
-.game-screen #mostrissimo-panel .boss-card>.board-card>.board-card-type,
-.game-screen #mostrissimo-panel .boss-card>.board-card>.board-card-effect,
-.game-screen #mostrissimo-panel .boss-card>.board-card>.board-card-footer{display:none!important}
+.game-screen #mostrissimo-panel .mostrissimo-card{position:relative;overflow:hidden;border:1px solid #cbbd9b;border-radius:.3rem}
+.game-screen #mostrissimo-panel .mostrissimo-card>.board-card{display:block;position:relative;width:100%;height:100%;border:0;border-radius:0;overflow:hidden}
+.game-screen #mostrissimo-panel .mostrissimo-card>.board-card>.board-card-art{position:absolute;inset:0;width:100%;height:100%}
+.game-screen #mostrissimo-panel .mostrissimo-card>.board-card>.board-card-art img{width:100%;height:100%;object-fit:cover}
+.game-screen #mostrissimo-panel .mostrissimo-card>.board-card>.board-card-titlebar{display:block!important;position:absolute;z-index:2;top:.1rem;right:.1rem;width:auto;padding:0;border:0;background:none}
+.game-screen #mostrissimo-panel .mostrissimo-card>.board-card>.board-card-titlebar>.board-card-name{display:none}
+.game-screen #mostrissimo-panel .mostrissimo-card>.board-card>.board-card-titlebar>.board-card-cost{display:grid;min-width:1.6rem;min-height:1.6rem;place-items:center;padding:.1rem;border:1px solid #fff1be;border-radius:50%;background:#291d39ef;color:#fff;font-weight:900;font-size:.78rem;text-shadow:0 1px #000}
+.game-screen #mostrissimo-panel .mostrissimo-card>.board-card>.board-card-type,
+.game-screen #mostrissimo-panel .mostrissimo-card>.board-card>.board-card-effect,
+.game-screen #mostrissimo-panel .mostrissimo-card>.board-card>.board-card-footer{display:none!important}
 
 /* La carta espansa mantiene integralmente il suo design e i comandi sotto. */
 .card-detail-overlay .game-card{border-width:.32rem}
@@ -74,6 +74,6 @@
 .card-detail-overlay .game-card-rules{display:block}
 .card-detail-overlay .detail-actions{justify-content:center}
 
-@media(max-width:900px){.game-screen .shared-board{height:100%;width:auto;max-width:100%;max-height:100%}.game-screen #mostrissimo-panel .boss-offer{justify-content:safe center}.game-screen .board-cell:not(.empty)>.board-card>.board-card-footer{font-size:clamp(.68rem,2.5vw,1rem)}}
-@media(max-width:520px){.game-screen .hand{height:72px}.game-screen .hand-card{flex-basis:64px}.game-screen .hand-card>.board-card>.board-card-titlebar>.board-card-cost{min-width:1.85rem;min-height:1.85rem;font-size:.94rem}.game-screen .board-cell:not(.empty)>.board-card>.board-card-footer{font-size:clamp(.58rem,3vw,.85rem)}.game-screen .board-cell:not(.empty)>.board-card>.board-card-footer>span{min-width:1.4em;min-height:1.4em;padding:.05em .11em}.game-screen #mostrissimo-panel .boss-card>.board-card>.board-card-titlebar>.board-card-cost{min-width:1.4rem;min-height:1.4rem;font-size:.7rem}}
+@media(max-width:900px){.game-screen .shared-board{height:100%;width:auto;max-width:100%;max-height:100%}.game-screen #mostrissimo-panel .mostrissimo-offer{justify-content:safe center}.game-screen .board-cell:not(.empty)>.board-card>.board-card-footer{font-size:clamp(.68rem,2.5vw,1rem)}}
+@media(max-width:520px){.game-screen .hand{height:72px}.game-screen .hand-card{flex-basis:64px}.game-screen .hand-card>.board-card>.board-card-titlebar>.board-card-cost{min-width:1.85rem;min-height:1.85rem;font-size:.94rem}.game-screen .board-cell:not(.empty)>.board-card>.board-card-footer{font-size:clamp(.58rem,3vw,.85rem)}.game-screen .board-cell:not(.empty)>.board-card>.board-card-footer>span{min-width:1.4em;min-height:1.4em;padding:.05em .11em}.game-screen #mostrissimo-panel .mostrissimo-card>.board-card>.board-card-titlebar>.board-card-cost{min-width:1.4rem;min-height:1.4rem;font-size:.7rem}}
 @media(max-height:700px){.game-screen .hand{height:58px}.game-screen .hand-card{flex-basis:52px}.game-screen .hand-card>.board-card>.board-card-titlebar>.board-card-cost{min-width:1.7rem;min-height:1.7rem;font-size:.82rem}}
