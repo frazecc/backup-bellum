@@ -586,10 +586,10 @@ async function drawMostrissimi() {
   const h = document.createElement('h2'); h.textContent = '✦ Offerta'; panel.append(h);
   if (!state) { panel.classList.add('hidden'); return; }
   panel.classList.remove('hidden');
-  const strip = document.createElement('div'); strip.className = 'boss-offer'; panel.append(strip);
+  const strip = document.createElement('div'); strip.className = 'mostrissimo-offer'; panel.append(strip);
   for (const inst of state.shared_mostrissimi ?? []) {
     const d = await card(inst.card_id), b = document.createElement('button');
-    b.type = 'button'; b.className = 'boss-card'; b.innerHTML = cardHTML(d,true);
+    b.type = 'button'; b.className = 'mostrissimo-card'; b.innerHTML = cardHTML(d,true);
     b.setAttribute('aria-label',`Apri ${d.name}, ${d.sacrifice_cost} sacrifici`);
     b.disabled = busy || !!reaction() || obligatory(); b.onclick = () => inspect('mostrissimo',inst.card_id); strip.append(b);
   }
