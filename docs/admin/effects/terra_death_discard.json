@@ -1,0 +1,16 @@
+{
+ "order": 33,
+ "label": "☠️ Terraforma: quando muore una tua creatura, l'avversario scarta",
+ "for": [
+  "terraforma"
+ ],
+ "amount": true,
+ "when": "Quando una tua creatura muore",
+ "json": {
+  "type": "discard",
+  "amount": "{n}",
+  "target": "opponent",
+  "trigger": "own_creature_dies"
+ },
+ "text": "Ogni volta che una tua creatura muore, l'avversario scarta {n} {carte} a caso"
+}

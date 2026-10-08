@@ -1,0 +1,16 @@
+{
+ "order": 27,
+ "label": "⏰ Terraforma: a inizio turno, cura",
+ "for": [
+  "terraforma"
+ ],
+ "amount": true,
+ "when": "All'inizio del tuo turno",
+ "json": {
+  "type": "heal",
+  "amount": "{n}",
+  "target": "self",
+  "trigger": "own_turn_start"
+ },
+ "text": "Ogni volta che inizia il tuo turno, guadagni {n} punti vita"
+}

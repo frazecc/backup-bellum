@@ -1,0 +1,29 @@
+{
+ "order": 34,
+ "label": "☠️ Terraforma: quando muore una tua creatura, danni",
+ "for": [
+  "terraforma"
+ ],
+ "amount": true,
+ "when": "Quando una tua creatura muore",
+ "targets": [
+  [
+   "any_target",
+   "Avversario o una creatura (a scelta)"
+  ],
+  [
+   "opponent",
+   "Giocatore avversario"
+  ]
+ ],
+ "json": {
+  "type": "damage",
+  "amount": "{n}",
+  "target": "{t}",
+  "trigger": "own_creature_dies"
+ },
+ "text": {
+  "any_target": "Ogni volta che una tua creatura muore, infliggi {n} danno a un bersaglio a tua scelta (avversario o creatura)",
+  "opponent": "Ogni volta che una tua creatura muore, infliggi {n} danno all'avversario"
+ }
+}

@@ -1,0 +1,16 @@
+{
+ "order": 29,
+ "label": "⏰ Terraforma: a inizio turno, l'avversario scarta",
+ "for": [
+  "terraforma"
+ ],
+ "amount": true,
+ "when": "All'inizio del tuo turno",
+ "json": {
+  "type": "discard",
+  "amount": "{n}",
+  "target": "opponent",
+  "trigger": "own_turn_start"
+ },
+ "text": "Ogni volta che inizia il tuo turno, l'avversario scarta {n} {carte} a caso"
+}

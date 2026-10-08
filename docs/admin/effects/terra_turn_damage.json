@@ -1,0 +1,29 @@
+{
+ "order": 30,
+ "label": "⏰ Terraforma: a inizio turno, danni",
+ "for": [
+  "terraforma"
+ ],
+ "amount": true,
+ "when": "All'inizio del tuo turno",
+ "targets": [
+  [
+   "any_target",
+   "Avversario o una creatura (a scelta)"
+  ],
+  [
+   "opponent",
+   "Giocatore avversario"
+  ]
+ ],
+ "json": {
+  "type": "damage",
+  "amount": "{n}",
+  "target": "{t}",
+  "trigger": "own_turn_start"
+ },
+ "text": {
+  "any_target": "Ogni volta che inizia il tuo turno, infliggi {n} danno a un bersaglio a tua scelta (avversario o creatura)",
+  "opponent": "Ogni volta che inizia il tuo turno, infliggi {n} danno all'avversario"
+ }
+}

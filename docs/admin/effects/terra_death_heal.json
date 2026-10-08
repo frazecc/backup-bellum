@@ -1,0 +1,16 @@
+{
+ "order": 31,
+ "label": "☠️ Terraforma: quando muore una tua creatura, cura",
+ "for": [
+  "terraforma"
+ ],
+ "amount": true,
+ "when": "Quando una tua creatura muore",
+ "json": {
+  "type": "heal",
+  "amount": "{n}",
+  "target": "self",
+  "trigger": "own_creature_dies"
+ },
+ "text": "Ogni volta che una tua creatura muore, guadagni {n} punti vita"
+}

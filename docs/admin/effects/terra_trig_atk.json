@@ -1,11 +1,11 @@
 {
  "order": 15,
- "label": "🎯 Terraforma: ogni mostro che evochi +Attacco",
+ "label": "🎯 Terraforma: ogni creatura che evochi +Attacco",
  "for": [
   "terraforma"
  ],
  "amount": true,
- "when": "Ogni volta che evochi un tuo mostro",
+ "when": "Ogni volta che evochi una creatura alleata",
  "durations": [
   [
    "permanent",
@@ -24,6 +24,6 @@
   "duration": "{d}",
   "trigger": "own_monster_summoned"
  },
- "text": "Ogni volta che evochi un tuo mostro, quel mostro ottiene +{n} attacco",
+ "text": "Ogni volta che evochi una creatura alleata, quella creatura ottiene +{n} attacco",
  "textTurn": " fino a fine turno"
 }

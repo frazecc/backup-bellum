@@ -1,0 +1,16 @@
+{
+ "order": 28,
+ "label": "⏰ Terraforma: a inizio turno, pesca",
+ "for": [
+  "terraforma"
+ ],
+ "amount": true,
+ "when": "All'inizio del tuo turno",
+ "json": {
+  "type": "draw",
+  "amount": "{n}",
+  "target": "self",
+  "trigger": "own_turn_start"
+ },
+ "text": "Ogni volta che inizia il tuo turno, pesca {n} {carte}"
+}

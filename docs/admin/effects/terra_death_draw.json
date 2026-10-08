@@ -1,0 +1,16 @@
+{
+ "order": 32,
+ "label": "☠️ Terraforma: quando muore una tua creatura, pesca",
+ "for": [
+  "terraforma"
+ ],
+ "amount": true,
+ "when": "Quando una tua creatura muore",
+ "json": {
+  "type": "draw",
+  "amount": "{n}",
+  "target": "self",
+  "trigger": "own_creature_dies"
+ },
+ "text": "Ogni volta che una tua creatura muore, pesca {n} {carte}"
+}

@@ -1,11 +1,11 @@
 {
  "order": 20,
- "label": "🎯 Terraforma: ogni mostro che evochi, danni",
+ "label": "🎯 Terraforma: ogni creatura che evochi, danni",
  "for": [
   "terraforma"
  ],
  "amount": true,
- "when": "Ogni volta che evochi un tuo mostro",
+ "when": "Ogni volta che evochi una creatura alleata",
  "targets": [
   [
    "any_target",
@@ -23,7 +23,7 @@
   "trigger": "own_monster_summoned"
  },
  "text": {
-  "any_target": "Ogni volta che evochi un tuo mostro, infliggi {n} danno a un bersaglio a tua scelta (avversario o creatura)",
-  "opponent": "Ogni volta che evochi un tuo mostro, infliggi {n} danno all'avversario"
+  "any_target": "Ogni volta che evochi una creatura alleata, infliggi {n} danno a un bersaglio a tua scelta (avversario o creatura)",
+  "opponent": "Ogni volta che evochi una creatura alleata, infliggi {n} danno all'avversario"
  }
 }

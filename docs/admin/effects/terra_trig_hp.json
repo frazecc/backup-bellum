@@ -1,11 +1,11 @@
 {
  "order": 16,
- "label": "🎯 Terraforma: ogni mostro che evochi +PV",
+ "label": "🎯 Terraforma: ogni creatura che evochi +PV",
  "for": [
   "terraforma"
  ],
  "amount": true,
- "when": "Ogni volta che evochi un tuo mostro",
+ "when": "Ogni volta che evochi una creatura alleata",
  "json": {
   "type": "buff",
   "stat": "hp",
@@ -14,5 +14,5 @@
   "duration": "permanent",
   "trigger": "own_monster_summoned"
  },
- "text": "Ogni volta che evochi un tuo mostro, quel mostro ottiene +{n} PV"
+ "text": "Ogni volta che evochi una creatura alleata, quella creatura ottiene +{n} PV"
 }

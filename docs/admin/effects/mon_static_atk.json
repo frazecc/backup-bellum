@@ -1,0 +1,18 @@
+{
+ "order": 32,
+ "label": "♾️ Continuo: finché è in campo, +Attacco alle tue creature",
+ "for": [
+  "monster",
+  "mostrissimo"
+ ],
+ "amount": true,
+ "when": "Finché è in campo",
+ "json": {
+  "type": "buff",
+  "stat": "attack",
+  "amount": "{n}",
+  "target": "all_creatures_self",
+  "duration": "while_in_play"
+ },
+ "text": "Le tue creature hanno +{n} attacco finché questa creatura è in campo"
+}
