@@ -392,6 +392,20 @@ async function applyEvent(c: Context, e: PendingEvent) {
     const player = s.players[p];
     player.max_mana = Math.min(6, player.max_mana + 1); player.current_mana = player.max_mana;
     for (const { cell } of units(s, p)) cell.tired = false;
+
+    // Casella centralissima (1,1): +1 attacco permanente a ogni upkeep di entrambi i giocatori
+    const center = at(s, { row: 1, col: 1 });
+    if (center?.kind === 'creature') {
+      center.attack += 1;
+      const centerCard = await getCardData(center.card_id);
+      log(c, center.owner_index, 'center_bonus',
+        `${centerCard.name} al centro guadagna +1 attacco.`, {
+        instance_id: center.instance_id,
+        position: { row: 1, col: 1 },
+        amount: 1,
+      });
+    }
+
     const count = draw(c, p, 1);
     log(c, p, 'upkeep', `${label(p)} ottiene ${player.current_mana}/${player.max_mana} mana e pesca ${count} carta/e.`);
     if (s.status !== 'running') return;
