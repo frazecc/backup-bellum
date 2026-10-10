@@ -114,8 +114,14 @@ export function deck(pool: DeckCard[], colors: DeckColors): CardInstance[] {
   const counts = (xs: DeckCard[], faction: DeckFaction) => xs.filter(x => x.faction === faction).length;
   const validDeck = (xs: DeckCard[]) => {
     const sum = xs.reduce((n, x) => n + x.cost, 0);
-    return xs.length === 10 && sum >= 25 && sum <= 40
-      && counts(xs, colors.primary) >= 2 && counts(xs, colors.secondary) >= 2 && counts(xs, colors.tertiary) >= 1
+    const costs = new Set(xs.map(x => x.cost));
+    const hasAllCosts = [1, 2, 3, 4, 5, 6].every(c => costs.has(c));
+    return xs.length === 10
+      && sum >= 25 && sum <= 35
+      && hasAllCosts
+      && counts(xs, colors.primary) >= 2
+      && counts(xs, colors.secondary) >= 2
+      && counts(xs, colors.tertiary) >= 1
       && xs.filter(x => x.boss).length === 1;
   };
   let best: DeckCard[] | null = null, bestScore = -Infinity;
@@ -128,17 +134,41 @@ export function deck(pool: DeckCard[], colors: DeckColors): CardInstance[] {
       const x = available[Math.floor(Math.random() * available.length)];
       picked.push(x); used.add(x.id); return true;
     };
+
+    // Boss obbligatorio (costo 6)
     const boss = bosses[Math.floor(Math.random() * bosses.length)];
     picked.push(boss); used.add(boss.id);
-    if (!take(by(colors.primary)) || !take(by(colors.secondary)) || !take(by(colors.secondary)) || !take(by(colors.tertiary))) continue;
+
+    // Almeno una carta per ogni costo 1-5
+    for (const cost of [1, 2, 3, 4, 5]) {
+      const options = cards.filter(x => x.cost === cost && !used.has(x.id));
+      if (!options.length) break;
+      const x = options[Math.floor(Math.random() * options.length)];
+      picked.push(x); used.add(x.id);
+    }
+
+    // Vincoli di colore (primary ≥2, secondary ≥2, tertiary ≥1)
+    const need = (faction: DeckFaction, min: number) => {
+      while (counts(picked, faction) < min) {
+        const options = by(faction).filter(x => !used.has(x.id));
+        if (!options.length) return false;
+        const x = options[Math.floor(Math.random() * options.length)];
+        picked.push(x); used.add(x.id);
+      }
+      return true;
+    };
+    if (!need(colors.primary, 2) || !need(colors.secondary, 2) || !need(colors.tertiary, 1)) continue;
+
+    // Riempimento fino a 10
     while (picked.length < 10 && take(cards)) { /* riempimento casuale senza duplicati */ }
+
     if (!validDeck(picked)) continue;
     const differentTypes = new Set(picked.map(x => x.type)).size;
     const nonMonsters = picked.filter(x => x.type !== 'monster').length;
     const score = differentTypes * 4 + Math.min(nonMonsters, 4) * 2 + Math.random() * 12;
     if (score > bestScore) { best = picked; bestScore = score; }
   }
-  if (!best) throw new Error(`Nessun mazzo valido per ${colors.primary}/${colors.secondary}/${colors.tertiary}: controlla il catalogo e la curva mana 2,5–4`);
+  if (!best) throw new Error(`Nessun mazzo valido per ${colors.primary}/${colors.secondary}/${colors.tertiary}: servono carte di costo 1-6 e media mana 2,5–3,5`);
   return shuffle(best.map(x => ({ instance_id: randomUUID(), card_id: x.id })));
 }
 export async function offer() {
