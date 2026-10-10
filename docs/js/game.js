@@ -537,6 +537,7 @@ async function drawBoard() {
     for (let col = 0; col < 3; col++) {
       const pos = {row,col}, c = at(pos), b = document.createElement('button');
       b.type = 'button'; b.className = 'board-cell';
+      if (row === 1 && col === 1) b.classList.add('center-cell');
       let definition = null;
       if (c) try { definition = await card(c.card_id); } catch(e) { console.warn(e); }
       b.classList.add(c ? c.owner_index === 1 ? 'human-card' : 'ai-card' : 'empty');
