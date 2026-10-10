@@ -792,28 +792,44 @@ function colorDialog() {
   let el = $('deck-color-dialog');
   if (el) return el;
   el = document.createElement('div'); el.id = 'deck-color-dialog'; el.className = 'card-detail-overlay hidden';
-  el.setAttribute('role','dialog'); el.setAttribute('aria-modal','true'); el.setAttribute('aria-labelledby','deck-color-title');
+  el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-labelledby', 'deck-color-title');
   el.style.zIndex = '130';
-  const panel = document.createElement('div'); panel.className = 'panel'; panel.style.cssText = 'width:min(92vw,440px);max-height:88dvh;overflow:auto;margin:auto;padding:1.2rem;text-align:center;border:1px solid #d5a758;box-shadow:0 12px 48px #000';
-  const title = document.createElement('h2'); title.id = 'deck-color-title'; title.textContent = 'Scegli i colori del mazzo';
-  const explanation = document.createElement('p'); explanation.textContent = 'Scegli principale e secondario. Il terzo colore sarà casuale; anche l’IA avrà tre colori casuali. IND non entra nel mazzo base.';
+  const panel = document.createElement('div'); panel.className = 'panel';
+  panel.style.cssText = 'width:min(92vw,440px);max-height:88dvh;overflow:auto;margin:auto;padding:1.2rem;text-align:center;border:1px solid #d5a758;box-shadow:0 12px 48px #000';
+  const title = document.createElement('h2'); title.id = 'deck-color-title'; title.textContent = 'Scegli i tuoi poteri';
+  const explanation = document.createElement('p');
+  explanation.textContent = 'Il colore dell’anima definisce la carta più forte del mazzo. Il potere dell’amuleto le magie secondarie. La maledizione (terzo colore) arriverà da sola.';
   const form = document.createElement('form'); form.id = 'deck-color-form'; form.style.cssText = 'display:grid;gap:.8rem';
-  const makeSelect = (id,text) => {
+  const makeSelect = (id, text) => {
     const label = document.createElement('label'); label.textContent = text; label.style.cssText = 'display:grid;gap:.3rem;text-align:left';
-    const select = document.createElement('select'); select.id = id; select.required = true; select.style.cssText = 'width:100%;padding:.65rem;background:#171924;color:#fff;border:1px solid #d5a758;border-radius:6px';
-    for (const [code,name] of Object.entries(deckFactionNames)) {
+    const select = document.createElement('select'); select.id = id; select.required = true;
+    select.style.cssText = 'width:100%;padding:.65rem;background:#171924;color:#fff;border:1px solid #d5a758;border-radius:6px';
+    for (const [code, name] of Object.entries(deckFactionNames)) {
       const option = document.createElement('option'); option.value = code; option.textContent = `${name} (${code})`; select.append(option);
     }
     label.append(select); return label;
   };
-  form.append(makeSelect('deck-primary-color','Colore principale'),makeSelect('deck-secondary-color','Colore secondario'));
-  const validation = document.createElement('p'); validation.id = 'deck-color-validation'; validation.setAttribute('role','alert'); validation.style.color = '#ffbd92'; form.append(validation);
+  form.append(
+    makeSelect('deck-primary-color', 'Il colore dell’anima'),
+    makeSelect('deck-secondary-color', 'Il potere dell’amuleto'),
+  );
+  const validation = document.createElement('p'); validation.id = 'deck-color-validation';
+  validation.setAttribute('role', 'alert'); validation.style.color = '#ffbd92'; form.append(validation);
   const actions = document.createElement('div'); actions.style.cssText = 'display:flex;justify-content:center;flex-wrap:wrap;gap:.6rem';
-  const confirm = document.createElement('button'); confirm.type = 'submit'; confirm.className = 'primary-button'; confirm.textContent = 'Crea partita'; confirm.id = 'deck-color-confirm';
-  const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'secondary-button'; cancel.textContent = 'Annulla'; cancel.onclick = () => closeColorDialog();
-  actions.append(confirm,cancel); form.append(actions); panel.append(title,explanation,form); el.append(panel); stageRoot().append(el);
-  form.addEventListener('submit',e => { e.preventDefault(); submitColors().catch(fail); });
-  el.addEventListener('click',e => { if (e.target === el && !busy) closeColorDialog(); });
+  const stats = document.createElement('button'); stats.type = 'button'; stats.className = 'secondary-button';
+  stats.id = 'deck-color-stats'; stats.textContent = '👁 Statistiche della mummia';
+  stats.onclick = () => {
+    const p = $('deck-primary-color')?.value, s = $('deck-secondary-color')?.value;
+    const pn = deckFactionNames[p] || p, sn = deckFactionNames[s] || s;
+    $('deck-color-validation').textContent = `Anima: ${pn}. Amuleto: ${sn}. La maledizione sarà rivelata all’inizio.`;
+  };
+  const confirm = document.createElement('button'); confirm.type = 'submit'; confirm.className = 'primary-button';
+  confirm.textContent = 'Sigilla il patto'; confirm.id = 'deck-color-confirm';
+  const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'secondary-button';
+  cancel.textContent = 'Annulla'; cancel.onclick = () => closeColorDialog();
+  actions.append(stats, confirm, cancel); form.append(actions);
+  form.addEventListener('submit', e => { e.preventDefault(); submitColors().catch(fail); });
+  panel.append(title, explanation, form); el.append(panel); stageRoot().append(el);
   return el;
 }
 function closeColorDialog() { $('deck-color-dialog')?.classList.add('hidden'); if (!state && !busy && !$('game-screen')?.classList.contains('hidden')) showStart(); }
