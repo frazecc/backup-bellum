@@ -373,3 +373,22 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
 }
 #stage #graveyard-cards > .hand-card.grave-card .fan-card { box-shadow: none; }
 #stage #public-checkpoint-layer { font-size: calc(16 * var(--p)); }
+/* Casella centralissima (1,1) — bonus +1 attacco permanente a ogni upkeep */
+#stage .board-cell.center-cell {
+  box-shadow: 0 0 0 2px #d5a758, 0 0 14px rgba(213, 167, 88, 0.5);
+  position: relative;
+}
+#stage .board-cell.center-cell::after {
+  content: "✦";
+  position: absolute;
+  top: 3px;
+  right: 5px;
+  font-size: 0.75em;
+  opacity: 0.85;
+  color: #d5a758;
+  pointer-events: none;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+}
+#stage .board-cell.center-cell.empty {
+  background: rgba(213, 167, 88, 0.08);
+}
