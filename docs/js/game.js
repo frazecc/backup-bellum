@@ -650,18 +650,62 @@ async function logs() {
   const latest = $('log-latest');
   if (latest) { latest.replaceChildren(); for (const text of texts.slice(-3)) { const li = document.createElement('li'); li.textContent = text; latest.append(li); } }
 }
-async function request(path,body,message) {
+async function request(path, body, message) {
   if (busy || !matchId) return;
   close(); busy = true; controls(); reactionDialog().classList.add('hidden'); choiceDialog().classList.add('hidden');
   try {
-    state = (await api(`/match/${encodeURIComponent(matchId)}/${path}`,{method:'POST',body})).state;
-    flow = null; await render();
-    try { await logs(); } catch(e) { console.warn(e); }
-    if (state.status === 'finished') {       const won = state.winner_index === 1;       notice(won ? 'HAI VINTO!' : 'HAI PERSO!', won ? 'success' : 'error');       if (!won) {         // Sconfitta: anima persa → torna alla mummia (sessione resta attiva → "Sono io")         localStorage.removeItem('bellum:last-match');         matchId = null;         state = null;         flow = null;         priorMatch = null;         deathDraft = { choiceId: null, instanceIds: [] };         presentationGeneration++;         presentationLayer().style.display = 'none';         close();         closeGraveyard();         closeColorDialog();         reactionDialog().classList.add('hidden');         choiceDialog().classList.add('hidden');         setTimeout(() => showAuthScreen(), 1200);         return;       }     } else {       notice(         state.mostrissimo_result?.outcome === 'failed'           ? state.mostrissimo_result.message           : deathOrder()             ? 'Scegli l’ordine delle creature morte.'             : deathTarget()               ? 'Scegli il bersaglio dell’effetto alla morte.'               : state.pending_reaction                 ? reactionDescription(state.pending_reaction.event)                 : message,         state.mostrissimo_result?.outcome === 'failed' ? 'error' : 'success',       );     }
-  } catch(e) {
+    state = (await api(`/match/${encodeURIComponent(matchId)}/${path}`, { method: 'POST', body })).state;
+    flow = null;
+    await render();
+    try { await logs(); } catch (e) { console.warn(e); }
+
+    if (state.status === 'finished') {
+      const won = state.winner_index === 1;
+      notice(won ? 'HAI VINTO!' : 'HAI PERSO!', won ? 'success' : 'error');
+      if (!won) {
+        // Sconfitta: anima persa → torna alla mummia (sessione resta attiva → "Sono io")
+        localStorage.removeItem('bellum:last-match');
+        matchId = null;
+        state = null;
+        flow = null;
+        priorMatch = null;
+        deathDraft = { choiceId: null, instanceIds: [] };
+        presentationGeneration++;
+        presentationLayer().style.display = 'none';
+        close();
+        closeGraveyard();
+        closeColorDialog();
+        reactionDialog().classList.add('hidden');
+        choiceDialog().classList.add('hidden');
+        setTimeout(() => showAuthScreen(), 1200);
+      }
+    } else {
+      notice(
+        state.mostrissimo_result?.outcome === 'failed'
+          ? state.mostrissimo_result.message
+          : deathOrder()
+            ? 'Scegli l’ordine delle creature morte.'
+            : deathTarget()
+              ? 'Scegli il bersaglio dell’effetto alla morte.'
+              : state.pending_reaction
+                ? reactionDescription(state.pending_reaction.event)
+                : message,
+        state.mostrissimo_result?.outcome === 'failed' ? 'error' : 'success',
+      );
+    }
+  } catch (e) {
     fail(e);
-    try { state = (await api(`/match/${encodeURIComponent(matchId)}`)).state; flow = null; } catch(refreshError) { console.warn(refreshError); }
-  } finally { busy = false; await render().catch(fail); queuePresentation(); }
+    try {
+      state = (await api(`/match/${encodeURIComponent(matchId)}`)).state;
+      flow = null;
+    } catch (refreshError) {
+      console.warn(refreshError);
+    }
+  } finally {
+    busy = false;
+    await render().catch(fail);
+    queuePresentation();
+  }
 }
 // Il giocatore avversario come bersaglio (danni a scelta): si tocca il riquadro dei suoi PV.
 async function playerTargetable() {
