@@ -1,7 +1,7 @@
 // docs/js/game.js — Bellum Penumbrum v4, bersaglio unico ETB (3d).
 // Passo 1 / Consegne A+B: layout a colonna centrale (stage), mano a ventaglio, dorsi IA, menu,
 // dialoghi confinati nella colonna e schermata iniziale (recupera / nuova partita).
-import { getAccessToken, getCurrentUser, signOut, usernameFromEmail } from './auth.js';
+import { getAccessToken, getCurrentUser, signOut, usernameFromEmail, showAuthScreen } from './auth.js';
 
 const API = 'https://bellum-penumbrum-api.onrender.com';
 const $ = id => document.getElementById(id);
@@ -788,14 +788,13 @@ function startDialog() {
   el = document.createElement('div'); el.id = 'start-dialog'; el.className = 'card-detail-overlay start-dialog hidden';
   el.setAttribute('role','dialog'); el.setAttribute('aria-modal','true'); el.setAttribute('aria-labelledby','start-title'); el.style.zIndex = '110';
   const panel = document.createElement('div'); panel.className = 'panel';
-  const title = document.createElement('h2'); title.id = 'start-title'; title.textContent = 'Bellum Penumbrum';
+  const title = document.createElement('h2'); title.id = 'start-title'; title.textContent = 'Le spoglie e l’inizio';
   const text = document.createElement('p'); text.id = 'start-text';
   const actions = document.createElement('div'); actions.className = 'start-actions';
-  const recover = document.createElement('button'); recover.type = 'button'; recover.id = 'start-recover-button'; recover.className = 'primary-button'; recover.textContent = 'Recupera partita precedente';
+  const recover = document.createElement('button'); recover.type = 'button'; recover.id = 'start-recover-button'; recover.className = 'primary-button'; recover.textContent = 'RIPRENDI le tue spoglie';
   recover.onclick = () => recoverPrior().catch(fail);
-  const fresh = document.createElement('button'); fresh.type = 'button'; fresh.id = 'start-new-button'; fresh.className = 'secondary-button'; fresh.textContent = 'Nuova partita';
-  fresh.onclick = () => openColorDialog();
-  actions.append(recover,fresh); panel.append(title,text,actions); el.append(panel); stageRoot().append(el);
+  const fresh = document.createElement('button'); fresh.type = 'button'; fresh.id = 'start-new-button'; fresh.className = 'secondary-button'; fresh.textContent = 'Abbraccia un nuovo inizio';
+  fresh.onclick = () => openColorDialog();  actions.append(recover,fresh); panel.append(title,text,actions); el.append(panel); stageRoot().append(el);
   return el;
 }
 function showStart() {
@@ -804,7 +803,9 @@ function showStart() {
   const el = startDialog(), has = !!priorMatch;
   $('start-recover-button').classList.toggle('hidden',!has);
   $('start-new-button').className = has ? 'secondary-button' : 'primary-button';
-  $('start-text').textContent = has ? 'Hai una partita in corso. Vuoi riprenderla o iniziarne una nuova?' : 'Inizia una nuova partita contro l’IA.';
+  $('start-text').textContent = has
+    ? 'Un’ombra precedente ti attende. Vuoi riprendere le tue spoglie o abbracciare un nuovo inizio?'
+    : 'Nessuna spoglia da recuperare. Puoi solo abbracciare un nuovo inizio.';
   el.classList.remove('hidden');
 }
 function hideStart() { $('start-dialog')?.classList.add('hidden'); }
