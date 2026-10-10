@@ -15,50 +15,44 @@ const loginButton = document.getElementById('login-button');
 const authMessage = document.getElementById('auth-message');
 const signedInUser = document.getElementById('signed-in-user');
 const logoutButton = document.getElementById('logout-button');
+const authKnown = document.getElementById('auth-known');
+const authKnownName = document.getElementById('auth-known-name');
+const authSonoIo = document.getElementById('auth-sono-io');
+const authAltroUtente = document.getElementById('auth-altro-utente');
 
 export function usernameFromEmail(email) {
   const normalizedEmail = String(email ?? '').trim().toLowerCase();
-
   if (normalizedEmail.endsWith(TEST_EMAIL_DOMAIN)) {
     return normalizedEmail.slice(0, -TEST_EMAIL_DOMAIN.length);
   }
-
   return normalizedEmail.split('@')[0] || '';
 }
 
 export async function getCurrentUser() {
   const { data, error } = await supabase.auth.getUser();
-
   if (error) {
     console.error('Errore nel recupero dell’utente:', error);
     return null;
   }
-
   return data.user ?? null;
 }
 
 export async function getAccessToken() {
   const { data, error } = await supabase.auth.getSession();
-
   if (error) {
     console.error('Errore nel recupero della sessione:', error);
     return null;
   }
-
   return data.session?.access_token ?? null;
 }
 
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
-
-  if (error) {
-    throw error;
-  }
+  if (error) throw error;
 }
 
 function setAuthMessage(message = '', type = '') {
   if (!authMessage) return;
-
   authMessage.textContent = message;
   authMessage.className = `form-message ${type}`.trim();
   authMessage.hidden = !message;
@@ -69,60 +63,67 @@ function setLoginLoading(isLoading) {
     loginButton.disabled = isLoading;
     loginButton.textContent = isLoading ? 'Accesso in corso…' : 'Accedi';
   }
-
-  if (usernameInput) {
-    usernameInput.disabled = isLoading;
-  }
-
-  if (passwordInput) {
-    passwordInput.disabled = isLoading;
-  }
+  if (usernameInput) usernameInput.disabled = isLoading;
+  if (passwordInput) passwordInput.disabled = isLoading;
 }
 
-function showAuthScreen() {
+function showLoginForm() {
+  loginForm?.classList.remove('hidden');
+  authKnown?.classList.add('hidden');
+}
+
+function showKnownUser(user) {
+  const name = usernameFromEmail(user?.email) || 'viaggiatore';
+  if (authKnownName) authKnownName.textContent = `Riconosco l’ombra di @${name}.`;
+  loginForm?.classList.add('hidden');
+  authKnown?.classList.remove('hidden');
+}
+
+/** Schermata mummia: sempre visibile all’ingresso / dopo sconfitta. */
+export function showAuthScreen(options = {}) {
   authScreen?.classList.remove('hidden');
   gameScreen?.classList.add('hidden');
+  setAuthMessage();
 
-  if (signedInUser) {
-    signedInUser.textContent = '';
-  }
+  if (signedInUser) signedInUser.textContent = '';
+
+  supabase.auth.getSession().then(({ data }) => {
+    if (data.session?.user && !options.forceLoginForm) {
+      showKnownUser(data.session.user);
+    } else {
+      showLoginForm();
+    }
+  }).catch(() => showLoginForm());
 }
 
 function showGameScreen(user) {
   const username = usernameFromEmail(user?.email);
-
   authScreen?.classList.add('hidden');
   gameScreen?.classList.remove('hidden');
-
   if (signedInUser) {
     signedInUser.textContent = username ? `@${username}` : 'Giocatore';
   }
-
   window.dispatchEvent(
     new CustomEvent('bellum:auth-ready', {
-      detail: {
-        user,
-      },
+      detail: { user },
     }),
   );
 }
 
 async function loadSession() {
   const { data, error } = await supabase.auth.getSession();
-
   if (error) {
     console.error('Errore nel recupero della sessione:', error);
     setAuthMessage('Impossibile verificare la sessione. Riprova.', 'error');
-    showAuthScreen();
+    showAuthScreen({ forceLoginForm: true });
     return;
   }
 
   if (data.session?.user) {
-    showGameScreen(data.session.user);
+    showAuthScreen({ preferKnown: true });
     return;
   }
-
-  showAuthScreen();
+  showAuthScreen({ forceLoginForm: true });
 }
 
 async function handleLogin(event) {
@@ -137,27 +138,16 @@ async function handleLogin(event) {
     return;
   }
 
-  const email = username.includes('@')
-    ? username
-    : `${username}${TEST_EMAIL_DOMAIN}`;
-
+  const email = username.includes('@') ? username : `${username}${TEST_EMAIL_DOMAIN}`;
   setLoginLoading(true);
 
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error || !data.user) {
       setAuthMessage('Nome utente o password non validi.', 'error');
       return;
     }
-
-    if (passwordInput) {
-      passwordInput.value = '';
-    }
-
+    if (passwordInput) passwordInput.value = '';
     setAuthMessage('Accesso eseguito.', 'success');
     showGameScreen(data.user);
   } catch (error) {
@@ -168,17 +158,34 @@ async function handleLogin(event) {
   }
 }
 
-async function handleLogout() {
+async function handleSonoIo() {
   setAuthMessage();
+  const user = await getCurrentUser();
+  if (!user) {
+    setAuthMessage('Sessione scaduta. Accedi di nuovo.', 'error');
+    showLoginForm();
+    return;
+  }
+  showGameScreen(user);
+}
 
+async function handleAltroUtente() {
+  setAuthMessage();
   try {
     await signOut();
+  } catch (e) {
+    console.warn(e);
+  }
+  if (loginForm) loginForm.reset();
+  showLoginForm();
+}
 
-    if (loginForm) {
-      loginForm.reset();
-    }
-
-    showAuthScreen();
+async function handleLogout() {
+  setAuthMessage();
+  try {
+    await signOut();
+    if (loginForm) loginForm.reset();
+    showAuthScreen({ forceLoginForm: true });
     setAuthMessage('Sessione terminata.', 'success');
   } catch (error) {
     console.error('Errore durante il logout:', error);
@@ -188,14 +195,13 @@ async function handleLogout() {
 
 loginForm?.addEventListener('submit', handleLogin);
 logoutButton?.addEventListener('click', handleLogout);
+authSonoIo?.addEventListener('click', () => handleSonoIo().catch(console.error));
+authAltroUtente?.addEventListener('click', () => handleAltroUtente().catch(console.error));
 
-supabase.auth.onAuthStateChange((_event, session) => {
-  if (session?.user) {
-    showGameScreen(session.user);
-    return;
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_OUT') {
+    showAuthScreen({ forceLoginForm: true });
   }
-
-  showAuthScreen();
 });
 
 loadSession();
