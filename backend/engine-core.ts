@@ -12,7 +12,7 @@ import type {
 import {
   adjacent, allowed, around, at, blank, cells, effects, eligible, enemyNeighbours, enemyTerraformas,
   find, findAura, findCreature, home, instance, keyword, label, other,
-  phaseNumber, playerTargetId, prepend, put, reactionTrigger, supported, target, targetChoices, targeted, units, valid, validTarget,
+  phaseNumber, playerTargetId, prepend, put, reactionTrigger, shuffle, supported, target, targetChoices, targeted, units, valid, validTarget,
 } from './engine-board.js';
 import { commit, db, getCardData, load, logMatchAction } from './engine-storage.js';
 import { availableFactions, bossFactions, chosenColors, deck, deckPool, offer, playableEffects, player, randomColors } from './engine-deck.js';
