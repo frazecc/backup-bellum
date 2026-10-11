@@ -907,6 +907,40 @@ async function submitColors() {
   $('deck-color-validation').textContent = '';
   await newMatch(primaryColor,secondaryColor);
 }
+function showCurseDialog(humanColors, aiColors) {
+  return new Promise(resolve => {
+    let el = $('curse-dialog');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'curse-dialog';
+      el.className = 'card-detail-overlay';
+      el.setAttribute('role', 'dialog');
+      el.setAttribute('aria-modal', 'true');
+      el.style.zIndex = '140';
+      stageRoot().append(el);
+    }
+    const tertiary = humanColors?.tertiary;
+    const tName = deckFactionNames[tertiary] || tertiary || 'sconosciuto';
+    const aiPrimary = aiColors?.primary;
+    const aiName = deckFactionNames[aiPrimary] || aiPrimary || 'nemico';
+    el.innerHTML = '';
+    const panel = document.createElement('div');
+    panel.className = 'panel';
+    panel.style.cssText = 'width:min(92vw,440px);margin:auto;padding:1.2rem;text-align:center;border:1px solid #d5a758;box-shadow:0 12px 48px #000';
+    const title = document.createElement('h2');
+    title.textContent = 'La maledizione si chiude';
+    const body = document.createElement('p');
+    body.innerHTML = `Un terzo colore ti è stato imposto: <strong>${tName} (${tertiary})</strong>.<br><br>È anche il colore primario del nemico: <strong>${aiName}</strong>.`;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'primary-button';
+    btn.textContent = 'Affronto il destino';
+    btn.onclick = () => { el.classList.add('hidden'); resolve(); };
+    panel.append(title, body, btn);
+    el.append(panel);
+    el.classList.remove('hidden');
+  });
+}
 async function newMatch(primaryColor, secondaryColor) {
   cardLoaded.clear();
   if (busy || obligatory()) return;
