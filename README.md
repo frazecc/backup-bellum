@@ -22,6 +22,23 @@ Tutto il motore (turni, effetti, IA, validazione) è nel backend.
 
 ---
 
+## Flusso di ingresso (narrativo)
+
+1. All’apertura compare sempre la mummia: *«Benvenuto coraggioso… dimostrami chi sei.»*
+2. Se non sei loggato → form username + password (email `username@test.local`).
+3. Se sei già loggato → bottone **«Sono io»** (niente password).
+4. Dopo l’ingresso:
+   - se c’è una partita non terminata → **RIPRENDI le tue spoglie** oppure **Abbraccia un nuovo inizio**
+   - altrimenti solo nuovo inizio
+5. Scelta colori:
+   - **Colore dell’anima** = primary
+   - **Potere dell’amuleto** = secondary
+6. Pop-up **maledizione**: il terzo colore (sempre diverso dai due scelti) è imposto al giocatore e diventa il **primary dell’IA**.
+7. **Sconfitta** → ritorno alla mummia (sessione attiva, basta «Sono io»).
+8. **Vittoria** → messaggio di vittoria (progressione a 3 vittorie: in coda).
+
+---
+
 ## Come si gioca (riassunto)
 
 - Vita iniziale **20**, partite brevi (~5 minuti).
@@ -29,13 +46,12 @@ Tutto il motore (turni, effetti, IA, validazione) è nel backend.
 - Mazzo di **10 carte** auto-generato (niente deckbuilding):
   - 1 boss obbligatorio (Mostro 6 mana del colore principale)
   - almeno 1 carta per ogni costo **1, 2, 3, 4, 5, 6**
-  - somma mana tra **25 e 35** (media ~2,5–3,5)
+  - somma mana tra **25 e 35**
   - colori: ≥2 primary, ≥2 secondary, ≥1 tertiary
-- **Mostrissimi**: 3 condivisi, max 1 evocato per turno. Si pagano sacrificando permanenti (anche stanchi o appena giocati).
-- Movimento: 1 mana, 1 casella ortogonale. Entra stanca (tranne se ha *Iperattivo*).
-- Si può muovere e poi attaccare nello stesso turno.
+- **Mostrissimi**: offerta condivisa, max 1 evocato per turno, si pagano con sacrifici di permanenti.
+- Movimento: 1 mana, 1 casella ortogonale. Entra stanca (tranne *Iperattivo*).
 
-Fazioni (effetto fondamento delle comuni):
+Fazioni (fondamento delle comuni):
 
 | Codice | Nome | Fondamento |
 |--------|------|------------|
@@ -44,7 +60,26 @@ Fazioni (effetto fondamento delle comuni):
 | PES | Pestilenza | scarta |
 | BUL | Bullismo | danno |
 | GRO | Grossanza | buff |
-| CLO | Clownerie | versioni +1 costo delle altre |
+| CLO | Clownerie | versioni “Clown” / +1 costo |
+
+Sottotipi attivi in catalogo: **Mostriciattolo, Prestigiatore, Cosplayer, Capibara, Cliché, Indrazzico**.
+
+---
+
+## Catalogo (stato ottobre 2026)
+
+Catalogo minimo giocabile (template vecchi eliminati):
+
+| Tipo | Quantità |
+|------|----------|
+| Mostro (1–6 × 6 fazioni, 1 boss ciascuna) | 36 |
+| Maledizione | 12 |
+| Trappola (instant) | 6 |
+| Aura | 2 |
+| Terraforma | 2 |
+| Mostrissimo | 5 |
+
+Espansioni previste: più varietà per fazione, CLO +1 costo, sinergie di sottotipo, Indrazzico.
 
 ---
 
