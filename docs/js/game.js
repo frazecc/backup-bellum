@@ -907,18 +907,41 @@ async function submitColors() {
   $('deck-color-validation').textContent = '';
   await newMatch(primaryColor,secondaryColor);
 }
-async function newMatch(primaryColor,secondaryColor) {
+async function newMatch(primaryColor, secondaryColor) {
   cardLoaded.clear();
-  if (busy || obligatory()) return; busy = true; controls();
-  $('deck-color-confirm').disabled = true;
+  if (busy || obligatory()) return;
+  busy = true; controls();
+  if ($('deck-color-confirm')) $('deck-color-confirm').disabled = true;
   notice('Creazione partita…');
   try {
-    const result = await api('/match/create',{method:'POST',body:{primaryColor,secondaryColor}});
-    presentationGeneration++; presentationLayer().style.display = 'none';
-    matchId = result.match_id; state = result.state; flow = null; deathDraft = {choiceId:null,instanceIds:[]}; close(); closeGraveyard(); closeColorDialog();
-    localStorage.setItem('bellum:last-match',matchId); await render(); await logs(); notice('Partita pronta. Tocca una carta.','success');
-  } catch(e) { fail(e); $('deck-color-validation').textContent = e instanceof Error ? e.message : 'Impossibile creare la partita.'; }
-  finally { busy = false; $('deck-color-confirm').disabled = false; await render().catch(fail); queuePresentation(); }
+    const result = await api('/match/create', { method: 'POST', body: { primaryColor, secondaryColor } });
+    presentationGeneration++;
+    presentationLayer().style.display = 'none';
+    matchId = result.match_id;
+    state = result.state;
+    flow = null;
+    deathDraft = { choiceId: null, instanceIds: [] };
+    close();
+    closeGraveyard();
+    closeColorDialog();
+    localStorage.setItem('bellum:last-match', matchId);
+    await render();
+    await logs();
+    const humanColors = state?.deck_colors?.[1];
+    const aiColors = state?.deck_colors?.[0];
+    await showCurseDialog(humanColors, aiColors);
+    notice('Partita pronta. Tocca una carta.', 'success');
+  } catch (e) {
+    fail(e);
+    if ($('deck-color-validation')) {
+      $('deck-color-validation').textContent = e instanceof Error ? e.message : 'Impossibile creare la partita.';
+    }
+  } finally {
+    busy = false;
+    if ($('deck-color-confirm')) $('deck-color-confirm').disabled = false;
+    await render().catch(fail);
+    queuePresentation();
+  }
 }
 async function refreshMatch() {
   if (busy || !matchId) return; busy = true; controls();
