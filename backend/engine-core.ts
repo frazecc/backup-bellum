@@ -882,7 +882,7 @@ const FACTION_IDS: Record<DeckFaction, number> = { CHI: 1, INF: 2, PES: 3, BUL: 
 export async function createNewMatch(userId: string, primary: DeckFaction, secondary: DeckFaction): Promise<{ matchId: string; state: GameState }> {
   const [pool, catalogue] = await Promise.all([deckPool(), offer()]);
   const available = availableFactions(pool), bosses = bossFactions(pool);
-  const humanColors = chosenColors(primary, secondary, available, bosses), aiColors = randomColors(available, bosses);
+  const humanColors = chosenColors(primary, secondary, available, bosses);   // Maledizione del giocatore = primary dell'IA (design narrativo)   const aiPrimary = humanColors.tertiary;   if (!bosses.includes(aiPrimary)) {     throw new Error(`La maledizione ${aiPrimary} non ha un boss da 6 mana: scegli altri colori`);   }   const aiRest = shuffle(available.filter(f => f !== aiPrimary));   const aiSecondary = aiRest[0];   const aiTertiary = aiRest[1] ?? aiRest[0];   if (!aiSecondary) throw new Error('Catalogo insufficiente per i colori dell’IA');   const aiColors = { primary: aiPrimary, secondary: aiSecondary, tertiary: aiTertiary };
   const humanCards = deck(pool, humanColors), aiCards = deck(pool, aiColors);
   const { data, error } = await db.from('matches').insert({ player_id: userId, opponent_type: 'ai', opponent_name: 'IA Bellum Penumbrum', player_won: null, turns_count: 0, duration_seconds: 0, player_faction_id: FACTION_IDS[primary], opponent_faction_id: FACTION_IDS[aiColors.primary] }).select('id').single();
   if (error || !data) throw new Error(`Creazione partita: ${error?.message ?? 'nessun ID'}`);
