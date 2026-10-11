@@ -392,3 +392,56 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
 #stage .board-cell.center-cell.empty {
   background: rgba(213, 167, 88, 0.08);
 }
+/* ---------- Banner messaggi di fase (visibile) ---------- */
+#stage .phase-banner {
+  position: absolute;
+  z-index: 90;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%) scale(0.92);
+  width: min(92%, calc(340 * var(--p)));
+  max-width: calc(380 * var(--p));
+  padding: calc(14 * var(--p)) calc(18 * var(--p));
+  border: 2px solid #c9a45c;
+  border-radius: calc(12 * var(--p));
+  background:
+    linear-gradient(165deg, #2a2438ee 0%, #171426f5 55%, #12101af8 100%);
+  box-shadow:
+    0 0 0 1px #0008,
+    0 12px 40px #000c,
+    inset 0 1px 0 #ffffff18;
+  color: #f7eedc;
+  text-align: center;
+  font: 700 calc(16 * var(--p))/1.25 'Roboto Condensed', Arial, sans-serif;
+  letter-spacing: 0.02em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+#stage .phase-banner.is-visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  pointer-events: auto;
+}
+
+#stage .phase-banner.success {
+  border-color: #6ecf8e;
+  color: #d8ffe6;
+  box-shadow: 0 0 0 1px #0008, 0 12px 40px #000c, 0 0 24px #36c97144;
+}
+
+#stage .phase-banner.error {
+  border-color: #e25f61;
+  color: #ffd0d0;
+  box-shadow: 0 0 0 1px #0008, 0 12px 40px #000c, 0 0 24px #e25f6144;
+}
+
+#stage .phase-banner .phase-banner-sub {
+  display: block;
+  margin-top: calc(6 * var(--p));
+  font-size: calc(12.5 * var(--p));
+  font-weight: 500;
+  color: #c9c0b0;
+  letter-spacing: 0;
+}
