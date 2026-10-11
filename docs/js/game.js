@@ -162,8 +162,38 @@ function summonCells(p) {
   }
   return found;
 }
-function notice(text,type='') {
-  if ($('game-message')) { $('game-message').textContent = text; $('game-message').className = `game-message ${type}`; }
+let noticeTimer = null;
+
+function notice(text, type = '') {
+  const el = $('phase-banner') || $('game-message');
+  if (!el) return;
+
+  // fallback se per qualche motivo manca il banner
+  if (el.id === 'game-message') {
+    el.textContent = text;
+    el.className = `game-message ${type}`;
+    return;
+  }
+
+  clearTimeout(noticeTimer);
+  el.hidden = false;
+  el.className = `phase-banner${type ? ' ' + type : ''}`;
+  el.innerHTML = escape(text);
+  // forza reflow poi mostra
+  void el.offsetWidth;
+  el.classList.add('is-visible');
+
+  noticeTimer = setTimeout(() => {
+    el.classList.remove('is-visible');
+    setTimeout(() => { el.hidden = true; el.textContent = ''; }, 240);
+  }, 2800);
+
+  // tap per chiudere subito
+  el.onclick = () => {
+    clearTimeout(noticeTimer);
+    el.classList.remove('is-visible');
+    setTimeout(() => { el.hidden = true; el.textContent = ''; }, 200);
+  };
 }
 function fail(e) { console.error(e); notice(e instanceof Error ? e.message : 'Errore inatteso','error'); }
 function close() { view = null; $('card-detail-overlay')?.classList.add('hidden'); document.body.classList.remove('detail-open'); }
