@@ -157,13 +157,56 @@ function drawOpponentHand() {
   root.append(count,backs);
 }
 function cardHTML(d, mini = false, cell = null) {
-  const cls = `faction-${faction(d)}`;
-  const cost = d.card_type === 'mostrissimo' ? `✦${Number(d.sacrifice_cost ?? 0)}` : `⚡${Number(d.mana_cost ?? 0)}`;
-  const art = d.image_url ? `<img src="${escape(d.image_url)}" alt="Illustrazione di ${escape(d.name)}" loading="lazy">` : '<span class="game-card-art-placeholder">🎴</span>';
-  const atk = cell?.attack ?? d.attack ?? 0, hp = cell?.hp ?? d.hp ?? 0;
-  if (mini) return `<article class="board-card ${cls}"><header class="board-card-titlebar"><span class="board-card-name">${escape(d.name)}</span><span class="board-card-cost">${cost}</span></header><div class="board-card-art">${art}</div><div class="board-card-type">${escape(types[d.card_type] ?? d.card_type)}</div><div class="board-card-effect">${escape(String(d.effect_text ?? '').replace(/\*\*/g,'').replace(/\s+/g,' ').slice(0,110))}</div>${creature(d) ? `<footer class="board-card-footer"><span>⚔ ${atk}</span><span>❤ ${hp}</span></footer>` : ''}</article>`;
-  const rules = escape(d.effect_text || 'Nessun effetto.').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
-  return `<article class="game-card ${cls}"><header class="game-card-titlebar"><span class="game-card-name">${escape(d.name)}</span><span class="game-card-cost">${cost}</span></header><div class="game-card-art">${art}</div><div class="game-card-type-row"><span>${escape(types[d.card_type] ?? d.card_type)}</span><span class="game-card-subtype">${escape(d.subtype ?? '')}</span></div><div class="game-card-rules">${rules}</div><div class="game-card-flavor">${escape(d.flavor_text ?? '')}</div><footer class="game-card-footer"><span class="game-card-rarity">${escape(rarities[d.rarity] ?? d.rarity ?? 'Comune')}</span>${creature(d) ? `<span class="game-card-stats"><span class="game-card-atk">⚔ ${atk}</span><span class="game-card-hp">❤ ${hp}</span></span>` : ''}</footer></article>`;
+  const f = faction(d);
+  const cls = `faction-${f}`;
+  const isMostrissimo = d.card_type === 'mostrissimo';
+  const costNum = isMostrissimo ? Number(d.sacrifice_cost ?? 0) : Number(d.mana_cost ?? 0);
+  const costIcon = isMostrissimo ? '✦' : '';
+  const art = d.image_url
+    ? `<img src="${escape(d.image_url)}" alt="Illustrazione di ${escape(d.name)}" loading="lazy">`
+    : '<span class="game-card-art-placeholder">🎴</span>';
+  const atk = cell?.attack ?? d.attack ?? 0;
+  const hp = cell?.hp ?? d.hp ?? 0;
+  const subtype = d.subtype ? String(d.subtype) : '';
+  const factionLabel = deckFactionNames[f.toUpperCase()] || f.toUpperCase();
+  const typeLabel = types[d.card_type] ?? d.card_type;
+
+  if (mini) {
+    return `<article class="board-card ${cls}">
+      <header class="board-card-titlebar">
+        <span class="board-card-name">${escape(d.name)}</span>
+        <span class="board-card-cost shape-${f}">${costIcon}${costNum}</span>
+      </header>
+      <div class="board-card-art">${art}</div>
+      <div class="board-card-type">${escape(typeLabel)}</div>
+      <div class="board-card-effect">${escape(String(d.effect_text ?? '').replace(/\*\*/g,'').replace(/\s+/g,' ').slice(0,110))}</div>
+      ${creature(d) ? `<footer class="board-card-footer"><span>⚔ ${atk}</span><span>❤ ${hp}</span></footer>` : ''}
+    </article>`;
+  }
+
+  const rules = escape(d.effect_text || 'Nessun effetto.')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>');
+
+  return `<article class="game-card ${cls}">
+    <header class="game-card-titlebar">
+      <span class="game-card-name">${escape(d.name)}</span>
+      <span class="game-card-cost shape-${f}">${costIcon}${costNum}</span>
+    </header>
+    <div class="game-card-art">${art}</div>
+    <div class="game-card-type-row">
+      <span>${escape(typeLabel)}</span>
+      <span class="game-card-subtype">${escape(factionLabel)}${subtype ? ' · ' + escape(subtype) : ''}</span>
+    </div>
+    <div class="game-card-rules">${rules}</div>
+    <div class="game-card-flavor">${escape(d.flavor_text ?? '')}</div>
+    <footer class="game-card-footer">
+      <span class="game-card-rarity">${escape(rarities[d.rarity] ?? d.rarity ?? 'Comune')}</span>
+      ${creature(d)
+        ? `<span class="game-card-stats"><span class="game-card-atk">⚔ ${atk}</span><span class="game-card-hp">❤ ${hp}</span></span>`
+        : ''}
+    </footer>
+  </article>`;
 }
 // Durante monster_etb la Trappola mirata può colpire soltanto la fonte
 // dell'ETB. Le altre finestre conservano le regole ordinarie di bersaglio.
