@@ -165,10 +165,10 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
 }
 #stage .cc-name {
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
-  padding: calc(3 * var(--p)) calc(4 * var(--p)) calc(2 * var(--p));
-  background: linear-gradient(#080911f5, #080911bb 80%, transparent);
-  color: #fff; text-shadow: 0 1px 2px #000; text-align: center; overflow-wrap: anywhere;
-  font: 800 calc(11.5 * var(--p))/1.05 'Roboto Condensed', Arial, sans-serif;
+  padding: calc(4 * var(--p)) calc(3 * var(--p)) calc(2 * var(--p));
+  background: linear-gradient(#080911f8, #080911cc 75%, transparent);
+  color: #fff; text-shadow: 0 1px 3px #000; text-align: center; overflow-wrap: anywhere;
+  font: 800 calc(12 * var(--p))/1.05 'Roboto Condensed', Arial, sans-serif;
 }
 #stage .cc-row {
   display: flex; align-items: flex-start; justify-content: space-between;
@@ -176,10 +176,10 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
 }
 #stage .cc-cost {
   flex: none; display: grid; place-items: center;
-  width: calc(22 * var(--p)); height: calc(22 * var(--p));
-  color: #fff; font: 900 calc(11 * var(--p))/1 'Roboto Condensed', Arial, sans-serif;
+  width: calc(24 * var(--p)); height: calc(24 * var(--p));
+  color: #fff; font: 900 calc(12 * var(--p))/1 'Roboto Condensed', Arial, sans-serif;
   text-shadow: 0 1px 2px #000c; background: var(--faction-color);
-  border: 1.5px solid #fff7; box-shadow: 0 1px 4px #000a;
+  border: 1.5px solid #fff8; box-shadow: 0 1px 5px #000b;
 }
 /* stesse forme della mano */
 #stage .cc-cost.shape-chi  { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); border-radius: 0; }
@@ -191,11 +191,12 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
 #stage .cc-cost.shape-ind  { border-radius: 50%; }
 
 #stage .cc-meta {
-  display: block; padding: 0 calc(4 * var(--p)) calc(3 * var(--p));
-  color: color-mix(in srgb, var(--faction-color) 65%, #fff);
-  font: 600 calc(9 * var(--p))/1.1 'Roboto Condensed', Arial, sans-serif;
-  text-transform: uppercase; letter-spacing: 0.03em; text-align: center;
+  display: block; padding: 0 calc(3 * var(--p)) calc(3 * var(--p));
+  color: #fff;
+  font: 700 calc(10 * var(--p))/1.1 'Roboto Condensed', Arial, sans-serif;
+  text-transform: uppercase; letter-spacing: 0.04em; text-align: center;
   text-shadow: 0 1px 2px #000;
+  opacity: 0.95;
 }
 
 #stage .cc-ico, #stage .fc-ico {
