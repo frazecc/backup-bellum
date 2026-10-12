@@ -182,13 +182,6 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
   border: 1.5px solid #fff8; box-shadow: 0 1px 5px #000b;
 }
 /* stesse forme della mano */
-#stage .cc-cost.shape-chi  { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); border-radius: 0; }
-#stage .cc-cost.shape-inf  { border-radius: 2px; }
-#stage .cc-cost.shape-pes  { clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%); border-radius: 0; }
-#stage .cc-cost.shape-bul  { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); border-radius: 0; }
-#stage .cc-cost.shape-gro  { clip-path: polygon(50% 0%, 90% 20%, 100% 60%, 75% 100%, 25% 100%, 0% 60%, 10% 20%); border-radius: 0; }
-#stage .cc-cost.shape-clo  { clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); border-radius: 0; }
-#stage .cc-cost.shape-ind  { border-radius: 50%; }
 
 #stage .cc-meta {
   display: block; padding: 0 calc(3 * var(--p)) calc(3 * var(--p));
@@ -345,14 +338,43 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
 /* ----- Carta in mano (design definitivo base) ----- */
 #stage .fan-card {
   position: absolute; inset: 0; display: block; overflow: hidden; pointer-events: none;
-  border: 2.5px solid var(--faction-color);
+  border: 2.5px solid #94a4ba; /* grigio Indrazzico = non giocabile */
   border-radius: calc(8 * var(--p));
   background: linear-gradient(160deg, color-mix(in srgb, var(--faction-color) 35%, #1a1c24), #12141c 70%);
-  box-shadow: 0 3px 10px #000c, inset 0 0 0 1px color-mix(in srgb, var(--faction-color) 40%, transparent);
+  box-shadow: 0 3px 10px #000c, inset 0 0 0 1px #94a4ba55;
 }
+/* Giocabile: bordo bianco + bende della mummia */
 #stage #player-hand > .hand-card.playable .fan-card {
-  border-color: #ffe49b;
-  box-shadow: 0 0 0 1.5px #fff4cc, 0 0 14px #f5d970aa, inset 0 0 0 1px #ffe49b66;
+  border-color: #ffffff;
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 0 16px #ffffff88,
+    0 0 28px #e8dcc4aa,
+    inset 0 0 0 1px #fff8;
+}
+#stage #player-hand > .hand-card.playable .fan-card::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 6;
+  background:
+    repeating-linear-gradient(
+      -28deg,
+      transparent 0 7px,
+      rgba(245, 236, 214, 0.55) 7px 11px
+    ),
+    repeating-linear-gradient(
+      28deg,
+      transparent 0 9px,
+      rgba(232, 220, 190, 0.28) 9px 13px
+    );
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.85),
+    0 0 10px rgba(255, 255, 255, 0.35);
+  mix-blend-mode: soft-light;
+  opacity: 0.95;
 }
 #stage .fc-art {
   position: absolute; inset: 0;
@@ -376,14 +398,56 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
   border: 2px solid #fff8;
 }
 
-/* Forme */
-#stage .fc-cost.shape-chi  { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); border-radius: 0; }          /* triangolo */
-#stage .fc-cost.shape-inf  { border-radius: 3px; }                                                       /* quadrato */
-#stage .fc-cost.shape-pes  { clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%); border-radius: 0; } /* pentagono */
-#stage .fc-cost.shape-bul  { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); border-radius: 0; } /* esagono */
-#stage .fc-cost.shape-gro  { clip-path: polygon(50% 0%, 90% 20%, 100% 60%, 75% 100%, 25% 100%, 0% 60%, 10% 20%); border-radius: 0; } /* eptagono */
-#stage .fc-cost.shape-clo  { clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); border-radius: 0; } /* ottagono */
-#stage .fc-cost.shape-ind  { border-radius: 50%; }                                                       /* cerchio Indrazzico */
+/* Forme costo — IDENTICHE a dettaglio (solo più piccole in mano) */
+#stage .fc-cost.shape-chi,
+#stage .cc-cost.shape-chi,
+#stage .game-card-cost.shape-chi,
+#stage .board-card-cost.shape-chi {
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%) !important;
+  border-radius: 0 !important;
+}
+#stage .fc-cost.shape-inf,
+#stage .cc-cost.shape-inf,
+#stage .game-card-cost.shape-inf,
+#stage .board-card-cost.shape-inf {
+  clip-path: none !important;
+  border-radius: 3px !important;
+}
+#stage .fc-cost.shape-pes,
+#stage .cc-cost.shape-pes,
+#stage .game-card-cost.shape-pes,
+#stage .board-card-cost.shape-pes {
+  clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%) !important;
+  border-radius: 0 !important;
+}
+#stage .fc-cost.shape-bul,
+#stage .cc-cost.shape-bul,
+#stage .game-card-cost.shape-bul,
+#stage .board-card-cost.shape-bul {
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%) !important;
+  border-radius: 0 !important;
+}
+#stage .fc-cost.shape-gro,
+#stage .cc-cost.shape-gro,
+#stage .game-card-cost.shape-gro,
+#stage .board-card-cost.shape-gro {
+  clip-path: polygon(50% 0%, 90% 20%, 100% 60%, 75% 100%, 25% 100%, 0% 60%, 10% 20%) !important;
+  border-radius: 0 !important;
+}
+#stage .fc-cost.shape-clo,
+#stage .cc-cost.shape-clo,
+#stage .game-card-cost.shape-clo,
+#stage .board-card-cost.shape-clo {
+  clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%) !important;
+  border-radius: 0 !important;
+}
+#stage .fc-cost.shape-ind,
+#stage .cc-cost.shape-ind,
+#stage .game-card-cost.shape-ind,
+#stage .board-card-cost.shape-ind {
+  clip-path: none !important;
+  border-radius: 50% !important;
+}
 
 #stage .fc-ico {
   position: absolute; z-index: 3;
@@ -604,22 +668,7 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
 }
 
 
-/* ----- Carta dettaglio: forme geometriche sul costo + tinta fazione ----- */
-#stage .game-card-cost.shape-chi,
-#stage .board-card-cost.shape-chi { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); border-radius: 0 !important; }
-#stage .game-card-cost.shape-inf,
-#stage .board-card-cost.shape-inf { border-radius: 4px !important; }
-#stage .game-card-cost.shape-pes,
-#stage .board-card-cost.shape-pes { clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%); border-radius: 0 !important; }
-#stage .game-card-cost.shape-bul,
-#stage .board-card-cost.shape-bul { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); border-radius: 0 !important; }
-#stage .game-card-cost.shape-gro,
-#stage .board-card-cost.shape-gro { clip-path: polygon(50% 0%, 90% 20%, 100% 60%, 75% 100%, 25% 100%, 0% 60%, 10% 20%); border-radius: 0 !important; }
-#stage .game-card-cost.shape-clo,
-#stage .board-card-cost.shape-clo { clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); border-radius: 0 !important; }
-#stage .game-card-cost.shape-ind,
-#stage .board-card-cost.shape-ind { border-radius: 50% !important; }
-
+/* ----- Carta dettaglio: tinta fazione ----- */
 #stage .detail-image .game-card {
   background: linear-gradient(160deg, color-mix(in srgb, var(--faction-color) 28%, #d9dadd), #aeb1b8 55%, #cbccd1);
 }
