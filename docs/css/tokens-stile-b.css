@@ -1,0 +1,69 @@
+/* docs/css/tokens-stile-b.css — Stile B Reliquia Dorata / Tomba Egizia
+   Caricare PRIMA di stage.css. Contiene solo variabili e font base. */
+
+:root {
+  --tomb-bg: #0b0806;
+  --tomb-stone: #3a2e22;
+  --tomb-stone-dark: #17110b;
+  --tomb-panel: #241a12;
+  --tomb-panel-inner: #0f0a06;
+  --tomb-empty: #2a2016;
+  --tomb-empty-border: #6b5a3c;
+  --tomb-gold: #c9a043;
+  --tomb-gold-light: #e8c565;
+  --tomb-gold-btn-start: #e8c565;
+  --tomb-gold-btn-end: #e0a22a;
+  --tomb-gold-border: #8a5a14;
+  --tomb-gold-shadow: #6b3f0c;
+  --tomb-chunky-shadow: #1a0a05;
+  --tomb-turquoise: #2fe0c4;
+  --tomb-turquoise-dark: #04201c;
+  --tomb-carmine: #d63a2f;
+  --tomb-lapis: #16324f;
+  --tomb-lapis-inner: #0a1a2e;
+  --tomb-malachite: #10302f;
+  --tomb-malachite-inner: #071a19;
+  --tomb-papyrus: #d7c08c;
+  --tomb-papyrus-light: #e8d5a8;
+  --tomb-ink: #3a1c0a;
+  --tomb-text: #efe2c0;
+  --tomb-sand: #c9b98a;
+  --tomb-sand-dark: #c9a96a;
+  --badge-cost: #2f7de1;
+  --badge-cost-border: #0f2f66;
+  --badge-atk: #f5a623;
+  --badge-atk-border: #5a3410;
+  --badge-hp: #e0453d;
+  --badge-hp-border: #5a1010;
+  --font-title: 'Lilita One', Georgia, serif;
+  --font-body: 'Nunito', system-ui, sans-serif;
+
+  /* Pigmenti carte per fazione (usati da .faction-*) */
+  --card-chi-c1: #c9b88a;
+  --card-chi-c2: #e8d9b0;
+  --card-inf-c1: #1f4f94;
+  --card-inf-c2: #5a8dc2;
+  --card-pes-c1: #563192;
+  --card-pes-c2: #8a72b8;
+  --card-bul-c1: #8f2a24;
+  --card-bul-c2: #c4684f;
+  --card-gro-c1: #1f6d44;
+  --card-gro-c2: #5aa87c;
+  --card-clo-c1: #8f6a12;
+  --card-clo-c2: #c9a53f;
+  --card-ind-c1: #5a6570;
+  --card-ind-c2: #8a96a3;
+}
+
+#stage,
+#stage button {
+  font-family: var(--font-body);
+}
+
+#stage .hud-name,
+#stage .menu-button,
+#stage .primary-button,
+#stage .secondary-button,
+#stage .phase-banner {
+  font-family: var(--font-title);
+}
