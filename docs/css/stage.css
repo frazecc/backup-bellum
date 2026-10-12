@@ -143,37 +143,95 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
 #stage .board-cell:disabled { opacity: 1; }
 #stage .board-cell.tired .cell-card { filter: grayscale(.45); opacity: .7; }
 
-#stage .cell-card { position: absolute; inset: 0; display: block; overflow: hidden; background: #22252e; pointer-events: none; }
-#stage .cc-art { position: absolute; inset: 0; background: #353746; }
+/* ----- Carta sulla griglia (allineata al design mano) ----- */
+#stage .cell-card {
+  position: absolute; inset: 0; display: block; overflow: hidden; pointer-events: none;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--faction-color) 30%, #1a1c24), #12141c 75%);
+  border: 1.5px solid color-mix(in srgb, var(--faction-color) 55%, #000);
+}
+#stage .cc-art {
+  position: absolute; inset: 0;
+  background: color-mix(in srgb, var(--faction-color) 15%, #2a2d38);
+}
 #stage .cc-art img { display: block; width: 100%; height: 100%; object-fit: cover; }
-#stage .cc-art .game-card-art-placeholder { display: grid; width: 100%; height: 100%; place-items: center; font-size: calc(30 * var(--p)); }
-#stage .cc-bar { position: absolute; z-index: 2; top: 0; left: 0; right: 0; display: flex; flex-direction: column; pointer-events: none; }
-#stage .cc-row { display: flex; align-items: flex-start; justify-content: space-between; padding: 0 calc(3 * var(--p)); }
-#stage .cc-cost {
-  flex: none; display: grid; place-items: center; min-width: calc(22 * var(--p)); height: calc(22 * var(--p)); padding: 0 calc(2 * var(--p));
-  border: 1.5px solid #ffe1a1; border-radius: 99px; background: #17213af5; color: #fff;
-  font: 900 calc(11.5 * var(--p))/1 'Roboto Condensed', Arial, sans-serif; white-space: nowrap;
+#stage .cc-art .game-card-art-placeholder {
+  display: grid; width: 100%; height: 100%; place-items: center;
+  font-size: calc(28 * var(--p)); opacity: 0.65;
+}
+
+#stage .cc-bar {
+  position: absolute; z-index: 2; top: 0; left: 0; right: 0;
+  display: flex; flex-direction: column; pointer-events: none;
 }
 #stage .cc-name {
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; padding: calc(3 * var(--p)) calc(4 * var(--p)) calc(5 * var(--p));
-  background: linear-gradient(#080911f4, #080911cc 72%, transparent); color: #fff; text-shadow: 0 1px 2px #000; text-align: center; overflow-wrap: anywhere;
-  font: 700 calc(12 * var(--p))/1.06 'Roboto Condensed', Arial, sans-serif;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  padding: calc(3 * var(--p)) calc(4 * var(--p)) calc(2 * var(--p));
+  background: linear-gradient(#080911f5, #080911bb 80%, transparent);
+  color: #fff; text-shadow: 0 1px 2px #000; text-align: center; overflow-wrap: anywhere;
+  font: 800 calc(11.5 * var(--p))/1.05 'Roboto Condensed', Arial, sans-serif;
 }
+#stage .cc-row {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 0 calc(3 * var(--p));
+}
+#stage .cc-cost {
+  flex: none; display: grid; place-items: center;
+  width: calc(22 * var(--p)); height: calc(22 * var(--p));
+  color: #fff; font: 900 calc(11 * var(--p))/1 'Roboto Condensed', Arial, sans-serif;
+  text-shadow: 0 1px 2px #000c; background: var(--faction-color);
+  border: 1.5px solid #fff7; box-shadow: 0 1px 4px #000a;
+}
+/* stesse forme della mano */
+#stage .cc-cost.shape-chi  { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); border-radius: 0; }
+#stage .cc-cost.shape-inf  { border-radius: 2px; }
+#stage .cc-cost.shape-pes  { clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%); border-radius: 0; }
+#stage .cc-cost.shape-bul  { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); border-radius: 0; }
+#stage .cc-cost.shape-gro  { clip-path: polygon(50% 0%, 90% 20%, 100% 60%, 75% 100%, 25% 100%, 0% 60%, 10% 20%); border-radius: 0; }
+#stage .cc-cost.shape-clo  { clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); border-radius: 0; }
+#stage .cc-cost.shape-ind  { border-radius: 50%; }
+
+#stage .cc-meta {
+  display: block; padding: 0 calc(4 * var(--p)) calc(3 * var(--p));
+  color: color-mix(in srgb, var(--faction-color) 65%, #fff);
+  font: 600 calc(9 * var(--p))/1.1 'Roboto Condensed', Arial, sans-serif;
+  text-transform: uppercase; letter-spacing: 0.03em; text-align: center;
+  text-shadow: 0 1px 2px #000;
+}
+
 #stage .cc-ico, #stage .fc-ico {
-  flex: none; display: grid; place-items: center; width: calc(18 * var(--p)); height: calc(18 * var(--p));
-  border: 1px solid #e0c36f; border-radius: calc(4 * var(--p)); background: #3b2f17ee; font-size: calc(11 * var(--p)); line-height: 1;
+  flex: none; display: grid; place-items: center;
+  width: calc(17 * var(--p)); height: calc(17 * var(--p));
+  border: 1px solid #e0c36f; border-radius: calc(3 * var(--p));
+  background: #3b2f17ee; font-size: calc(10 * var(--p)); line-height: 1;
 }
-#stage .cc-stats { position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; display: flex; align-items: flex-end; justify-content: space-between; gap: 2px; padding: calc(3 * var(--p)); pointer-events: none; }
+
+#stage .cc-stats {
+  position: absolute; z-index: 2; left: 0; right: 0; bottom: 0;
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 2px;
+  padding: calc(3 * var(--p)); pointer-events: none;
+}
 #stage .cc-atk, #stage .cc-hp, #stage .fc-stat {
-  display: grid; place-items: center; min-width: calc(30 * var(--p)); height: calc(22 * var(--p)); padding: 0 calc(5 * var(--p));
-  border: 1px solid #ffffffa8; border-radius: calc(6 * var(--p)); color: #fff; white-space: nowrap; text-shadow: 0 1px 2px #000;
-  font: 900 calc(14 * var(--p))/1 'Roboto Condensed', Arial, sans-serif; box-shadow: 0 1px 4px #0009;
+  display: grid; place-items: center;
+  min-width: calc(28 * var(--p)); height: calc(20 * var(--p));
+  padding: 0 calc(4 * var(--p));
+  border: 1px solid #ffffffa8; border-radius: calc(5 * var(--p));
+  color: #fff; white-space: nowrap; text-shadow: 0 1px 2px #000;
+  font: 900 calc(12.5 * var(--p))/1 'Roboto Condensed', Arial, sans-serif;
+  box-shadow: 0 1px 4px #0009;
 }
 #stage .cc-atk, #stage .fc-stat.atk { border-color: #f0b88b; background: #602714f0; }
 #stage .cc-hp, #stage .fc-stat.hp { border-color: #ffb0b8; background: #691f2ff0; }
 #stage .cc-hp.hurt { color: #ffd04d; }
 #stage .cc-atk.buff { color: #9bf0a8; }
+
 #stage .cell-card.is-terra::after {
+  content: 'TERRAFORMA';
+  position: absolute; z-index: 2; left: 0; right: 0; bottom: 0;
+  padding: calc(2 * var(--p));
+  background: #241d13de; color: #ffdea1; text-align: center;
+  font: 900 calc(9.5 * var(--p))/1.2 'Roboto Condensed', Arial, sans-serif;
+  letter-spacing: .04em;
+}#stage .cell-card.is-terra::after {
   content: 'TERRAFORMA'; position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; padding: calc(2 * var(--p));
   background: #241d13de; color: #ffdea1; text-align: center; font: 900 calc(10 * var(--p))/1.2 'Roboto Condensed', Arial, sans-serif; letter-spacing: .04em;
 }
