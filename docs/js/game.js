@@ -59,8 +59,26 @@ function cellHTML(d, c) {
   return `<article class="cell-card faction-${faction(d)}${c.kind === 'terraforma' ? ' is-terra' : ''}"><div class="cc-art">${artHTML(d)}</div><div class="cc-bar"><span class="cc-name">${escape(d.name)}</span><div class="cc-row"><span class="cc-cost">${costText(d)}</span>${hasText(d) ? TEXT_ICON.replace('CLS','cc-ico') : ''}</div></div>${isCreature ? `<div class="cc-stats"><span class="cc-atk${buff}">⚔ ${atk}</span><span class="cc-hp${hurt}">❤ ${hp}</span></div>` : c.kind === 'terraforma' && c.hp !== undefined ? `<div class="cc-stats"><span class="cc-hp${Number(c.hp) < Number(c.max_hp) ? ' hurt' : ''}">❤ ${c.hp}</span></div>` : ''}</article>`;
 }
 function handCardHTML(d) {
-  const isCreature = creature(d), text = hasText(d);
-  return `<article class="fan-card faction-${faction(d)}${isCreature ? '' : ' no-stats'}"><div class="fc-art">${artHTML(d)}</div><span class="fc-cost">${costText(d)}</span>${text ? TEXT_ICON.replace('CLS','fc-ico') : ''}${isCreature ? `<span class="fc-stat atk">⚔ ${d.attack ?? 0}</span><span class="fc-stat hp">❤ ${d.hp ?? 0}</span>` : ''}<div class="fc-info"><span class="fc-name">${escape(d.name)}</span>${text ? `<span class="fc-fx">${escape(plainText(d).slice(0,90))}</span>` : ''}</div></article>`;
+  const isCreature = creature(d);
+  const text = hasText(d);
+  const f = faction(d);
+  const cost = d.card_type === 'mostrissimo'
+    ? Number(d.sacrifice_cost ?? 0)
+    : Number(d.mana_cost ?? 0);
+  const costIcon = d.card_type === 'mostrissimo' ? '✦' : '';
+  const subtype = d.subtype ? String(d.subtype) : '';
+  const factionLabel = (deckFactionNames[f.toUpperCase()] || f.toUpperCase()).slice(0, 3);
+
+  return `<article class="fan-card faction-${f}${isCreature ? '' : ' no-stats'}">
+    <div class="fc-art">${artHTML(d)}</div>
+    <span class="fc-cost shape-${f}" title="Costo">${costIcon}${cost}</span>
+    ${text ? TEXT_ICON.replace('CLS', 'fc-ico') : ''}
+    ${isCreature ? `<span class="fc-stat atk">⚔ ${d.attack ?? 0}</span><span class="fc-stat hp">❤ ${d.hp ?? 0}</span>` : ''}
+    <div class="fc-info">
+      <span class="fc-name">${escape(d.name)}</span>
+      <span class="fc-meta">${escape(factionLabel)}${subtype ? ' · ' + escape(subtype) : ''}</span>
+    </div>
+  </article>`;
 }
 // Geometria del ventaglio, in "px di riferimento" della colonna 455x768 (vedi css/stage.css).
 const HAND_AREA = 403, HAND_MIN_VISIBLE = 34;
