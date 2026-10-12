@@ -43,40 +43,101 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
 /* Neutralizza l'aspetto "pannello" nei blocchi della colonna */
 #stage .panel { padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
 
-/* ---------- HUD (IA + stato) ---------- */
-#stage .hud-top { position: relative; z-index: 50; flex: none; display: flex; flex-direction: column; gap: calc(3 * var(--p)); }
+/* ---------- HUD (IA + stato) — dark arcano / mummia ---------- */
+#stage .hud-top { position: relative; z-index: 50; flex: none; display: flex; flex-direction: column; gap: calc(4 * var(--p)); }
 #stage .hud-bar {
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: calc(6 * var(--p));
-  min-height: calc(40 * var(--p)); padding: calc(3 * var(--p)) calc(5 * var(--p));
-  border: 1px solid #57515e; border-radius: calc(8 * var(--p));
-  background: linear-gradient(100deg, #161923, #26232e, #161923);
+  min-height: calc(42 * var(--p)); padding: calc(4 * var(--p)) calc(6 * var(--p));
+  border: 1px solid #6b5a3e;
+  border-radius: calc(9 * var(--p));
+  background:
+    linear-gradient(180deg, rgba(232, 200, 120, 0.06), transparent 40%),
+    linear-gradient(100deg, #12101a, #1c1826 45%, #14121c);
+  box-shadow:
+    inset 0 1px 0 rgba(232, 200, 120, 0.12),
+    0 4px 14px #0008;
 }
-#stage .ai-hud { border-top: 2px solid #aa5976; }
-#stage .player-hud { position: relative; min-height: calc(52 * var(--p)); border-bottom: 2px solid #638dba; }
-#stage .hud-group { display: flex; align-items: center; gap: calc(4 * var(--p)); min-width: 0; }
+#stage .ai-hud {
+  border-top: 2px solid #c39c53;
+  border-color: #6b5a3e;
+  border-top-color: #aa5976;
+}
+#stage .player-hud {
+  position: relative;
+  min-height: calc(54 * var(--p));
+  border-bottom: 2px solid #c39c53;
+  border-color: #6b5a3e;
+  border-bottom-color: #638dba;
+}
+#stage .hud-group { display: flex; align-items: center; gap: calc(5 * var(--p)); min-width: 0; }
 #stage .hud-center { display: flex; align-items: center; justify-content: center; min-width: 0; }
 #stage .hud-name {
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center;
   font: 700 calc(14 * var(--p))/1.1 'Roboto Condensed', Arial, sans-serif; color: #ffc3d1;
+  letter-spacing: 0.02em;
 }
 #stage .player-hud .hud-name {
-  position: absolute; top: calc(-8 * var(--p)); left: 50%; transform: translateX(-50%); max-width: 60%;
-  padding: 0 calc(7 * var(--p)); border-radius: calc(6 * var(--p)); background: #141823;
-  font-size: calc(11.5 * var(--p)); color: #c4ddff;
+  position: absolute; top: calc(-9 * var(--p)); left: 50%; transform: translateX(-50%); max-width: 60%;
+  padding: calc(1 * var(--p)) calc(10 * var(--p));
+  border: 1px solid #6b5a3e;
+  border-radius: calc(6 * var(--p));
+  background: linear-gradient(180deg, #1e1a28, #14121c);
+  font-size: calc(11.5 * var(--p)); color: #e8d5a0;
+  box-shadow: 0 2px 8px #0009;
 }
 #stage .hud-value {
   display: flex; align-items: center; justify-content: center; gap: calc(3 * var(--p));
-  min-width: calc(40 * var(--p)); height: calc(32 * var(--p)); padding: 0 calc(6 * var(--p));
-  border: 1px solid #545660; border-radius: calc(6 * var(--p)); background: #11151f; text-align: center;
+  min-width: calc(42 * var(--p)); height: calc(34 * var(--p)); padding: 0 calc(7 * var(--p));
+  border: 1px solid #5c4e38;
+  border-radius: calc(7 * var(--p));
+  background:
+    linear-gradient(180deg, rgba(232, 200, 120, 0.08), transparent 55%),
+    #0e0c14;
+  text-align: center;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
-#stage .hud-value .hud-label { font-size: calc(14 * var(--p)); line-height: 1; }
-#stage .hud-value strong { color: #f9f4e8; font-size: calc(19 * var(--p)); line-height: 1; font-variant-numeric: tabular-nums; }
-#stage .hud-value .hud-sep { color: #8f94a8; font-size: calc(14 * var(--p)); line-height: 1; }
+#stage .hud-value .hud-label { font-size: calc(14 * var(--p)); line-height: 1; filter: saturate(1.1); }
+#stage .hud-value strong {
+  color: #f5ecd6;
+  font-size: calc(19 * var(--p));
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 2px #000a;
+}
+#stage .hud-value .hud-sep { color: #8a7d62; font-size: calc(14 * var(--p)); line-height: 1; }
+#stage .hud-value.life {
+  border-color: #7a3a45;
+  background:
+    linear-gradient(180deg, rgba(226, 95, 97, 0.12), transparent 55%),
+    #120c12;
+}
 #stage .hud-value.life strong { color: #ff9ca9; }
+#stage .hud-value.mana {
+  border-color: #3a5078;
+  background:
+    linear-gradient(180deg, rgba(100, 160, 255, 0.12), transparent 55%),
+    #0c1018;
+}
 #stage .hud-value.mana strong { color: #acd2ff; }
+#stage .hud-value.deck {
+  border-color: #6b5a3e;
+  background:
+    linear-gradient(180deg, rgba(243, 214, 142, 0.1), transparent 55%),
+    #12100c;
+}
 #stage .hud-value.deck strong { color: #f3d68e; }
+#stage .hud-value.grave {
+  border-color: #5a4a68;
+  background:
+    linear-gradient(180deg, rgba(180, 140, 200, 0.1), transparent 55%),
+    #100e16;
+  cursor: pointer;
+}
 #stage .hud-value.grave strong { color: #d1bade; }
-#stage .hud-value.grave { cursor: pointer; }
+#stage .hud-value.grave:hover {
+  border-color: #c39c53;
+  box-shadow: 0 0 10px rgba(195, 156, 83, 0.25);
+}
 
 /* Dorsi delle carte in mano all'IA (solo conteggio: nessuna informazione privata) */
 #stage .opponent-hand {
@@ -108,8 +169,11 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
 #stage .hud-menu { position: relative; flex: none; }
 #stage .menu-button {
   position: relative; display: grid; place-items: center; width: calc(32 * var(--p)); height: calc(26 * var(--p)); padding: 0;
-  border: 1px solid #65606a; border-radius: calc(6 * var(--p)); background: #262a36; color: #f1eee7;
+  border: 1px solid #6b5a3e; border-radius: calc(6 * var(--p));
+  background: linear-gradient(180deg, #2a2434, #1a1622);
+  color: #e8d5a0;
   font-size: calc(17 * var(--p)); line-height: 1;
+  box-shadow: inset 0 1px 0 rgba(232, 200, 120, 0.1);
 }
 #stage .menu-button::after { content: ''; position: absolute; inset: -9px -6px; }   /* area di tocco più ampia */
 #stage .menu-panel {
