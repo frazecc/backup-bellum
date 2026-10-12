@@ -53,10 +53,35 @@ const hasText = d => plainText(d).length > 0;
 const artHTML = d => d.image_url ? `<img src="${escape(d.image_url)}" alt="Illustrazione di ${escape(d.name)}">` : '<span class="game-card-art-placeholder">🎴</span>';
 const TEXT_ICON = '<span class="CLS" title="Questa carta ha un testo" aria-hidden="true">📜</span>';
 function cellHTML(d, c) {
-  const isCreature = isCreatureCell(c), atk = c.attack ?? d.attack ?? 0, hp = c.hp ?? d.hp ?? 0;
+  const isCreature = isCreatureCell(c);
+  const atk = c.attack ?? d.attack ?? 0;
+  const hp = c.hp ?? d.hp ?? 0;
   const hurt = isCreature && Number(c.max_hp) > 0 && Number(hp) < Number(c.max_hp) ? ' hurt' : '';
   const buff = isCreature && Number(atk) > Number(d.attack ?? 0) ? ' buff' : '';
-  return `<article class="cell-card faction-${faction(d)}${c.kind === 'terraforma' ? ' is-terra' : ''}"><div class="cc-art">${artHTML(d)}</div><div class="cc-bar"><span class="cc-name">${escape(d.name)}</span><div class="cc-row"><span class="cc-cost">${costText(d)}</span>${hasText(d) ? TEXT_ICON.replace('CLS','cc-ico') : ''}</div></div>${isCreature ? `<div class="cc-stats"><span class="cc-atk${buff}">⚔ ${atk}</span><span class="cc-hp${hurt}">❤ ${hp}</span></div>` : c.kind === 'terraforma' && c.hp !== undefined ? `<div class="cc-stats"><span class="cc-hp${Number(c.hp) < Number(c.max_hp) ? ' hurt' : ''}">❤ ${c.hp}</span></div>` : ''}</article>`;
+  const f = faction(d);
+  const cost = d.card_type === 'mostrissimo'
+    ? Number(d.sacrifice_cost ?? 0)
+    : Number(d.mana_cost ?? 0);
+  const costIcon = d.card_type === 'mostrissimo' ? '✦' : '';
+  const subtype = d.subtype ? String(d.subtype) : '';
+  const factionLabel = (deckFactionNames[f.toUpperCase()] || f.toUpperCase()).slice(0, 3);
+
+  return `<article class="cell-card faction-${f}${c.kind === 'terraforma' ? ' is-terra' : ''}">
+    <div class="cc-art">${artHTML(d)}</div>
+    <div class="cc-bar">
+      <span class="cc-name">${escape(d.name)}</span>
+      <div class="cc-row">
+        <span class="cc-cost shape-${f}">${costIcon}${cost}</span>
+        ${hasText(d) ? TEXT_ICON.replace('CLS', 'cc-ico') : ''}
+      </div>
+      <span class="cc-meta">${escape(factionLabel)}${subtype ? ' · ' + escape(subtype) : ''}</span>
+    </div>
+    ${isCreature
+      ? `<div class="cc-stats"><span class="cc-atk${buff}">⚔ ${atk}</span><span class="cc-hp${hurt}">❤ ${hp}</span></div>`
+      : (c.kind === 'terraforma' && c.hp !== undefined
+          ? `<div class="cc-stats"><span class="cc-hp${Number(c.hp) < Number(c.max_hp) ? ' hurt' : ''}">❤ ${c.hp}</span></div>`
+          : '')}
+  </article>`;
 }
 function handCardHTML(d) {
   const isCreature = creature(d);
