@@ -296,7 +296,7 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
 #stage .board-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(6 * var(--p)); min-width: 0; min-height: 0; }
 #stage .board-cell {
   position: relative; display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; aspect-ratio: auto; padding: 0;
-  overflow: hidden;
+  overflow: visible; /* badge rotondi possono sporgere */
   border: 3px solid var(--tomb-empty-border, #6b5a3c);
   border-radius: calc(12 * var(--p));
   background: var(--tomb-empty, #2a2016);
@@ -342,80 +342,121 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
   box-shadow: 0 2px 0 var(--tomb-chunky-shadow, #1a0a05), 0 0 14px #e8c565aa;
 }
 
-/* ----- Carta sulla griglia (allineata al design mano) ----- */
+/* ----- Carta sulla griglia — Stile B papiro + badge rotondi ----- */
 #stage .cell-card {
-  position: absolute; inset: 0; display: block; overflow: hidden; pointer-events: none;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--faction-color) 30%, #1a1c24), #12141c 75%);
-  border: 1.5px solid color-mix(in srgb, var(--faction-color) 55%, #000);
+  position: absolute; inset: calc(2 * var(--p));
+  display: flex; flex-direction: column; gap: calc(2 * var(--p));
+  overflow: visible; pointer-events: none;
+  background: var(--tomb-papyrus, #d7c08c);
+  border: 2px solid #5a3410;
+  border-radius: calc(10 * var(--p));
+  padding: calc(2 * var(--p));
+  box-shadow: 0 2px 0 var(--tomb-chunky-shadow, #1a0a05);
+}
+#stage .cc-nameband {
+  flex: none; height: calc(22 * var(--p));
+  border-radius: calc(6 * var(--p));
+  background: var(--card-c1, #8f6a12);
+  display: flex; align-items: center;
+  padding: 0 calc(4 * var(--p)) 0 calc(18 * var(--p));
+  overflow: hidden;
+}
+#stage .cc-name {
+  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: #fff;
+  font-family: var(--font-body, 'Nunito', system-ui, sans-serif);
+  font-weight: 800;
+  font-size: calc(11 * var(--p));
+  line-height: 1.05;
+  text-shadow: 0 1px 0 #00000066;
 }
 #stage .cc-art {
-  position: absolute; inset: 0;
-  background: color-mix(in srgb, var(--faction-color) 15%, #2a2d38);
+  flex: 1 1 auto; min-height: 0;
+  border-radius: calc(5 * var(--p));
+  border: 2px solid #5a3410;
+  background: var(--card-c2, #c9a53f);
+  overflow: hidden;
 }
 #stage .cc-art img { display: block; width: 100%; height: 100%; object-fit: cover; }
 #stage .cc-art .game-card-art-placeholder {
   display: grid; width: 100%; height: 100%; place-items: center;
-  font-size: calc(28 * var(--p)); opacity: 0.65;
-}
-
-#stage .cc-bar {
-  position: absolute; z-index: 2; top: 0; left: 0; right: 0;
-  display: flex; flex-direction: column; pointer-events: none;
-}
-#stage .cc-name {
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
-  padding: calc(4 * var(--p)) calc(3 * var(--p)) calc(2 * var(--p));
-  background: linear-gradient(#080911f8, #080911cc 75%, transparent);
-  color: #fff; text-shadow: 0 1px 3px #000; text-align: center; overflow-wrap: anywhere;
-  font: 800 calc(12 * var(--p))/1.05 'Roboto Condensed', Arial, sans-serif;
-}
-#stage .cc-row {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  padding: 0 calc(3 * var(--p));
+  font-size: calc(22 * var(--p)); opacity: 0.55; color: #5a3410;
 }
 #stage .cc-cost {
-  flex: none; display: grid; place-items: center;
-  width: calc(24 * var(--p)); height: calc(24 * var(--p));
-  color: #fff; font: 900 calc(12 * var(--p))/1 'Roboto Condensed', Arial, sans-serif;
-  text-shadow: 0 1px 2px #000c; background: var(--faction-color);
-  border: 1.5px solid #fff8; box-shadow: 0 1px 5px #000b;
-}
-/* stesse forme della mano */
-
-#stage .cc-meta {
-  display: block; padding: 0 calc(3 * var(--p)) calc(3 * var(--p));
-  color: #fff;
-  font: 700 calc(10 * var(--p))/1.1 'Roboto Condensed', Arial, sans-serif;
-  text-transform: uppercase; letter-spacing: 0.04em; text-align: center;
-  text-shadow: 0 1px 2px #000;
-  opacity: 0.95;
-}
-
-#stage .cc-ico, #stage .fc-ico {
-  flex: none; display: grid; place-items: center;
-  width: calc(17 * var(--p)); height: calc(17 * var(--p));
-  border: 1px solid #e0c36f; border-radius: calc(3 * var(--p));
-  background: #3b2f17ee; font-size: calc(10 * var(--p)); line-height: 1;
-}
-
-#stage .cc-stats {
-  position: absolute; z-index: 2; left: 0; right: 0; bottom: 0;
-  display: flex; align-items: flex-end; justify-content: space-between; gap: 2px;
-  padding: calc(3 * var(--p)); pointer-events: none;
-}
-#stage .cc-atk, #stage .cc-hp, #stage .fc-stat {
+  position: absolute; z-index: 4;
+  left: calc(-6 * var(--p)); top: calc(-6 * var(--p));
+  width: calc(22 * var(--p)); height: calc(22 * var(--p));
+  border-radius: 50%;
   display: grid; place-items: center;
-  min-width: calc(28 * var(--p)); height: calc(20 * var(--p));
-  padding: 0 calc(4 * var(--p));
-  border: 1px solid #ffffffa8; border-radius: calc(5 * var(--p));
-  color: #fff; white-space: nowrap; text-shadow: 0 1px 2px #000;
-  font: 900 calc(12.5 * var(--p))/1 'Roboto Condensed', Arial, sans-serif;
-  box-shadow: 0 1px 4px #0009;
+  background: var(--badge-cost, #2f7de1);
+  border: 2.5px solid var(--badge-cost-border, #0f2f66);
+  color: #fff;
+  font-family: var(--font-title, 'Lilita One', Georgia, serif);
+  font-size: calc(13 * var(--p));
+  font-weight: 400;
+  line-height: 1;
+  box-shadow: 0 1px 4px #0008;
 }
-#stage .cc-atk, #stage .fc-stat.atk { border-color: #f0b88b; background: #602714f0; }
-#stage .cc-hp, #stage .fc-stat.hp { border-color: #ffb0b8; background: #691f2ff0; }
-#stage .cc-hp.hurt { color: #ffd04d; }
-#stage .cc-atk.buff { color: #9bf0a8; }
+#stage .cc-meta {
+  position: absolute; z-index: 3;
+  left: 50%; bottom: calc(2 * var(--p));
+  transform: translateX(-50%);
+  max-width: 90%;
+  padding: 0 calc(3 * var(--p));
+  color: #5a3410;
+  font-family: var(--font-body, 'Nunito', system-ui, sans-serif);
+  font-weight: 800;
+  font-size: calc(9 * var(--p));
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+#stage .cc-ico, #stage .fc-ico {
+  position: absolute; z-index: 4;
+  right: calc(2 * var(--p)); top: calc(24 * var(--p));
+  display: grid; place-items: center;
+  width: calc(16 * var(--p)); height: calc(16 * var(--p));
+  border: 1px solid #5a3410; border-radius: calc(4 * var(--p));
+  background: #e8d5a8ee; font-size: calc(10 * var(--p)); line-height: 1;
+}
+#stage .cc-atk, #stage .cc-hp {
+  position: absolute; z-index: 4;
+  width: calc(24 * var(--p)); height: calc(24 * var(--p));
+  border-radius: 50%;
+  display: grid; place-items: center;
+  color: #fff;
+  font-family: var(--font-title, 'Lilita One', Georgia, serif);
+  font-size: calc(14 * var(--p));
+  font-weight: 400;
+  line-height: 1;
+  text-shadow: 0 1px 0 #5a3410;
+  box-shadow: 0 1px 4px #0008;
+}
+#stage .cc-atk {
+  left: calc(-6 * var(--p)); bottom: calc(-6 * var(--p));
+  background: var(--badge-atk, #f5a623);
+  border: 2.5px solid var(--badge-atk-border, #5a3410);
+}
+#stage .cc-hp {
+  right: calc(-6 * var(--p)); bottom: calc(-6 * var(--p));
+  background: var(--badge-hp, #e0453d);
+  border: 2.5px solid var(--badge-hp-border, #5a1010);
+}
+#stage .cc-hp.hurt { color: #ffe08a; }
+#stage .cc-atk.buff { color: #c8ffd0; }
+
+/* Pigmenti fazione sulle carte griglia */
+#stage .cell-card.faction-chi { --card-c1: var(--card-chi-c1); --card-c2: var(--card-chi-c2); }
+#stage .cell-card.faction-inf { --card-c1: var(--card-inf-c1); --card-c2: var(--card-inf-c2); }
+#stage .cell-card.faction-pes { --card-c1: var(--card-pes-c1); --card-c2: var(--card-pes-c2); }
+#stage .cell-card.faction-bul { --card-c1: var(--card-bul-c1); --card-c2: var(--card-bul-c2); }
+#stage .cell-card.faction-gro { --card-c1: var(--card-gro-c1); --card-c2: var(--card-gro-c2); }
+#stage .cell-card.faction-clo { --card-c1: var(--card-clo-c1); --card-c2: var(--card-clo-c2); }
+#stage .cell-card.faction-ind { --card-c1: var(--card-ind-c1); --card-c2: var(--card-ind-c2); }
 
 #stage .cell-card.is-terra::after {
   content: 'TERRAFORMA';
@@ -548,7 +589,19 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
 #stage .hud-source-only { position: absolute !important; width: 1px !important; height: 1px !important; margin: -1px !important; padding: 0 !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important; }
 
 /* ---------- Mano a ventaglio ---------- */
-#stage .hand-zone { flex: none; position: relative; height: calc(162 * var(--p)); padding: 0; border: 0; background: none; }
+#stage .hand-zone {
+  flex: none; position: relative;
+  height: calc(176 * var(--p));
+  margin: 0 calc(2 * var(--p));
+  padding: calc(6 * var(--p)) calc(8 * var(--p)) calc(8 * var(--p));
+  border: 4px solid var(--tomb-gold, #c9a043);
+  border-radius: calc(20 * var(--p));
+  background: var(--tomb-panel, #241a12);
+  box-shadow:
+    0 5px 0 var(--tomb-chunky-shadow, #1a0a05),
+    inset 0 0 0 3px var(--tomb-panel-inner, #0f0a06),
+    0 0 20px #e8c56566;
+}
 #stage .fan-hand { position: absolute; inset: 0; display: block; height: auto; padding: 0; overflow: visible; }
 #stage #player-hand > .hand-card {
   position: absolute; left: 50%; bottom: calc((10 + var(--hd, 0)) * var(--p)); flex: none; display: block;
@@ -565,24 +618,29 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
 #stage #player-hand > .hand-card:focus-visible { z-index: 99; translate: 0 calc(-12 * var(--p)); outline: none; }
 @media (hover: hover) { #stage #player-hand > .hand-card:hover { z-index: 99; translate: 0 calc(-14 * var(--p)); } }
 
-/* ----- Carta in mano (design definitivo base) ----- */
+/* ----- Carta in mano — Stile B papiro + badge rotondi ----- */
 #stage .fan-card {
-  position: absolute; inset: 0; display: block; overflow: hidden; pointer-events: none;
-  border: 2.5px solid #94a4ba !important; /* grigio Indrazzico = non giocabile */
-  border-radius: calc(8 * var(--p));
-  background: linear-gradient(160deg, color-mix(in srgb, var(--faction-color) 35%, #1a1c24), #12141c 70%);
-  box-shadow: 0 3px 10px #000c, inset 0 0 0 1px #94a4ba55;
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; gap: calc(2 * var(--p));
+  overflow: visible; pointer-events: none;
+  border: 3px solid var(--tomb-gold, #c9a043) !important;
+  border-radius: calc(12 * var(--p));
+  background: var(--tomb-papyrus, #d7c08c);
+  padding: calc(2 * var(--p));
+  box-shadow: 0 3px 0 var(--tomb-chunky-shadow, #1a0a05), 0 0 12px #e8c56555;
 }
-/* Giocabile: bordo bianco forte + bende mummia ben visibili */
+/* Non giocabile: bordo grigio Indrazzico */
+#stage #player-hand > .hand-card:not(.playable) .fan-card {
+  border-color: #94a4ba !important;
+  box-shadow: 0 3px 0 var(--tomb-chunky-shadow, #1a0a05);
+}
+/* Giocabile: bordo bianco + alone oro + bende mummia */
 #stage #player-hand > .hand-card.playable .fan-card {
   border: 3px solid #ffffff !important;
   box-shadow:
-    0 0 0 3px #f5ecd6,
-    0 0 0 6px rgba(255, 255, 255, 0.35),
-    0 0 22px #ffffffcc,
-    0 0 36px #e8d5a066,
-    inset 0 0 0 1px #fff;
-  filter: brightness(1.08);
+    0 0 0 3px var(--tomb-gold-light, #e8c565),
+    0 8px 0 var(--tomb-chunky-shadow, #1a0a05),
+    0 0 24px #e8c565cc;
 }
 #stage #player-hand > .hand-card.playable .fan-card::before {
   content: "";
@@ -591,134 +649,134 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
   border-radius: inherit;
   pointer-events: none;
   z-index: 5;
-  /* bende: strisce beige opache e leggibili */
   background:
     repeating-linear-gradient(
       -32deg,
       rgba(245, 236, 214, 0) 0 5px,
-      rgba(245, 236, 214, 0.72) 5px 9px,
-      rgba(210, 190, 150, 0.45) 9px 11px,
+      rgba(245, 236, 214, 0.55) 5px 9px,
+      rgba(210, 190, 150, 0.35) 9px 11px,
       rgba(245, 236, 214, 0) 11px 18px
     );
-  opacity: 0.9;
+  opacity: 0.85;
 }
 #stage #player-hand > .hand-card.playable .fan-card::after {
   content: "";
   position: absolute;
-  inset: -4px;
+  inset: -3px;
   border-radius: inherit;
   pointer-events: none;
   z-index: 6;
-  border: 2px dashed rgba(245, 236, 214, 0.95);
-  box-shadow: 0 0 12px rgba(255, 255, 255, 0.5);
+  border: 2px dashed rgba(245, 236, 214, 0.9);
+}
+#stage .fc-nameband {
+  flex: none; height: calc(24 * var(--p));
+  border-radius: calc(7 * var(--p));
+  background: var(--card-c1, #8f6a12);
+  display: flex; align-items: center;
+  padding: 0 calc(4 * var(--p)) 0 calc(18 * var(--p));
+  overflow: hidden;
+}
+#stage .fc-name {
+  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: #fff;
+  font-family: var(--font-body, 'Nunito', system-ui, sans-serif);
+  font-weight: 800;
+  font-size: calc(12 * var(--p));
+  line-height: 1.05;
+  text-shadow: 0 1px 0 #00000066;
 }
 #stage .fc-art {
-  position: absolute; inset: 0;
-  background: color-mix(in srgb, var(--faction-color) 18%, #2a2d38);
+  flex: 1 1 auto; min-height: 0;
+  border-radius: calc(6 * var(--p));
+  border: 2px solid #5a3410;
+  background: var(--card-c2, #c9a53f);
+  overflow: hidden;
 }
 #stage .fc-art img { display: block; width: 100%; height: 100%; object-fit: cover; }
 #stage .fc-art .game-card-art-placeholder {
   display: grid; width: 100%; height: 100%; place-items: center;
-  font-size: calc(32 * var(--p)); opacity: 0.7;
+  font-size: calc(28 * var(--p)); opacity: 0.55; color: #5a3410;
 }
 
-/* Costo mana — forme geometriche per fazione (accessibilità) */
+/* Badge costo rotondo blu (Stile B) — le shape-* restano ma il cerchio vince sul bordo */
 #stage .fc-cost {
-  position: absolute; z-index: 3;
-  top: calc(4 * var(--p)); left: calc(4 * var(--p));
-  display: grid; place-items: center;
-  width: calc(28 * var(--p)); height: calc(28 * var(--p));
-  color: #fff; font: 900 calc(13 * var(--p))/1 'Roboto Condensed', Arial, sans-serif;
-  text-shadow: 0 1px 2px #000c; box-shadow: 0 2px 6px #000a;
-  background: var(--faction-color);
-  border: 2px solid #fff8;
-}
-
-/* Forme costo — IDENTICHE a dettaglio (solo più piccole in mano) */
-#stage .fc-cost.shape-chi,
-#stage .cc-cost.shape-chi,
-#stage .game-card-cost.shape-chi,
-#stage .board-card-cost.shape-chi {
-  clip-path: polygon(50% 0%, 0% 100%, 100% 100%) !important;
-  border-radius: 0 !important;
-}
-#stage .fc-cost.shape-inf,
-#stage .cc-cost.shape-inf,
-#stage .game-card-cost.shape-inf,
-#stage .board-card-cost.shape-inf {
-  clip-path: none !important;
-  border-radius: 3px !important;
-}
-#stage .fc-cost.shape-pes,
-#stage .cc-cost.shape-pes,
-#stage .game-card-cost.shape-pes,
-#stage .board-card-cost.shape-pes {
-  clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%) !important;
-  border-radius: 0 !important;
-}
-#stage .fc-cost.shape-bul,
-#stage .cc-cost.shape-bul,
-#stage .game-card-cost.shape-bul,
-#stage .board-card-cost.shape-bul {
-  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%) !important;
-  border-radius: 0 !important;
-}
-#stage .fc-cost.shape-gro,
-#stage .cc-cost.shape-gro,
-#stage .game-card-cost.shape-gro,
-#stage .board-card-cost.shape-gro {
-  clip-path: polygon(50% 0%, 90% 20%, 100% 60%, 75% 100%, 25% 100%, 0% 60%, 10% 20%) !important;
-  border-radius: 0 !important;
-}
-#stage .fc-cost.shape-clo,
-#stage .cc-cost.shape-clo,
-#stage .game-card-cost.shape-clo,
-#stage .board-card-cost.shape-clo {
-  clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%) !important;
-  border-radius: 0 !important;
-}
-#stage .fc-cost.shape-ind,
-#stage .cc-cost.shape-ind,
-#stage .game-card-cost.shape-ind,
-#stage .board-card-cost.shape-ind {
-  clip-path: none !important;
+  position: absolute; z-index: 4;
+  left: calc(-7 * var(--p)); top: calc(-7 * var(--p));
+  width: calc(24 * var(--p)); height: calc(24 * var(--p));
   border-radius: 50% !important;
+  clip-path: none !important;
+  display: grid; place-items: center;
+  background: var(--badge-cost, #2f7de1) !important;
+  border: 2.5px solid var(--badge-cost-border, #0f2f66) !important;
+  color: #fff;
+  font-family: var(--font-title, 'Lilita One', Georgia, serif);
+  font-size: calc(14 * var(--p));
+  font-weight: 400;
+  line-height: 1;
+  text-shadow: none;
+  box-shadow: 0 1px 4px #0008;
+}
+#stage .cc-cost {
+  border-radius: 50% !important;
+  clip-path: none !important;
 }
 
 #stage .fc-ico {
-  position: absolute; z-index: 3;
-  top: calc(36 * var(--p)); left: calc(6 * var(--p));
+  position: absolute; z-index: 4;
+  right: calc(3 * var(--p)); top: calc(28 * var(--p));
 }
 #stage .fc-stat {
-  position: absolute; z-index: 3;
-  left: calc(3 * var(--p));
-  min-width: calc(34 * var(--p));
-  height: calc(24 * var(--p));
-  padding: 0 calc(5 * var(--p));
-  font-size: calc(13 * var(--p)) !important;
+  position: absolute; z-index: 4;
+  width: calc(26 * var(--p)); height: calc(26 * var(--p));
+  border-radius: 50%;
+  display: grid; place-items: center;
+  padding: 0;
+  min-width: 0;
+  color: #fff;
+  font-family: var(--font-title, 'Lilita One', Georgia, serif);
+  font-size: calc(15 * var(--p)) !important;
+  font-weight: 400;
+  line-height: 1;
+  text-shadow: 0 1px 0 #5a3410;
+  box-shadow: 0 1px 4px #0008;
 }
-#stage .fc-stat.atk { bottom: calc(32 * var(--p)); }
-#stage .fc-stat.hp  { bottom: calc(5 * var(--p)); }
-
-#stage .fc-info {
-  position: absolute; z-index: 2; left: 0; right: 0; bottom: 0;
-  display: flex; flex-direction: column; gap: 1px;
-  padding: calc(16 * var(--p)) calc(5 * var(--p)) calc(5 * var(--p)) calc(40 * var(--p));
-  background: linear-gradient(transparent, #080911f5 50%);
+#stage .fc-stat.atk {
+  left: calc(-7 * var(--p)); bottom: calc(-7 * var(--p));
+  background: var(--badge-atk, #f5a623);
+  border: 2.5px solid var(--badge-atk-border, #5a3410);
 }
-#stage .fan-card.no-stats .fc-info { padding-left: calc(6 * var(--p)); }
-
-#stage .fc-name {
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
-  color: #fff; text-shadow: 0 1px 3px #000;
-  font: 800 calc(13 * var(--p))/1.05 'Roboto Condensed', Arial, sans-serif;
+#stage .fc-stat.hp {
+  right: calc(-7 * var(--p)); bottom: calc(-7 * var(--p));
+  left: auto;
+  background: var(--badge-hp, #e0453d);
+  border: 2.5px solid var(--badge-hp-border, #5a1010);
 }
 #stage .fc-meta {
-  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  color: color-mix(in srgb, var(--faction-color) 70%, #fff);
-  font: 600 calc(10 * var(--p))/1.1 'Roboto Condensed', Arial, sans-serif;
-  text-transform: uppercase; letter-spacing: 0.03em;
+  position: absolute; z-index: 3;
+  left: 50%; bottom: calc(2 * var(--p));
+  transform: translateX(-50%);
+  max-width: 88%;
+  padding: 0 calc(2 * var(--p));
+  color: #5a3410;
+  font-family: var(--font-body, 'Nunito', system-ui, sans-serif);
+  font-weight: 800;
+  font-size: calc(9 * var(--p));
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+
+/* Pigmenti fazione mano */
+#stage .fan-card.faction-chi { --card-c1: var(--card-chi-c1); --card-c2: var(--card-chi-c2); }
+#stage .fan-card.faction-inf { --card-c1: var(--card-inf-c1); --card-c2: var(--card-inf-c2); }
+#stage .fan-card.faction-pes { --card-c1: var(--card-pes-c1); --card-c2: var(--card-pes-c2); }
+#stage .fan-card.faction-bul { --card-c1: var(--card-bul-c1); --card-c2: var(--card-bul-c2); }
+#stage .fan-card.faction-gro { --card-c1: var(--card-gro-c1); --card-c2: var(--card-gro-c2); }
+#stage .fan-card.faction-clo { --card-c1: var(--card-clo-c1); --card-c2: var(--card-clo-c2); }
+#stage .fan-card.faction-ind { --card-c1: var(--card-ind-c1); --card-c2: var(--card-ind-c2); }
 /* ================= Dialoghi confinati nella colonna (Consegna B) ================= */
 #stage .card-detail-overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: calc(6 * var(--p)); backdrop-filter: blur(calc(5 * var(--p))); }
 #stage .card-detail-overlay > .panel {
