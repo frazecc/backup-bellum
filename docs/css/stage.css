@@ -451,15 +451,16 @@ body:has(#stage.calm) .narrator-medallion.bob { animation: none !important; }
 }
 
 /* Solo menu (riga status Partita/Turno/Fase rimossa) — compatta */
-#stage .status-row {
-  display: flex; align-items: center; justify-content: flex-end;
-  min-height: 0;
-  padding: 0 calc(2 * var(--p));
-  margin: 0;
-  border: 0; background: none; box-shadow: none;
-}
+#stage .status-row { display: none !important; } /* riga eliminata: menu ora in ai-hud */
 #stage .hud-status { display: none !important; }
-#stage .hud-menu { position: relative; flex: none; }
+#stage .hud-menu { position: relative; flex: none; display: flex; align-items: center; }
+#stage .ai-hud .hud-right { gap: calc(8 * var(--p)); }
+#stage .ai-hud .menu-button {
+  width: calc(32 * var(--p));
+  height: calc(32 * var(--p));
+  border-radius: calc(10 * var(--p));
+  font-size: calc(15 * var(--p));
+}
 #stage .menu-button {
   position: relative; display: grid; place-items: center;
   width: calc(36 * var(--p)); height: calc(36 * var(--p)); padding: 0;
