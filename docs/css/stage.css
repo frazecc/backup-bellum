@@ -449,40 +449,14 @@ body:has(#stage.calm) .narrator-medallion.bob { animation: none !important; }
   margin-left: calc(min(var(--back-w) + 3 * var(--p), (var(--back-avail) - var(--back-w)) / max(var(--n) - 1, 1)) - var(--back-w));
 }
 
-/* Riga sottile Partita / Turno / Fase + menu — Stile B */
+/* Solo menu (riga status Partita/Turno/Fase rimossa) */
 #stage .status-row {
-  display: flex; align-items: center; justify-content: space-between; gap: calc(8 * var(--p));
-  min-height: calc(36 * var(--p));
-  padding: calc(6 * var(--p)) calc(10 * var(--p)) calc(10 * var(--p));
-  border-radius: calc(16 * var(--p));
-  background: var(--tomb-lapis, #16324f);
-  border: 3px solid var(--tomb-gold, #c9a043);
-  box-shadow:
-    0 4px 0 var(--tomb-chunky-shadow, #1a0a05),
-    inset 0 0 0 2px var(--tomb-lapis-inner, #0a1a2e),
-    0 0 18px #2fb7a655;
+  display: flex; align-items: center; justify-content: flex-end;
+  min-height: 0;
+  padding: calc(2 * var(--p)) calc(4 * var(--p)) 0;
+  border: 0; background: none; box-shadow: none;
 }
-#stage .hud-status {
-  display: flex; align-items: baseline; gap: calc(12 * var(--p));
-  flex-wrap: nowrap; min-width: 0; overflow: hidden; padding: 0; border: 0; background: none;
-}
-#stage .hud-status > div {
-  display: flex; align-items: baseline; gap: calc(4 * var(--p));
-  white-space: nowrap; font-size: calc(13 * var(--p));
-}
-#stage .status-label {
-  color: var(--tomb-sand, #c9b98a);
-  font-size: calc(11 * var(--p));
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-#stage .hud-status strong {
-  color: var(--tomb-gold-light, #e8c565);
-  font-family: var(--font-title, 'Lilita One', Georgia, serif);
-  font-weight: 400;
-  font-size: calc(15 * var(--p));
-}
+#stage .hud-status { display: none !important; }
 #stage .hud-menu { position: relative; flex: none; }
 #stage .menu-button {
   position: relative; display: grid; place-items: center;
@@ -787,15 +761,15 @@ body:has(#stage.calm) .narrator-medallion.bob { animation: none !important; }
 }
 
 /* Offerta Mostrissimi — Stile B malachite + papiro */
-#stage .offer-slot { flex: none; width: calc(94 * var(--p)); min-height: 0; display: flex; }
+#stage .offer-slot { flex: none; width: calc(88 * var(--p)); min-height: 0; display: flex; }
 #stage #mostrissimo-panel {
   position: static; flex: 1 1 auto;
   display: flex; flex-direction: column; align-items: center;
   width: 100%; min-width: 0; min-height: 0;
-  padding: calc(8 * var(--p)) calc(5 * var(--p));
-  overflow: visible;
+  padding: calc(5 * var(--p)) calc(4 * var(--p));
+  overflow: hidden;
   border: 4px solid var(--tomb-gold, #c9a043);
-  border-radius: calc(18 * var(--p));
+  border-radius: calc(16 * var(--p));
   background: var(--tomb-malachite, #10302f);
   box-shadow:
     0 5px 0 var(--tomb-chunky-shadow, #1a0a05),
@@ -805,28 +779,42 @@ body:has(#stage.calm) .narrator-medallion.bob { animation: none !important; }
   grid-column: auto; grid-row: auto;
 }
 #stage #mostrissimo-panel > h2 {
-  flex: none; margin: 0 0 calc(6 * var(--p));
+  flex: none; margin: 0 0 calc(2 * var(--p));
   color: var(--tomb-gold-light, #e8c565);
   font-family: var(--font-title, 'Lilita One', Georgia, serif);
-  font-size: calc(15 * var(--p));
+  font-size: calc(13 * var(--p));
   font-weight: 400;
   text-align: center;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   text-shadow: 0 2px 0 var(--tomb-malachite-inner, #071a19);
 }
-#stage #mostrissimo-panel .mostrissimo-offer {
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-  gap: calc(8 * var(--p));
-  flex: 1 1 0; width: 100%; min-width: 0; min-height: 0;
-  max-width: 100%; max-height: none; padding: 0; overflow: hidden;
+#stage #mostrissimo-panel .mostrissimo-rules {
+  flex: none;
+  margin: 0 0 calc(4 * var(--p));
+  padding: 0 calc(2 * var(--p));
+  color: var(--tomb-sand, #c9b98a);
+  font-family: var(--font-body, 'Nunito', system-ui, sans-serif);
+  font-size: calc(9.5 * var(--p));
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
 }
+#stage #mostrissimo-panel .mostrissimo-offer {
+  display: flex; flex-direction: column; align-items: center; justify-content: space-evenly;
+  gap: calc(4 * var(--p));
+  flex: 1 1 0; width: 100%; min-width: 0; min-height: 0;
+  max-width: 100%; padding: 0; overflow: hidden;
+}
+/* Carte adattive: si riducono per far stare le 3 intere senza scroll */
 #stage #mostrissimo-panel .mostrissimo-card {
-  position: relative; flex: none;
+  position: relative;
+  flex: 1 1 0;
   display: block;
-  width: calc(76 * var(--p));
-  height: calc(108 * var(--p));
-  min-width: 0; min-height: 0;
+  width: calc(62 * var(--p));
+  max-height: calc(88 * var(--p));
+  min-height: 0;
+  aspect-ratio: 62 / 88;
   padding: 0; overflow: visible;
   border: 0; border-radius: 0;
   background: transparent;
@@ -835,10 +823,10 @@ body:has(#stage.calm) .narrator-medallion.bob { animation: none !important; }
 #stage #mostrissimo-panel .mostrissimo-card .fan-card {
   position: absolute; inset: 0;
   border-color: var(--tomb-gold, #c9a043) !important;
-  box-shadow: 0 3px 0 var(--tomb-chunky-shadow, #1a0a05), 0 0 14px #e8c56566;
+  box-shadow: 0 2px 0 var(--tomb-chunky-shadow, #1a0a05), 0 0 10px #e8c56566;
 }
 #stage #mostrissimo-panel .mostrissimo-card:hover .fan-card {
-  box-shadow: 0 3px 0 var(--tomb-chunky-shadow, #1a0a05), 0 0 20px #2fe0c4aa;
+  box-shadow: 0 2px 0 var(--tomb-chunky-shadow, #1a0a05), 0 0 16px #2fe0c4aa;
 }
 #stage #mostrissimo-panel .mostrissimo-card:disabled {
   opacity: 0.7;
