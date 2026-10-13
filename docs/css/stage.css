@@ -22,7 +22,14 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
   grid-template-columns: none; grid-template-rows: none;
 }
 .stage-frame { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
-.stage-side { flex: 1 1 0; min-width: 0; height: 100%; }      /* colonne laterali PC: vuote, predisposte */
+.stage-side {
+  display: none;
+  flex: none; width: 360px; max-width: 28vw; min-width: 0; height: 100%;
+  box-sizing: border-box; padding: 20px 0;
+}
+@media (min-width: 1100px) {
+  .stage-frame.is-framed .stage-side { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+}
 .stage-frame.is-framed #stage {
   background:
     repeating-linear-gradient(0deg, #00000066 0 2px, transparent 2px 58px),
@@ -30,6 +37,261 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
     radial-gradient(ellipse at 50% 30%, #2e1f11 0%, #0b0806 84%);
   border-left: 1px solid var(--tomb-gold, #c9a043);
   border-right: 1px solid var(--tomb-gold, #c9a043);
+}
+
+/* ---------- Narratore Mummy (desktop sinistra) ---------- */
+.stage-side-left .narrator-desk {
+  width: min(360px, 100%);
+  box-sizing: border-box;
+  border-radius: 24px;
+  background: var(--tomb-panel, #241a12);
+  border: 4px solid var(--tomb-gold, #c9a043);
+  box-shadow: 0 5px 0 var(--tomb-chunky-shadow, #1a0a05), inset 0 0 0 3px var(--tomb-panel-inner, #0f0a06), 0 0 30px #e8c56566;
+  padding: 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  color: var(--tomb-text, #efe2c0);
+  font-family: var(--font-body, 'Nunito', system-ui, sans-serif);
+}
+.narrator-desk-label {
+  align-self: stretch;
+  font-family: var(--font-title, 'Lilita One', Georgia, serif);
+  font-size: 16px; letter-spacing: 0.08em;
+  color: var(--tomb-gold-light, #e8c565);
+}
+.narrator-medallion {
+  width: 232px; height: 232px; flex: none;
+  border-radius: 116px;
+  background: var(--tomb-malachite, #10302f);
+  border: 6px solid var(--tomb-gold, #c9a043);
+  box-shadow: 0 6px 0 var(--tomb-chunky-shadow, #1a0a05), 0 0 54px 10px #ffb02e99;
+  overflow: hidden;
+  display: grid; place-items: center;
+}
+.narrator-medallion.bob { animation: tomb-bob 3s ease-in-out infinite; }
+@keyframes tomb-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+body:has(#stage.calm) .narrator-medallion.bob { animation: none !important; }
+.narrator-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.narrator-fallback.hidden { display: none !important; }
+.narrator-desk-name {
+  font-family: var(--font-title, 'Lilita One', Georgia, serif);
+  font-size: 30px; line-height: 1.1;
+  color: var(--tomb-gold-light, #e8c565);
+  text-shadow: 0 3px 0 var(--tomb-lapis-inner, #0a1a2e);
+}
+.narrator-desk-speech {
+  width: 100%; box-sizing: border-box;
+  border-radius: 22px;
+  border: 4px solid var(--tomb-gold, #c9a043);
+  background: var(--tomb-papyrus, #d7c08c);
+  box-shadow: 0 5px 0 var(--tomb-chunky-shadow, #1a0a05), 0 0 28px #ffb02e55;
+  padding: 18px 16px;
+  text-align: center;
+  color: var(--tomb-ink, #3a1c0a);
+  font-weight: 800;
+  font-size: 18px;
+  line-height: 1.35;
+}
+.narrator-desk-hint {
+  font-weight: 700; font-size: 13px; line-height: 1.35;
+  color: var(--tomb-sand-dark, #c9a96a);
+  text-align: center;
+}
+
+/* ---------- Narratore Mummy (popup mobile / full-stage) ---------- */
+#stage .narrator-popup {
+  position: absolute; inset: 0; z-index: 100;
+  box-sizing: border-box;
+  background: radial-gradient(ellipse at 50% 24%, #4a3012 0%, #0d0906 74%);
+  border: 6px solid var(--tomb-gold, #c9a043);
+  box-shadow: inset 0 0 0 3px var(--tomb-lapis-inner, #0a1a2e), inset 0 0 70px #ffb02e55;
+  display: flex; flex-direction: column; align-items: center;
+  padding: calc(24 * var(--p)) calc(16 * var(--p)) calc(18 * var(--p));
+  color: var(--tomb-text, #efe2c0);
+}
+#stage .narrator-popup.hidden { display: none !important; }
+#stage .narrator-popup-label {
+  font-family: var(--font-title, 'Lilita One', Georgia, serif);
+  font-size: calc(13 * var(--p));
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--tomb-sand, #c9b98a);
+}
+#stage .narrator-popup .narrator-medallion {
+  margin-top: calc(14 * var(--p));
+  width: calc(200 * var(--p));
+  height: calc(200 * var(--p));
+  border-radius: 50%;
+}
+#stage .narrator-popup-name {
+  font-family: var(--font-title, 'Lilita One', Georgia, serif);
+  font-size: calc(28 * var(--p));
+  line-height: 1.1;
+  color: var(--tomb-gold-light, #e8c565);
+  text-shadow: 0 3px 0 var(--tomb-lapis-inner, #0a1a2e);
+  margin-top: calc(12 * var(--p));
+}
+#stage .narrator-popup-speech {
+  flex: 1; width: 100%;
+  display: flex; align-items: center; justify-content: center;
+  margin: calc(12 * var(--p)) 0;
+}
+#stage .narrator-popup-bubble {
+  width: 100%; box-sizing: border-box;
+  border-radius: calc(22 * var(--p));
+  border: 4px solid var(--tomb-gold, #c9a043);
+  background: var(--tomb-papyrus, #d7c08c);
+  box-shadow: 0 5px 0 var(--tomb-chunky-shadow, #1a0a05), 0 0 28px #ffb02e55;
+  padding: calc(20 * var(--p)) calc(16 * var(--p));
+  text-align: center;
+  color: var(--tomb-ink, #3a1c0a);
+  font-weight: 800;
+  font-size: calc(18 * var(--p));
+  line-height: 1.35;
+}
+#stage .narrator-continue {
+  width: 100%;
+  min-height: calc(52 * var(--p));
+  border: 3px solid var(--tomb-gold-border, #8a5a14);
+  border-radius: calc(16 * var(--p));
+  background: linear-gradient(180deg, var(--tomb-gold-btn-start, #e8c565), var(--tomb-gold-btn-end, #e0a22a));
+  color: #4a1f08;
+  font-family: var(--font-title, 'Lilita One', Georgia, serif);
+  font-size: calc(20 * var(--p));
+  cursor: pointer;
+  box-shadow: 0 4px 0 var(--tomb-gold-shadow, #6b3f0c), 0 0 20px #e8c565aa;
+}
+
+/* ---------- Anteprima carta desktop (colonna destra) ---------- */
+.stage-side-right .card-preview-desk {
+  width: min(360px, 100%);
+  box-sizing: border-box;
+  border-radius: 24px;
+  background: var(--tomb-panel, #241a12);
+  border: 4px solid var(--tomb-gold, #c9a043);
+  box-shadow: 0 5px 0 var(--tomb-chunky-shadow, #1a0a05), inset 0 0 0 3px var(--tomb-panel-inner, #0f0a06), 0 0 30px #e8c56566;
+  padding: 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  color: var(--tomb-text, #efe2c0);
+  font-family: var(--font-body, 'Nunito', system-ui, sans-serif);
+}
+.card-preview-label {
+  align-self: stretch;
+  font-family: var(--font-title, 'Lilita One', Georgia, serif);
+  font-size: 16px; letter-spacing: 0.08em;
+  color: var(--tomb-gold-light, #e8c565);
+}
+.card-preview-slot {
+  position: relative;
+  width: 100%;
+  min-height: 430px;
+  display: flex; align-items: center; justify-content: center;
+}
+.card-preview-empty {
+  margin: 0;
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--tomb-sand-dark, #c9a96a);
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.35;
+}
+.card-preview-empty.hidden,
+.card-preview-card.hidden { display: none !important; }
+.card-preview-card {
+  position: relative;
+  width: 300px;
+  height: 430px;
+  box-sizing: border-box;
+  border-radius: 20px;
+  border: 5px solid var(--tomb-gold, #c9a043);
+  background: var(--tomb-papyrus, #d7c08c);
+  box-shadow: 0 6px 0 var(--tomb-chunky-shadow, #1a0a05), 0 0 34px #e8c56588;
+  padding: 6px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.card-preview-card .cp-nameband {
+  height: 50px; flex: none;
+  border-radius: 12px;
+  background: var(--card-c1, #8f2a24);
+  color: #fff;
+  font-family: var(--font-title, 'Lilita One', Georgia, serif);
+  font-size: 22px; line-height: 1.05;
+  padding: 8px 10px 0 48px;
+  overflow: hidden;
+  text-shadow: 0 2px 0 #00000066;
+}
+.card-preview-card .cp-art {
+  height: 176px; flex: none;
+  border-radius: 10px;
+  border: 3px solid #5a3410;
+  background: var(--card-c2, #c4684f);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  font-weight: 800; font-size: 13px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: #5a3410;
+}
+.card-preview-card .cp-art img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.card-preview-card .cp-type {
+  font-weight: 800; font-size: 14px; color: #7a1f2b; text-align: center;
+}
+.card-preview-card .cp-rules {
+  flex: 1;
+  border-radius: 10px;
+  background: var(--tomb-papyrus-light, #e8d5a8);
+  border: 2px solid #c9a96a;
+  padding: 10px;
+  font-weight: 700; font-size: 15px; line-height: 1.35;
+  color: var(--tomb-ink, #3a1c0a);
+  overflow: auto;
+}
+.card-preview-card .cp-cost,
+.card-preview-card .cp-atk,
+.card-preview-card .cp-hp {
+  position: absolute;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  font-family: var(--font-title, 'Lilita One', Georgia, serif);
+  box-shadow: 0 0 18px currentColor;
+}
+.card-preview-card .cp-cost {
+  left: -14px; top: -14px;
+  width: 44px; height: 44px; border-radius: 22px;
+  background: var(--badge-cost, #2f7de1);
+  border: 3px solid var(--badge-cost-border, #0f2f66);
+  font-size: 24px;
+}
+.card-preview-card .cp-atk {
+  left: -14px; bottom: -14px;
+  width: 50px; height: 50px; border-radius: 25px;
+  background: var(--badge-atk, #f5a623);
+  border: 3px solid var(--badge-atk-border, #5a3410);
+  font-size: 26px;
+  text-shadow: 0 2px 0 #5a3410;
+}
+.card-preview-card .cp-hp {
+  right: -14px; bottom: -14px;
+  width: 50px; height: 50px; border-radius: 25px;
+  background: var(--badge-hp, #e0453d);
+  border: 3px solid var(--badge-hp-border, #5a1010);
+  font-size: 26px;
+  text-shadow: 0 2px 0 #5a1010;
+}
+.card-preview-card.faction-chi { --card-c1: var(--card-chi-c1); --card-c2: var(--card-chi-c2); }
+.card-preview-card.faction-inf { --card-c1: var(--card-inf-c1); --card-c2: var(--card-inf-c2); }
+.card-preview-card.faction-pes { --card-c1: var(--card-pes-c1); --card-c2: var(--card-pes-c2); }
+.card-preview-card.faction-bul { --card-c1: var(--card-bul-c1); --card-c2: var(--card-bul-c2); }
+.card-preview-card.faction-gro { --card-c1: var(--card-gro-c1); --card-c2: var(--card-gro-c2); }
+.card-preview-card.faction-clo { --card-c1: var(--card-clo-c1); --card-c2: var(--card-clo-c2); }
+.card-preview-card.faction-ind { --card-c1: var(--card-ind-c1); --card-c2: var(--card-ind-c2); }
+.card-preview-hint {
+  font-weight: 700; font-size: 13px; line-height: 1.35;
+  color: var(--tomb-sand-dark, #c9a96a);
+  text-align: center;
 }
 
 #stage {
@@ -275,6 +537,62 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
 #stage .menu-colors { color: var(--tomb-ink, #3a1c0a); text-align: right; font-size: calc(13 * var(--p)); font-weight: 700; }
 #stage .menu-user { align-items: center; }
 #stage .signed-in-user { color: var(--tomb-ink, #3a1c0a); font-size: calc(14 * var(--p)); font-weight: 700; }
+#stage .menu-sep {
+  height: 3px; border-radius: 2px;
+  background: #c9a96a;
+  margin: calc(6 * var(--p)) calc(8 * var(--p));
+}
+#stage .reduce-toggle {
+  min-height: calc(58 * var(--p)) !important;
+  padding: calc(6 * var(--p)) calc(12 * var(--p)) !important;
+  border: 0; border-radius: calc(12 * var(--p));
+  background: transparent;
+  color: var(--tomb-ink, #3a1c0a);
+  text-align: left;
+  display: flex; align-items: center; justify-content: space-between; gap: calc(12 * var(--p));
+  cursor: pointer;
+  width: 100%;
+}
+#stage .reduce-toggle:hover { background: rgba(0,0,0,0.06); }
+#stage .reduce-text { display: block; flex: 1 1 auto; min-width: 0; }
+#stage .reduce-title {
+  display: block;
+  font-weight: 800;
+  font-size: calc(16 * var(--p));
+  color: var(--tomb-ink, #3a1c0a);
+}
+#stage .reduce-desc {
+  display: block;
+  font-weight: 600;
+  font-size: calc(12 * var(--p));
+  color: #6b4a2a;
+  line-height: 1.25;
+  margin-top: 2px;
+}
+#stage .reduce-switch {
+  position: relative; flex: none;
+  width: calc(50 * var(--p)); height: calc(30 * var(--p));
+  border-radius: calc(15 * var(--p));
+  background: #c9b48a;
+  border: 3px solid #5a3410;
+  transition: background 0.15s ease;
+}
+#stage .reduce-toggle[aria-checked="true"] .reduce-switch {
+  background: var(--tomb-gold, #c9a043);
+}
+#stage .reduce-knob {
+  position: absolute; top: 1px; left: 1px;
+  width: calc(20 * var(--p)); height: calc(20 * var(--p));
+  border-radius: 50%;
+  background: var(--tomb-text, #efe2c0);
+  border: 2px solid #5a3410;
+  transition: left 0.15s ease;
+}
+#stage .reduce-toggle[aria-checked="true"] .reduce-knob {
+  left: calc(22 * var(--p));
+}
+#stage.calm .reduce-knob,
+#stage.calm .reduce-switch { transition: none !important; }
 
 /* ---------- Plancia + offerta Mostrissimi — Stile B ---------- */
 #stage .board-zone { position: relative; flex: 1 1 0; min-height: 0; display: flex; gap: calc(8 * var(--p)); }
@@ -475,24 +793,63 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
   background: #25213bee; color: #fff1bf; font-size: calc(12 * var(--p)); font-weight: 900; pointer-events: none;
 }
 
-/* Offerta Mostrissimi: strip verticale al fianco della scacchiera */
-#stage .offer-slot { flex: none; width: calc(78 * var(--p)); min-height: 0; display: flex; }
+/* Offerta Mostrissimi — Stile B malachite + papiro */
+#stage .offer-slot { flex: none; width: calc(94 * var(--p)); min-height: 0; display: flex; }
 #stage #mostrissimo-panel {
-  position: static; flex: 1 1 auto; display: flex; flex-direction: column; align-items: stretch; width: 100%; min-width: 0; min-height: 0;
-  padding: calc(3 * var(--p)); overflow: visible; border: 1px solid #796748; border-radius: calc(7 * var(--p));
-  background: linear-gradient(145deg, #292c37, #191b24); grid-column: auto; grid-row: auto;
+  position: static; flex: 1 1 auto;
+  display: flex; flex-direction: column; align-items: center;
+  width: 100%; min-width: 0; min-height: 0;
+  padding: calc(8 * var(--p)) calc(5 * var(--p));
+  overflow: visible;
+  border: 4px solid var(--tomb-gold, #c9a043);
+  border-radius: calc(18 * var(--p));
+  background: var(--tomb-malachite, #10302f);
+  box-shadow:
+    0 5px 0 var(--tomb-chunky-shadow, #1a0a05),
+    inset 0 0 0 3px var(--tomb-malachite-inner, #071a19),
+    inset 0 0 20px #2fe0c455,
+    0 0 22px #2fe0c4aa;
+  grid-column: auto; grid-row: auto;
 }
-#stage #mostrissimo-panel > h2 { flex: none; margin: 0 0 calc(3 * var(--p)); color: #f0d28f; font-size: calc(11.5 * var(--p)); font-weight: 800; text-align: center; letter-spacing: .03em; }
+#stage #mostrissimo-panel > h2 {
+  flex: none; margin: 0 0 calc(6 * var(--p));
+  color: var(--tomb-gold-light, #e8c565);
+  font-family: var(--font-title, 'Lilita One', Georgia, serif);
+  font-size: calc(15 * var(--p));
+  font-weight: 400;
+  text-align: center;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 0 var(--tomb-malachite-inner, #071a19);
+}
 #stage #mostrissimo-panel .mostrissimo-offer {
-  display: flex; flex-direction: column; align-items: stretch; justify-content: stretch; gap: calc(4 * var(--p));
-  flex: 1 1 0; width: 100%; min-width: 0; min-height: 0; max-width: 100%; max-height: none; padding: 0; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  gap: calc(8 * var(--p));
+  flex: 1 1 0; width: 100%; min-width: 0; min-height: 0;
+  max-width: 100%; max-height: none; padding: 0; overflow: hidden;
 }
 #stage #mostrissimo-panel .mostrissimo-card {
-  position: relative; flex: 1 1 0; display: block; width: 100%; min-width: 0; min-height: 0; height: auto; max-height: none; aspect-ratio: auto;
-  padding: 0; overflow: hidden; border: 2px solid #cbbd9b; border-radius: calc(5 * var(--p)); background: #25232e;
+  position: relative; flex: none;
+  display: block;
+  width: calc(76 * var(--p));
+  height: calc(108 * var(--p));
+  min-width: 0; min-height: 0;
+  padding: 0; overflow: visible;
+  border: 0; border-radius: 0;
+  background: transparent;
+  cursor: pointer;
 }
-#stage #mostrissimo-panel .mostrissimo-card > .board-card > .board-card-titlebar > .board-card-cost {
-  min-width: calc(24 * var(--p)); min-height: calc(24 * var(--p)); font-size: calc(12.5 * var(--p));
+#stage #mostrissimo-panel .mostrissimo-card .fan-card {
+  position: absolute; inset: 0;
+  border-color: var(--tomb-gold, #c9a043) !important;
+  box-shadow: 0 3px 0 var(--tomb-chunky-shadow, #1a0a05), 0 0 14px #e8c56566;
+}
+#stage #mostrissimo-panel .mostrissimo-card:hover .fan-card {
+  box-shadow: 0 3px 0 var(--tomb-chunky-shadow, #1a0a05), 0 0 20px #2fe0c4aa;
+}
+#stage #mostrissimo-panel .mostrissimo-card:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 /* Sacrifici da pagare: scheda sopra la plancia (non sposta il layout) */
 #stage .tribute-zone { position: absolute; z-index: 25; left: 0; right: 0; }
@@ -615,7 +972,7 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
 }
 #stage #player-hand > .hand-card:disabled { opacity: .72; }
 #stage #player-hand > .hand-card.playable { translate: 0 calc(-8 * var(--p)); filter: none; }
-#stage #player-hand > .hand-card:focus-visible { z-index: 99; translate: 0 calc(-12 * var(--p)); outline: none; }
+#stage #player-hand > .hand-card:focus-visible { z-index: 99; translate: 0 calc(-12 * var(--p)); }
 @media (hover: hover) { #stage #player-hand > .hand-card:hover { z-index: 99; translate: 0 calc(-14 * var(--p)); } }
 
 /* ----- Carta in mano — Stile B papiro + badge rotondi ----- */
@@ -942,7 +1299,7 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
   transform: translateX(-50%);
   font-size: calc(10 * var(--p));
 }
-/* ---------- Banner messaggi di fase (visibile) ---------- */
+/* ---------- Banner messaggi di fase — Stile B ---------- */
 #stage .phase-banner {
   position: absolute;
   z-index: 90;
@@ -951,18 +1308,20 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
   transform: translate(-50%, -50%) scale(0.92);
   width: min(92%, calc(340 * var(--p)));
   max-width: calc(380 * var(--p));
-  padding: calc(14 * var(--p)) calc(18 * var(--p));
-  border: 2px solid #c9a45c;
-  border-radius: calc(12 * var(--p));
-  background:
-    linear-gradient(165deg, #2a2438ee 0%, #171426f5 55%, #12101af8 100%);
+  padding: calc(16 * var(--p)) calc(20 * var(--p));
+  border: 4px solid var(--tomb-gold, #c9a043);
+  border-radius: calc(18 * var(--p));
+  background: var(--tomb-lapis, #16324f);
   box-shadow:
-    0 0 0 1px #0008,
-    0 12px 40px #000c,
-    inset 0 1px 0 #ffffff18;
-  color: #f7eedc;
+    0 6px 0 var(--tomb-chunky-shadow, #1a0a05),
+    inset 0 0 0 2px var(--tomb-lapis-inner, #0a1a2e),
+    0 0 28px #e8c56566;
+  color: var(--tomb-text, #efe2c0);
   text-align: center;
-  font: 700 calc(16 * var(--p))/1.25 'Roboto Condensed', Arial, sans-serif;
+  font-family: var(--font-title, 'Lilita One', Georgia, serif);
+  font-size: calc(20 * var(--p));
+  font-weight: 400;
+  line-height: 1.25;
   letter-spacing: 0.02em;
   opacity: 0;
   pointer-events: none;
@@ -976,24 +1335,33 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
 }
 
 #stage .phase-banner.success {
-  border-color: #6ecf8e;
-  color: #d8ffe6;
-  box-shadow: 0 0 0 1px #0008, 0 12px 40px #000c, 0 0 24px #36c97144;
+  border-color: var(--tomb-turquoise, #2fe0c4);
+  color: #e8fff8;
+  box-shadow: 0 6px 0 var(--tomb-chunky-shadow, #1a0a05), 0 0 28px #2fe0c466;
 }
 
 #stage .phase-banner.error {
-  border-color: #e25f61;
-  color: #ffd0d0;
-  box-shadow: 0 0 0 1px #0008, 0 12px 40px #000c, 0 0 24px #e25f6144;
+  border-color: var(--tomb-carmine, #d63a2f);
+  color: #ffe0dc;
+  box-shadow: 0 6px 0 var(--tomb-chunky-shadow, #1a0a05), 0 0 28px #d63a2f66;
 }
 
 #stage .phase-banner .phase-banner-sub {
   display: block;
   margin-top: calc(6 * var(--p));
-  font-size: calc(12.5 * var(--p));
-  font-weight: 500;
-  color: #c9c0b0;
+  font-family: var(--font-body, 'Nunito', system-ui, sans-serif);
+  font-size: calc(13 * var(--p));
+  font-weight: 700;
+  color: var(--tomb-sand, #c9b98a);
   letter-spacing: 0;
+}
+
+/* Riduci animazioni: spegne torcia, fiamma, prism, glow, transition carte */
+#stage.calm *,
+#stage.calm *::before,
+#stage.calm *::after {
+  animation: none !important;
+  transition: none !important;
 }
 
 
@@ -1014,19 +1382,81 @@ html:has(#game-screen:not(.hidden)) { font-size: calc(16 * var(--p, 1px)); }
   color: var(--faction-dark);
 }
 
-/* Contrasto costo: testo scuro su fazioni chiare */
-#stage .faction-chi .fc-cost,
-#stage .faction-chi .cc-cost,
-#stage .faction-chi .game-card-cost,
-#stage .faction-clo .fc-cost,
-#stage .faction-clo .cc-cost,
-#stage .faction-clo .game-card-cost {
-  color: #1a1520 !important;
-  text-shadow: 0 1px 0 #fff6 !important;
-  border-color: #1a152088 !important;
-}
+/* Contrasto: badge costo Stile B sono sempre blu → testo bianco leggibile */
 #stage .fc-cost,
-#stage .cc-cost {
-  color: #fff;
-  text-shadow: 0 1px 2px #000c;
+#stage .cc-cost,
+#stage .game-card-cost {
+  color: #fff !important;
+  text-shadow: 0 1px 2px #000a !important;
+}
+
+/* ---------- Passo 10: accessibilità e polish ---------- */
+#stage button:focus-visible,
+#stage [role="switch"]:focus-visible,
+#stage .board-cell:focus-visible,
+#stage .hand-card:focus-visible,
+#stage .mostrissimo-card:focus-visible,
+.stage-side button:focus-visible,
+.stage-side [role="switch"]:focus-visible {
+  outline: 3px solid #ffffff !important;
+  outline-offset: 2px;
+}
+#stage #player-hand > .hand-card:focus-visible {
+  z-index: 99;
+  translate: 0 calc(-12 * var(--p));
+  /* outline gestito sopra: non annullarlo */
+}
+
+/* Aree tocco minime (già --tap); rinforzo su controlli chiave */
+#stage .menu-button,
+#stage .action-panel button,
+#stage .narrator-continue,
+#stage .reduce-toggle {
+  min-height: max(var(--tap), calc(44 * var(--p)));
+}
+
+/* prefers-reduced-motion di sistema → stesso effetto di .calm se non c'è preferenza salvata
+   (già gestito in JS da wireReduceMotion) */
+@media (prefers-reduced-motion: reduce) {
+  #stage:not(.calm) .torch-overlay,
+  #stage:not(.calm) .altar-svg .flame,
+  #stage:not(.calm) .board-cell.center-cell::before,
+  #stage:not(.calm) .board-cell.valid-summon,
+  #stage:not(.calm) .board-cell.valid-move,
+  #stage:not(.calm) .board-cell.valid-target {
+    /* JS applica .calm all'avvio se stored===null; qui solo rete di sicurezza */
+  }
+}
+
+/* Log e istruzioni: leggibilità su fondo tomba */
+#stage .selection-instructions,
+#stage .game-message {
+  color: var(--tomb-text, #efe2c0);
+}
+#stage .logs-panel,
+#stage .log-disclosure summary {
+  color: var(--tomb-sand, #c9b98a);
+}
+
+/* Dialoghi overlay: bordo oro coerente */
+#stage .card-detail-overlay > .panel {
+  border: 3px solid var(--tomb-gold, #c9a043) !important;
+  background: linear-gradient(145deg, #2a2218, #17110b) !important;
+  color: var(--tomb-text, #efe2c0);
+}
+#stage .card-detail-overlay > .panel h2 {
+  color: var(--tomb-gold-light, #e8c565) !important;
+  font-family: var(--font-title, 'Lilita One', Georgia, serif) !important;
+}
+#stage .card-detail-overlay .primary-button {
+  border: 3px solid var(--tomb-gold-border, #8a5a14);
+  background: linear-gradient(180deg, var(--tomb-gold-btn-start, #e8c565), var(--tomb-gold-btn-end, #e0a22a));
+  color: #4a1f08;
+  font-family: var(--font-title, 'Lilita One', Georgia, serif);
+  box-shadow: 0 3px 0 var(--tomb-gold-shadow, #6b3f0c);
+}
+#stage .card-detail-overlay .secondary-button {
+  border: 2px solid var(--tomb-gold, #c9a043);
+  background: var(--tomb-panel, #241a12);
+  color: var(--tomb-gold-light, #e8c565);
 }
