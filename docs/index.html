@@ -90,30 +90,28 @@
                 <div class="hud-group hud-right">
                   <div class="hud-value deck" title="Mazzo"><span class="hud-label" aria-hidden="true"><svg class="hud-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d7c08c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="6" width="14" height="15" rx="2"/><path d="M8 3h11a2 2 0 0 1 2 2v12"/></svg></span><strong id="opponent-deck-count">0</strong></div>
                   <div class="hud-value grave" title="Cimitero"><span class="hud-label" aria-hidden="true"><svg class="hud-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d7c08c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V9a6 6 0 0 1 12 0v12z"/><path d="M12 8v6M9.5 10.5h5"/></svg></span><strong id="opponent-graveyard-count">0</strong></div>
+                  <div class="hud-menu">
+                    <button id="menu-button" class="menu-button" type="button" aria-label="Menu" aria-haspopup="true" aria-expanded="false" aria-controls="menu-panel">☰</button>
+                    <div id="menu-panel" class="menu-panel hidden" role="menu" aria-label="Menu di gioco">
+                      <button id="new-match-button" class="primary-button" type="button">Nuova partita</button>
+                      <button id="refresh-button" class="secondary-button" type="button" disabled>Aggiorna</button>
+                      <div class="menu-line"><span>Tuo mazzo</span><p id="player-deck-colors" class="menu-colors" aria-label="Colori del tuo mazzo"></p></div>
+                      <div class="menu-line"><span>Mazzo IA</span><p id="opponent-deck-colors" class="menu-colors" aria-label="Colori del mazzo IA"></p></div>
+                      <div class="menu-line menu-user"><span id="signed-in-user" class="signed-in-user"></span><button id="logout-button" class="secondary-button" type="button">Esci</button></div>
+                      <div class="menu-sep" aria-hidden="true"></div>
+                      <button id="reduce-motion-toggle" role="switch" aria-checked="false" class="reduce-toggle" type="button">
+                        <span class="reduce-text">
+                          <span class="reduce-title">Riduci animazioni</span>
+                          <span class="reduce-desc">Transizioni istantanee, senza effetti</span>
+                        </span>
+                        <span class="reduce-switch" aria-hidden="true"><span class="reduce-knob"></span></span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div id="opponent-hand" class="opponent-hand" role="img" aria-label="Carte in mano all'IA"></div>
               <span id="opponent-hand-count" class="hud-source-only" aria-hidden="true">0</span>
-              <div class="status-row">
-                <div class="hud-menu">
-                  <button id="menu-button" class="menu-button" type="button" aria-label="Menu" aria-haspopup="true" aria-expanded="false" aria-controls="menu-panel">☰</button>
-                  <div id="menu-panel" class="menu-panel hidden" role="menu" aria-label="Menu di gioco">
-                    <button id="new-match-button" class="primary-button" type="button">Nuova partita</button>
-                    <button id="refresh-button" class="secondary-button" type="button" disabled>Aggiorna</button>
-                    <div class="menu-line"><span>Tuo mazzo</span><p id="player-deck-colors" class="menu-colors" aria-label="Colori del tuo mazzo"></p></div>
-                    <div class="menu-line"><span>Mazzo IA</span><p id="opponent-deck-colors" class="menu-colors" aria-label="Colori del mazzo IA"></p></div>
-                    <div class="menu-line menu-user"><span id="signed-in-user" class="signed-in-user"></span><button id="logout-button" class="secondary-button" type="button">Esci</button></div>
-                    <div class="menu-sep" aria-hidden="true"></div>
-                    <button id="reduce-motion-toggle" role="switch" aria-checked="false" class="reduce-toggle" type="button">
-                      <span class="reduce-text">
-                        <span class="reduce-title">Riduci animazioni</span>
-                        <span class="reduce-desc">Transizioni istantanee, senza effetti</span>
-                      </span>
-                      <span class="reduce-switch" aria-hidden="true"><span class="reduce-knob"></span></span>
-                    </button>
-                  </div>
-                </div>
-              </div>
             </header>
 
             <div class="board-zone">
