@@ -824,9 +824,9 @@ function playable(d) {
   if (!creature(d) && d.card_type !== 'aura' && targetEffect(d) && !hasTargets(d)) return false;
   return true;
 }
-/** Troppo cara rispetto al mana massimo del turno (bende mummia). */
+/** Troppo cara rispetto al mana massimo del turno (bende mummia). Vale anche per trappole/instant. */
 function tooExpensive(d) {
-  if (!d || d.card_type === 'mostrissimo' || d.card_type === 'instant') return false;
+  if (!d || d.card_type === 'mostrissimo') return false;
   return Number(d.mana_cost ?? 0) > Number(me()?.max_mana ?? 0);
 }
 async function drawBoard() {
@@ -894,7 +894,7 @@ async function drawMostrissimi() {
   const h = document.createElement('h2'); h.textContent = 'Offerta'; panel.append(h);
   const rules = document.createElement('p');
   rules.className = 'mostrissimo-rules';
-  rules.textContent = 'Max 1 per turno. Costo di mana zero. Sacrifica dei permanenti (anche stanchi / appena giocati).';
+  rules.textContent = 'Max 1/turno · Mana 0 · Sacrifica permanenti (anche stanchi).';
   panel.append(rules);
   if (!state) { panel.classList.add('hidden'); return; }
   panel.classList.remove('hidden');
