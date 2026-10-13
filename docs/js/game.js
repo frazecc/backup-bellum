@@ -820,6 +820,10 @@ async function drawMostrissimi() {
   }
   panel.replaceChildren();
   const h = document.createElement('h2'); h.textContent = 'Offerta'; panel.append(h);
+  const rules = document.createElement('p');
+  rules.className = 'mostrissimo-rules';
+  rules.textContent = 'Max 1 per turno. Costo di mana zero. Sacrifica dei permanenti (anche stanchi / appena giocati).';
+  panel.append(rules);
   if (!state) { panel.classList.add('hidden'); return; }
   panel.classList.remove('hidden');
   const strip = document.createElement('div'); strip.className = 'mostrissimo-offer'; panel.append(strip);
@@ -876,9 +880,6 @@ function showDeckColors() {
 async function render() {
   const set = (id,x) => { if ($(id)) $(id).textContent = String(x); };
   if (state) hideStart();
-  set('match-status',state?.status === 'finished' ? 'Terminata' : state ? 'In corso' : 'Nessuna partita');
-  set('turn-status',state ? `${state.current_turn} · ${state.active_player_index === 1 ? 'Tu' : 'IA'}` : '—');
-  set('phase-status',state?.phase === 'upkeep' ? 'MANATENIMENTO' : state?.phase === 'main' ? 'Principale' : state?.phase ?? '—');
   set('player-life',me()?.life ?? 20); set('player-current-mana',me()?.current_mana ?? 0); set('player-max-mana',me()?.max_mana ?? 0);
   set('player-hand-count',me()?.hand?.length ?? 0); set('player-deck-count',me()?.deck?.length ?? 0); set('player-graveyard-count',me()?.graveyard?.length ?? 0);
   set('opponent-life',them()?.life ?? 20); set('opponent-current-mana',them()?.current_mana ?? 0); set('opponent-max-mana',them()?.max_mana ?? 0);
