@@ -571,7 +571,8 @@ async function presentPublic(a, generation) {
   const panel = document.createElement('div');
   Object.assign(panel.style,{width:'100%',maxHeight:'100%',overflowY:'auto',
     background:'#171426',color:'#f7eedc',border:'2px solid #a78355',borderRadius:'14px',
-    padding:'1.2rem',boxShadow:'0 15px 60px #000',textAlign:'center',fontSize:'1.15rem'});
+    padding:'1.2rem',boxShadow:'0 15px 60px #000',textAlign:'center',fontSize:'1.15rem',
+    display:'flex',flexDirection:'column',alignItems:'center',gap:'12px'});
   const title = document.createElement('div');
   title.textContent = a.kind === 'phase'
     ? `Turno ${a.turn} · ${a.phase === 'upkeep' ? 'MANATENIMENTO' : a.phase === 'main' ? 'PRINCIPALE' : a.phase === 'end' ? 'FINE' : 'INIZIO'} · Mana massimo ${a.max_mana ?? 0}`
@@ -587,9 +588,32 @@ async function presentPublic(a, generation) {
     const cell = document.createElement('div'); cell.textContent = `Cella [${a.position.row},${a.position.col}]`;
     panel.append(cell);
   }
+  const ok = document.createElement('button');
+  ok.type = 'button';
+  ok.textContent = 'Ho capito';
+  ok.className = 'phase-banner-ok';
+  Object.assign(ok.style,{
+    minHeight:'44px',padding:'0 20px',cursor:'pointer',
+    border:'3px solid #8a5a14',borderRadius:'14px',
+    background:'linear-gradient(180deg,#e8c565,#e0a22a)',color:'#4a1f08',
+    fontFamily:"'Lilita One', Georgia, serif",fontSize:'1.05rem'
+  });
+  panel.append(ok);
   layer.append(panel); layer.style.display = 'flex';
-  await waitPresentation(1000);
-  if (generation === presentationGeneration) layer.style.display = 'none';
+  document.body.classList.add('notice-open');
+  // Pausa finché l’utente non conferma (bottone o click sullo sfondo del layer).
+  await new Promise(resolve => {
+    const done = () => {
+      if (generation !== presentationGeneration) { resolve(); return; }
+      layer.style.display = 'none';
+      layer.replaceChildren();
+      document.body.classList.remove('notice-open');
+      layer.onclick = null;
+      resolve();
+    };
+    ok.onclick = e => { e.stopPropagation(); done(); };
+    layer.onclick = e => { if (e.target === layer) done(); };
+  });
 }
 // Passo 3: ogni risultato pubblico ha il suo balloon (state.public_announcements, in ordine); /advance usa
 // sempre l'ID dell'ultimo (state.public_announcement). Dopo refresh/recupero (onlyLast) si ripresenta solo l'ultimo.
