@@ -130,15 +130,87 @@ function wireStage() {
   window.addEventListener('orientationchange',() => setTimeout(fitStage,150));
   window.visualViewport?.addEventListener('resize',fitStage);
 }
+function applyReduceMotion(on) {
+  const stage = $('stage');
+  if (stage) stage.classList.toggle('calm', !!on);
+  const toggle = $('reduce-motion-toggle');
+  if (toggle) toggle.setAttribute('aria-checked', on ? 'true' : 'false');
+  try { localStorage.setItem('bellum:reduce-motion', on ? '1' : '0'); } catch (_) { /* ignore */ }
+}
+function wireReduceMotion() {
+  const toggle = $('reduce-motion-toggle');
+  if (!toggle || toggle.dataset.ready) return;
+  toggle.dataset.ready = 'true';
+  let stored = null;
+  try { stored = localStorage.getItem('bellum:reduce-motion'); } catch (_) { /* ignore */ }
+  const prefers = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const on = stored === '1' || (stored === null && prefers);
+  applyReduceMotion(on);
+  toggle.addEventListener('click', e => {
+    e.stopPropagation();
+    const next = toggle.getAttribute('aria-checked') !== 'true';
+    applyReduceMotion(next);
+  });
+}
+let narratorResolver = null;
+function setNarratorImage(src) {
+  const url = src || 'img/mummy/mummy-base.png';
+  for (const id of ['narrator-popup-img', 'narrator-desk-img']) {
+    const img = $(id);
+    if (!img) continue;
+    img.style.display = '';
+    img.onerror = () => {
+      img.style.display = 'none';
+      img.nextElementSibling?.classList.remove('hidden');
+    };
+    if (img.getAttribute('src') !== url) img.setAttribute('src', url);
+    img.onload = () => {
+      img.style.display = '';
+      img.nextElementSibling?.classList.add('hidden');
+    };
+  }
+}
+/** Mostra battuta del narratore. Su mobile apre popup; su desktop aggiorna la colonna sinistra. */
+function showNarrator(text, imageSrc) {
+  const speech = String(text ?? '').trim() || '…';
+  setNarratorImage(imageSrc);
+  const desk = $('narrator-desk-speech');
+  if (desk) desk.textContent = speech;
+  const popup = $('narrator-popup');
+  const bubble = $('narrator-popup-speech');
+  if (bubble) bubble.textContent = speech;
+  const wide = typeof matchMedia === 'function' && matchMedia('(min-width: 1100px)').matches
+    && !!document.querySelector('.stage-frame.is-framed');
+  if (wide || !popup) return Promise.resolve();
+  popup.classList.remove('hidden');
+  return new Promise(resolve => {
+    narratorResolver = resolve;
+    const btn = $('narrator-continue');
+    if (btn && !btn.dataset.ready) {
+      btn.dataset.ready = 'true';
+      btn.addEventListener('click', () => hideNarrator());
+    }
+  });
+}
+function hideNarrator() {
+  $('narrator-popup')?.classList.add('hidden');
+  const r = narratorResolver;
+  narratorResolver = null;
+  if (r) r();
+}
 function wireMenu() {
   const button = $('menu-button'), panel = $('menu-panel');
   if (!button || !panel || button.dataset.ready) return;
   button.dataset.ready = 'true';
   const setOpen = open => { panel.classList.toggle('hidden',!open); button.setAttribute('aria-expanded',String(open)); };
   button.addEventListener('click',e => { e.stopPropagation(); setOpen(panel.classList.contains('hidden')); });
-  panel.addEventListener('click',e => { if (e.target.closest?.('button')) setOpen(false); });
+  panel.addEventListener('click',e => {
+    const t = e.target.closest?.('button');
+    if (t && t.id !== 'reduce-motion-toggle') setOpen(false);
+  });
   document.addEventListener('click',e => { if (!panel.classList.contains('hidden') && !panel.contains(e.target)) setOpen(false); });
   document.addEventListener('keydown',e => { if (e.key === 'Escape' && !panel.classList.contains('hidden')) setOpen(false); });
+  wireReduceMotion();
 }
 function drawOpponentHand() {
   const root = $('opponent-hand'); if (!root) return;
@@ -276,7 +348,12 @@ function notice(text, type = '') {
   };
 }
 function fail(e) { console.error(e); notice(e instanceof Error ? e.message : 'Errore inatteso','error'); }
-function close() { view = null; $('card-detail-overlay')?.classList.add('hidden'); document.body.classList.remove('detail-open'); }
+function close() {
+  view = null;
+  $('card-detail-overlay')?.classList.add('hidden');
+  document.body.classList.remove('detail-open');
+  // Su desktop l'anteprima resta sull'ultima carta vista; non la svuotiamo.
+}
 async function api(path,options={}) {
   const token = await getAccessToken();
   if (!token) throw new Error('Sessione scaduta, accedi di nuovo.');
@@ -588,11 +665,49 @@ function wireGraveyards() {
   const life = $('opponent-life')?.closest('.hud-value');
   if (life && !life.dataset.playerTargetReady) { life.dataset.playerTargetReady = 'true'; life.addEventListener('click',() => playerClick().catch(fail)); }
 }
+function updateCardPreview(d, cell = null) {
+  const empty = $('card-preview-empty');
+  const slot = $('card-preview-card');
+  if (!empty || !slot) return;
+  if (!d) {
+    empty.classList.remove('hidden');
+    slot.classList.add('hidden');
+    slot.innerHTML = '';
+    slot.setAttribute('aria-hidden', 'true');
+    return;
+  }
+  const f = faction(d);
+  const isMostrissimo = d.card_type === 'mostrissimo';
+  const costNum = isMostrissimo ? Number(d.sacrifice_cost ?? 0) : Number(d.mana_cost ?? 0);
+  const costIcon = isMostrissimo ? '✦' : '';
+  const atk = cell?.attack ?? d.attack ?? 0;
+  const hp = cell?.hp ?? d.hp ?? 0;
+  const subtype = d.subtype ? String(d.subtype) : '';
+  const factionLabel = deckFactionNames[f.toUpperCase()] || f.toUpperCase();
+  const typeLabel = types[d.card_type] ?? d.card_type;
+  const rules = escape(String(d.effect_text || 'Nessun effetto.').replace(/\*\*/g, '').replace(/\s+/g, ' ').trim());
+  const art = d.image_url
+    ? `<img src="${escape(d.image_url)}" alt="">`
+    : 'Illustrazione provvisoria';
+  const showStats = creature(d) || (cell?.kind === 'terraforma' && cell?.hp !== undefined);
+  slot.className = `card-preview-card faction-${f}`;
+  slot.innerHTML = `
+    <div class="cp-nameband">${escape(d.name)}</div>
+    <div class="cp-art">${art}</div>
+    <div class="cp-type">${escape(typeLabel)}${subtype ? ' · ' + escape(subtype) : ''} · ${escape(factionLabel)}</div>
+    <div class="cp-rules">${rules}</div>
+    <div class="cp-cost">${costIcon}${costNum}</div>
+    ${showStats ? `<div class="cp-atk">${atk}</div><div class="cp-hp">${hp}</div>` : ''}`;
+  empty.classList.add('hidden');
+  slot.classList.remove('hidden');
+  slot.setAttribute('aria-hidden', 'false');
+}
 async function inspect(kind,id,extra={}) {
   if (busy || obligatory() || (reaction() && kind !== 'grave')) return;
   view = {kind,id,...extra};
   const current = view, d = await card(id);
   if (current !== view) return;
+  updateCardPreview(d, current.cell ?? null);
   overlay(); $('detail-image').innerHTML = cardHTML(d,false,current.cell ?? null);
   const bar = $('detail-actions'); bar.replaceChildren();
   const add = (text,fn,disabled=false) => bar.append(button(text,fn,disabled));
@@ -697,13 +812,13 @@ async function drawMostrissimi() {
     if (slot) slot.append(panel); else if (before?.parentNode) before.parentNode.insertBefore(panel,before); else document.body.append(panel);
   }
   panel.replaceChildren();
-  const h = document.createElement('h2'); h.textContent = '✦ Offerta'; panel.append(h);
+  const h = document.createElement('h2'); h.textContent = 'Offerta'; panel.append(h);
   if (!state) { panel.classList.add('hidden'); return; }
   panel.classList.remove('hidden');
   const strip = document.createElement('div'); strip.className = 'mostrissimo-offer'; panel.append(strip);
   for (const inst of state.shared_mostrissimi ?? []) {
     const d = await card(inst.card_id), b = document.createElement('button');
-    b.type = 'button'; b.className = 'mostrissimo-card'; b.innerHTML = cardHTML(d,true);
+    b.type = 'button'; b.className = 'mostrissimo-card'; b.innerHTML = handCardHTML(d);
     b.setAttribute('aria-label',`Apri ${d.name}, ${d.sacrifice_cost} sacrifici`);
     b.disabled = busy || !!reaction() || obligatory(); b.onclick = () => inspect('mostrissimo',inst.card_id); strip.append(b);
   }
@@ -1077,6 +1192,7 @@ async function newMatch(primaryColor, secondaryColor) {
     const humanColors = state?.deck_colors?.[1];
     const aiColors = state?.deck_colors?.[0];
     await showCurseDialog(humanColors, aiColors);
+    await showNarrator('La tomba si è aperta. Tocca una carta della mano per iniziare, coraggioso.');
     notice('Partita pronta. Tocca una carta.', 'success');
   } catch (e) {
     fail(e);
