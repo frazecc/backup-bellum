@@ -390,7 +390,9 @@ async function applyEvent(c: Context, e: PendingEvent) {
   if (e.kind === 'upkeep_start') {
     s.phase = 'upkeep'; s.anti_loop_counter = 0;
     const player = s.players[p];
-    player.max_mana = Math.min(6, player.max_mana + 1); player.current_mana = player.max_mana;
+    // Mana max = numero del turno globale (1, 2, 3… cap 6), solo nel proprio manatenimento.
+    player.max_mana = Math.min(6, Math.max(1, s.current_turn));
+    player.current_mana = player.max_mana;
     for (const { cell } of units(s, p)) cell.tired = false;
 
     // Casella centralissima (1,1): +1 attacco permanente a ogni upkeep di entrambi i giocatori
@@ -713,7 +715,8 @@ function expireTemporaryBuffs(s: GameState) {
 function startTurn(c: Context, p: PlayerIndex) {
   const s = c.s;
   s.active_player_index = p; s.phase = 'upkeep'; s.anti_loop_counter = 0; s.mostrissimo_result = null;
-  if (p === 1) s.current_turn++;
+  // Ogni inizio turno (umano o IA) avanza il contatore globale: mana max = current_turn.
+  s.current_turn++;
   prepend(s, { kind: 'declare_event', event: { kind: 'upkeep_start', actor: p } });
 }
 // Bersaglio legale ≠ mossa conveniente: cure e bonus vanno solo su creature dell'IA, danni e
@@ -908,25 +911,50 @@ export async function createNewMatch(userId: string, primary: DeckFaction, secon
   }).select('id').single();
   if (error || !data) throw new Error(`Creazione partita: ${error?.message ?? 'nessun ID'}`);
   const matchId = String(data.id), ai = player(0, null, aiCards), human = player(1, userId, humanCards);
-  for (let i = 0; i < 4; i++) ai.hand.push(ai.deck.shift()!);
-  for (let i = 0; i < 3; i++) human.hand.push(human.deck.shift()!);
-  human.max_mana = human.current_mana = 1;
+  // Lancio di moneta: chi inizia è casuale. Il primo ha 3 carte in mano, il secondo 4.
+  const firstPlayer: PlayerIndex = Math.random() < 0.5 ? 1 : 0;
+  const firstHand = 3, secondHand = 4;
+  if (firstPlayer === 1) {
+    for (let i = 0; i < secondHand; i++) ai.hand.push(ai.deck.shift()!);
+    for (let i = 0; i < firstHand; i++) human.hand.push(human.deck.shift()!);
+    human.max_mana = human.current_mana = 1;
+  } else {
+    for (let i = 0; i < firstHand; i++) ai.hand.push(ai.deck.shift()!);
+    for (let i = 0; i < secondHand; i++) human.hand.push(human.deck.shift()!);
+    ai.max_mana = ai.current_mana = 1;
+  }
   const state: GameState = {
     state_version: 4, state_revision: 0, match_id: matchId, status: 'running',
     players: [ai, human], deck_colors: [aiColors, humanColors], board: blank(),
-    current_turn: 1, active_player_index: 1, phase: 'main', anti_loop_counter: 0,
+    current_turn: 1, active_player_index: firstPlayer, phase: 'main', anti_loop_counter: 0,
     winner_index: null, shared_mostrissimi: catalogue.shared,
     remaining_mostrissimi: catalogue.remaining, used_mostrissimi: [],
     work_queue: [], last_mostrissimo_turn: {}, mostrissimo_result: null,
   };
+  // Se inizia l’IA: fase principale già attiva con 1 mana (come l’umano quando inizia lui).
+  if (firstPlayer === 0) {
+    state.ai_progress = { stage: 'actions', actions_taken: 0 };
+    state.work_queue = [{ kind: 'advance_ai' }];
+  }
   const inserted = await db.from('game_state').insert({
     match_id: matchId, state_json: state, revision: 0, current_turn: 1,
     current_phase: phaseNumber(state.phase), last_updated: new Date().toISOString(),
   });
   if (inserted.error) throw new Error(`Creazione stato: ${inserted.error.message}`);
+  // Se inizia l’IA, esegue le prime azioni e salva (eventuali public_announcement pronti per il client).
+  if (firstPlayer === 0) {
+    const c: Context = { id: matchId, s: state, logs: [], deaths: [] };
+    await drain(c);
+    const saved = await commit(matchId, state, c.logs);
+    await logMatchAction(matchId, {
+      turn: 1, phase: saved.phase, player_index: -1, action_type: 'match_create',
+      description: `Partita iniziata (inizia Mummy). Tu: ${primary}/${secondary}/${humanColors.tertiary}; IA: ${aiColors.primary}/${aiColors.secondary}/${aiColors.tertiary}.`,
+    });
+    return { matchId, state: saved };
+  }
   await logMatchAction(matchId, {
     turn: 1, phase: 'main', player_index: -1, action_type: 'match_create',
-    description: `Partita iniziata. Tu: ${primary}/${secondary}/${humanColors.tertiary}; IA: ${aiColors.primary}/${aiColors.secondary}/${aiColors.tertiary}.`,
+    description: `Partita iniziata (inizi tu). Tu: ${primary}/${secondary}/${humanColors.tertiary}; IA: ${aiColors.primary}/${aiColors.secondary}/${aiColors.tertiary}.`,
   });
   return { matchId, state };
 }
