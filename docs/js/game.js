@@ -50,6 +50,12 @@ const stageRoot = () => $('stage') ?? document.body; // tutti i dialoghi vivono 
 const costText = d => d.card_type === 'mostrissimo' ? `✦${Number(d.sacrifice_cost ?? 0)}` : `⚡${Number(d.mana_cost ?? 0)}`;
 const plainText = d => String(d?.effect_text ?? '').replace(/\*\*/g,'').replace(/\s+/g,' ').trim();
 const hasText = d => plainText(d).length > 0;
+/** Anteprima effetto: intero se corto, altrimenti taglio + puntini. */
+const effectPreview = (d, max = 72) => {
+  const t = plainText(d);
+  if (!t) return '';
+  return t.length > max ? `${t.slice(0, Math.max(1, max - 1))}…` : t;
+};
 const artHTML = d => d.image_url ? `<img src="${escape(d.image_url)}" alt="Illustrazione di ${escape(d.name)}">` : '<span class="game-card-art-placeholder">🎴</span>';
 const TEXT_ICON = '<span class="CLS" title="Questa carta ha un testo" aria-hidden="true">📜</span>';
 function cellHTML(d, c) {
@@ -65,12 +71,13 @@ function cellHTML(d, c) {
   const costIcon = d.card_type === 'mostrissimo' ? '✦' : '';
   const subtype = d.subtype ? String(d.subtype) : '';
   const factionLabel = (deckFactionNames[f.toUpperCase()] || f.toUpperCase()).slice(0, 3);
+  const fx = effectPreview(d, 48);
 
   return `<article class="cell-card faction-${f}${c.kind === 'terraforma' ? ' is-terra' : ''}">
     <div class="cc-nameband"><span class="cc-name">${escape(d.name)}</span></div>
     <div class="cc-art">${artHTML(d)}</div>
     <span class="cc-cost shape-${f}" title="Costo">${costIcon}${cost}</span>
-    ${hasText(d) ? TEXT_ICON.replace('CLS', 'cc-ico') : ''}
+    ${fx ? `<div class="cc-fx">${escape(fx)}</div>` : ''}
     <span class="cc-meta">${escape(factionLabel)}${subtype ? ' · ' + escape(subtype) : ''}</span>
     ${isCreature
       ? `<span class="cc-atk${buff}">${atk}</span><span class="cc-hp${hurt}">${hp}</span>`
@@ -81,7 +88,6 @@ function cellHTML(d, c) {
 }
 function handCardHTML(d) {
   const isCreature = creature(d);
-  const text = hasText(d);
   const f = faction(d);
   const cost = d.card_type === 'mostrissimo'
     ? Number(d.sacrifice_cost ?? 0)
@@ -89,12 +95,13 @@ function handCardHTML(d) {
   const costIcon = d.card_type === 'mostrissimo' ? '✦' : '';
   const subtype = d.subtype ? String(d.subtype) : '';
   const factionLabel = (deckFactionNames[f.toUpperCase()] || f.toUpperCase()).slice(0, 3);
+  const fx = effectPreview(d, 72);
 
   return `<article class="fan-card faction-${f}${isCreature ? '' : ' no-stats'}">
     <div class="fc-nameband"><span class="fc-name">${escape(d.name)}</span></div>
     <div class="fc-art">${artHTML(d)}</div>
     <span class="fc-cost shape-${f}" title="Costo">${costIcon}${cost}</span>
-    ${text ? TEXT_ICON.replace('CLS', 'fc-ico') : ''}
+    ${fx ? `<div class="fc-fx">${escape(fx)}</div>` : ''}
     ${isCreature ? `<span class="fc-stat atk">${d.attack ?? 0}</span><span class="fc-stat hp">${d.hp ?? 0}</span>` : ''}
     <span class="fc-meta">${escape(factionLabel)}${subtype ? ' · ' + escape(subtype) : ''}</span>
   </article>`;
@@ -236,42 +243,34 @@ function cardHTML(d, mini = false, cell = null) {
   const subtype = d.subtype ? String(d.subtype) : '';
   const factionLabel = deckFactionNames[f.toUpperCase()] || f.toUpperCase();
   const typeLabel = types[d.card_type] ?? d.card_type;
-
-  if (mini) {
-    return `<article class="board-card ${cls}">
-      <header class="board-card-titlebar">
-        <span class="board-card-name">${escape(d.name)}</span>
-        <span class="board-card-cost shape-${f}">${costIcon}${costNum}</span>
-      </header>
-      <div class="board-card-art">${art}</div>
-      <div class="board-card-type">${escape(typeLabel)}</div>
-      <div class="board-card-effect">${escape(String(d.effect_text ?? '').replace(/\*\*/g,'').replace(/\s+/g,' ').slice(0,110))}</div>
-      ${creature(d) ? `<footer class="board-card-footer"><span>⚔ ${atk}</span><span>❤ ${hp}</span></footer>` : ''}
-    </article>`;
-  }
-
-  const rules = escape(d.effect_text || 'Nessun effetto.')
+  const isCreature = creature(d);
+  // Stesso layout delle mini (fan/cell): badge rotondi agli angoli + effetto sotto l’arte.
+  const fxShort = effectPreview(d, mini ? 90 : 160);
+  const rulesFull = escape(d.effect_text || '')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\n/g, '<br>');
 
-  return `<article class="game-card ${cls}">
-    <header class="game-card-titlebar">
-      <span class="game-card-name">${escape(d.name)}</span>
-      <span class="game-card-cost shape-${f}">${costIcon}${costNum}</span>
-    </header>
-    <div class="game-card-art">${art}</div>
-    <div class="game-card-type-row">
-      <span>${escape(typeLabel)}</span>
-      <span class="game-card-subtype">${escape(factionLabel)}${subtype ? ' · ' + escape(subtype) : ''}</span>
-    </div>
-    <div class="game-card-rules">${rules}</div>
-    <div class="game-card-flavor">${escape(d.flavor_text ?? '')}</div>
-    <footer class="game-card-footer">
-      <span class="game-card-rarity">${escape(rarities[d.rarity] ?? d.rarity ?? 'Comune')}</span>
-      ${creature(d)
-        ? `<span class="game-card-stats"><span class="game-card-atk">⚔ ${atk}</span><span class="game-card-hp">❤ ${hp}</span></span>`
-        : ''}
-    </footer>
+  if (mini) {
+    return `<article class="board-card fan-like ${cls}${isCreature ? '' : ' no-stats'}">
+      <div class="fc-nameband"><span class="fc-name">${escape(d.name)}</span></div>
+      <div class="fc-art">${art}</div>
+      <span class="fc-cost shape-${f}" title="Costo">${costIcon}${costNum}</span>
+      ${fxShort ? `<div class="fc-fx">${escape(fxShort)}</div>` : ''}
+      ${isCreature ? `<span class="fc-stat atk">${atk}</span><span class="fc-stat hp">${hp}</span>` : ''}
+      <span class="fc-meta">${escape(factionLabel.slice(0, 3))}${subtype ? ' · ' + escape(subtype) : ''}</span>
+    </article>`;
+  }
+
+  return `<article class="game-card fan-like ${cls}${isCreature ? '' : ' no-stats'}">
+    <div class="fc-nameband"><span class="fc-name">${escape(d.name)}</span></div>
+    <div class="fc-art">${art}</div>
+    <span class="fc-cost shape-${f}" title="Costo">${costIcon}${costNum}</span>
+    <div class="gc-type">${escape(typeLabel)}</div>
+    <div class="game-card-rules">${rulesFull || '<em>Nessun effetto.</em>'}</div>
+    ${d.flavor_text ? `<div class="game-card-flavor">${escape(d.flavor_text)}</div>` : ''}
+    ${isCreature ? `<span class="fc-stat atk">${atk}</span><span class="fc-stat hp">${hp}</span>` : ''}
+    <span class="fc-meta">${escape(factionLabel)}${subtype ? ' · ' + escape(subtype) : ''}</span>
+    <div class="gc-rarity">${escape(rarities[d.rarity] ?? d.rarity ?? 'Comune')}</div>
   </article>`;
 }
 // Durante monster_etb la Trappola mirata può colpire soltanto la fonte
@@ -574,9 +573,25 @@ async function presentPublic(a, generation) {
     padding:'1.2rem',boxShadow:'0 15px 60px #000',textAlign:'center',fontSize:'1.15rem',
     display:'flex',flexDirection:'column',alignItems:'center',gap:'12px'});
   const title = document.createElement('div');
-  title.textContent = a.kind === 'phase'
-    ? `Turno ${a.turn} · ${a.phase === 'upkeep' ? 'MANATENIMENTO' : a.phase === 'main' ? 'PRINCIPALE' : a.phase === 'end' ? 'FINE' : 'INIZIO'} · Mana massimo ${a.max_mana ?? 0}`
-    : a.text;
+  if (a.kind === 'phase') {
+    const phaseName = a.phase === 'upkeep' ? 'MANATENIMENTO'
+      : a.phase === 'main' ? 'PRINCIPALE'
+      : a.phase === 'end' ? 'FINE' : 'INIZIO';
+    let who = '—';
+    if (a.actor === 0) who = 'Mummy';
+    else if (a.actor === 1) {
+      try { who = usernameFromEmail((await getCurrentUser())?.email) || 'Tu'; }
+      catch { who = 'Tu'; }
+    }
+    title.style.cssText = 'text-align:left;line-height:1.55;font-family:"Nunito",system-ui,sans-serif;font-weight:800;letter-spacing:.02em';
+    title.innerHTML =
+      `TURNO: <strong>${a.turn ?? '—'}</strong><br>` +
+      `GIOCATORE ATTIVO: <strong>${escape(who)}</strong><br>` +
+      `FASE ATTUALE: <strong>${phaseName}</strong><br>` +
+      `MANA MAX: <strong>${a.max_mana ?? 0}</strong>`;
+  } else {
+    title.textContent = a.text;
+  }
   panel.append(title);
   if (a.kind === 'card' && a.card_id) {
     try { const d = await card(a.card_id); if (generation !== presentationGeneration) return;
@@ -1280,6 +1295,53 @@ function showCurseDialog(humanColors, aiColors) {
     el.classList.remove('hidden');
   });
 }
+/** Popup moneta egizia: chi inizia la partita (dopo la maledizione). */
+function showCoinFlip(firstIsHuman) {
+  return new Promise(resolve => {
+    let el = $('coin-flip-dialog');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'coin-flip-dialog';
+      el.className = 'card-detail-overlay';
+      el.setAttribute('role', 'dialog');
+      el.setAttribute('aria-modal', 'true');
+      el.style.zIndex = '145';
+      stageRoot().append(el);
+    }
+    el.innerHTML = '';
+    const panel = document.createElement('div');
+    panel.className = 'panel';
+    panel.style.cssText = 'width:min(92vw,400px);margin:auto;padding:1.4rem 1.2rem;text-align:center;border:1px solid #d5a758;box-shadow:0 12px 48px #000';
+    const label = document.createElement('p');
+    label.style.cssText = 'margin:0 0 .6rem;font-family:"Nunito",system-ui,sans-serif;font-weight:700;color:#5a3410';
+    label.textContent = 'La moneta del destino gira…';
+    const coin = document.createElement('div');
+    coin.className = 'coin-flip-disk';
+    coin.setAttribute('aria-hidden', 'true');
+    coin.innerHTML = `<svg viewBox="0 0 120 120" width="110" height="110">
+      <circle cx="60" cy="60" r="56" fill="#e8c565" stroke="#8a5a14" stroke-width="6"/>
+      <circle cx="60" cy="60" r="44" fill="none" stroke="#c9a043" stroke-width="3"/>
+      <path d="M60 22 L66 48 L94 48 L72 64 L80 92 L60 76 L40 92 L48 64 L26 48 L54 48 Z" fill="#4a1f08" opacity=".85"/>
+      <text x="60" y="108" text-anchor="middle" font-size="9" fill="#4a1f08" font-family="Georgia,serif">RA</text>
+    </svg>`;
+    const result = document.createElement('p');
+    result.style.cssText = 'margin:1rem 0 .4rem;font-family:"Lilita One",Georgia,serif;font-size:1.35rem;color:#e8c565;letter-spacing:.02em';
+    result.textContent = firstIsHuman ? 'Inizi tu' : 'Inizia Mummy';
+    const sub = document.createElement('p');
+    sub.style.cssText = 'margin:0 0 1.1rem;font-size:.95rem;line-height:1.4';
+    sub.textContent = firstIsHuman
+      ? 'Primo turno: mana massimo 1. Tocca una carta quando sei pronto.'
+      : 'Mummy muove per prima. Mana massimo 1. Osserva e preparati.';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'primary-button';
+    btn.textContent = 'Continua';
+    btn.onclick = () => { el.classList.add('hidden'); resolve(); };
+    panel.append(label, coin, result, sub, btn);
+    el.append(panel);
+    el.classList.remove('hidden');
+  });
+}
 async function newMatch(primaryColor, secondaryColor) {
   cardLoaded.clear();
   if (busy || obligatory()) return;
@@ -1303,9 +1365,11 @@ async function newMatch(primaryColor, secondaryColor) {
     const humanColors = state?.deck_colors?.[1];
     const aiColors = state?.deck_colors?.[0];
     await showCurseDialog(humanColors, aiColors);
+    const firstIsHuman = state?.active_player_index === 1;
+    await showCoinFlip(firstIsHuman);
     const uname = usernameFromEmail((await getCurrentUser())?.email) || 'coraggioso';
-    await showNarrator(`${uname}, la tomba si è aperta. Tocca una carta della mano per iniziare.`);
-    await notice('Partita pronta. Tocca una carta.', 'success');
+    await showNarrator(`${uname}, la tomba si è aperta.${firstIsHuman ? ' Tocca una carta della mano per iniziare.' : ' Mummy ha la priorità.'}`);
+    if (firstIsHuman) await notice('Partita pronta. Tocca una carta.', 'success');
   } catch (e) {
     fail(e);
     if ($('deck-color-validation')) {
