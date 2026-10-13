@@ -217,10 +217,10 @@ function drawOpponentHand() {
   const n = them()?.hand?.length ?? 0; // SOLO il numero: mai card_id o faccia delle carte dell'IA.
   root.replaceChildren(); root.style.setProperty('--n',String(Math.max(n,1)));
   root.setAttribute('aria-label',`L’IA ha ${n} ${n === 1 ? 'carta' : 'carte'} in mano`);
-  const count = document.createElement('span'); count.className = 'oh-count'; count.innerHTML = `${n}<small>in mano</small>`;
+  // Solo dorsi: il conteggio testuale «N in mano» è ridondante (i dorsi bastano).
   const backs = document.createElement('span'); backs.className = 'oh-backs';
   for (let i = 0; i < n; i++) { const back = document.createElement('span'); back.className = 'card-back'; backs.append(back); }
-  root.append(count,backs);
+  root.append(backs);
 }
 function cardHTML(d, mini = false, cell = null) {
   const f = faction(d);
@@ -752,6 +752,11 @@ function playable(d) {
   if (!creature(d) && d.card_type !== 'aura' && targetEffect(d) && !hasTargets(d)) return false;
   return true;
 }
+/** Troppo cara rispetto al mana massimo del turno (bende mummia). */
+function tooExpensive(d) {
+  if (!d || d.card_type === 'mostrissimo' || d.card_type === 'instant') return false;
+  return Number(d.mana_cost ?? 0) > Number(me()?.max_mana ?? 0);
+}
 async function drawBoard() {
   const root = $('shared-board'); if (!root) return;
   root.replaceChildren();
@@ -797,8 +802,10 @@ async function drawHand() {
     try {
       const d = await card(inst.card_id); b.innerHTML = handCardHTML(d);
       b.disabled = !state || busy || !!reaction() || obligatory();
+      // Stati visivi: playable = alzata + cornice lampeggiante; too-expensive = sole bende.
       if (playable(d)) b.classList.add('playable');
-      b.setAttribute('aria-label',`Apri ${d.name}${playable(d) ? ', giocabile' : ''}`);
+      else if (tooExpensive(d)) b.classList.add('too-expensive');
+      b.setAttribute('aria-label',`Apri ${d.name}${playable(d) ? ', giocabile' : tooExpensive(d) ? ', troppo costosa' : ''}`);
       b.onclick = () => inspect('hand',inst.card_id,{instanceId:inst.instance_id});
     } catch(e) { b.textContent = 'Carta non caricabile'; b.disabled = true; console.warn(e); }
     root.append(b);
@@ -845,7 +852,21 @@ function controls() {
   const disable = (id,v) => { if ($(id)) $(id).disabled = !!v; };
   disable('new-match-button',busy || obligatory()); disable('end-turn-button',!active()); disable('refresh-button',busy || !matchId);
   disable('cancel-selection-button',busy || obligatory() || !flow || (!!pending() && flow?.kind !== 'trap-target'));
-  if ($('selection-instructions')) $('selection-instructions').textContent = deathOrder() ? 'Scegli l’ordine delle creature morte.' : deathTarget() ? 'Scegli il bersaglio dell’effetto alla morte.' : flow?.kind === 'trap-target' ? reaction()?.event?.kind === 'monster_etb' ? 'Scegli la creatura che ha generato l’ETB.' : 'Scegli il bersaglio della Trappola.' : reaction() ? 'Rispondi alla finestra reattiva o passa.' : flow?.kind === 'mostrissimo-target' ? 'Scegli il bersaglio ETB.' : pending() ? 'Evocazione obbligatoria in corso.' : flow?.kind === 'hand' && flow.step === 'cell' ? 'Scegli una cella.' : flow?.kind === 'hand' && flow.step === 'target' ? 'Scegli un bersaglio.' : flow?.kind === 'attack' ? 'Scegli il nemico.' : flow?.kind === 'move' ? 'Scegli una cella adiacente.' : 'Leggi nome e tipo delle carte; tocca per aprire il testo completo.';
+  if ($('selection-instructions')) {
+    const hint = deathOrder() ? 'Scegli l’ordine delle creature morte.'
+      : deathTarget() ? 'Scegli il bersaglio dell’effetto alla morte.'
+      : flow?.kind === 'trap-target' ? (reaction()?.event?.kind === 'monster_etb' ? 'Scegli la creatura che ha generato l’ETB.' : 'Scegli il bersaglio della Trappola.')
+      : reaction() ? 'Rispondi alla finestra reattiva o passa.'
+      : flow?.kind === 'mostrissimo-target' ? 'Scegli il bersaglio ETB.'
+      : pending() ? 'Evocazione obbligatoria in corso.'
+      : flow?.kind === 'hand' && flow.step === 'cell' ? 'Scegli una cella.'
+      : flow?.kind === 'hand' && flow.step === 'target' ? 'Scegli un bersaglio.'
+      : flow?.kind === 'attack' ? 'Scegli il nemico.'
+      : flow?.kind === 'move' ? 'Scegli una cella adiacente.'
+      : '';
+    $('selection-instructions').textContent = hint;
+    $('selection-instructions').hidden = !hint;
+  }
 }
 function showDeckColors() {
   const human = state?.deck_colors?.[1], ai = state?.deck_colors?.[0];
@@ -908,18 +929,17 @@ async function request(path, body, message) {
         setTimeout(() => showAuthScreen(), 1200);
       }
     } else {
-      notice(
-        state.mostrissimo_result?.outcome === 'failed'
-          ? state.mostrissimo_result.message
-          : deathOrder()
-            ? 'Scegli l’ordine delle creature morte.'
-            : deathTarget()
-              ? 'Scegli il bersaglio dell’effetto alla morte.'
-              : state.pending_reaction
-                ? reactionDescription(state.pending_reaction.event)
-                : message,
-        state.mostrissimo_result?.outcome === 'failed' ? 'error' : 'success',
-      );
+      // Un solo canale: phase-banner. Evita messaggi generici fuori tempo
+      // (es. «È di nuovo il tuo turno» mentre è ancora il turno IA).
+      let text = null;
+      let kind = 'success';
+      if (state.mostrissimo_result?.outcome === 'failed') {
+        text = state.mostrissimo_result.message; kind = 'error';
+      } else if (deathOrder()) text = 'Scegli l’ordine delle creature morte.';
+      else if (deathTarget()) text = 'Scegli il bersaglio dell’effetto alla morte.';
+      else if (state.pending_reaction) text = reactionDescription(state.pending_reaction.event);
+      else if (message && !(path === 'end-turn' && state.active_player_index !== 1)) text = message;
+      if (text) notice(text, kind);
     }
   } catch (e) {
     fail(e);
@@ -1227,7 +1247,7 @@ async function init() {
     if (flow?.kind === 'trap-target') { flow = null; render().catch(fail); notice('Scegli un’altra Trappola o passa.'); return; }
     if (!pending() && !reaction()) { flow = null; close(); render().catch(fail); notice('Selezione annullata.'); }
   });
-  $('end-turn-button')?.addEventListener('click',() => { if (active()) request('end-turn',{},'È di nuovo il tuo turno.'); });
+  $('end-turn-button')?.addEventListener('click',() => { if (active()) request('end-turn',{},''); });
   $('refresh-button')?.addEventListener('click',() => refreshMatch().catch(fail));
   $('logout-button')?.addEventListener('click',() => signOut().then(() => { presentationGeneration++; presentationLayer().style.display = 'none'; matchId = null; state = null; flow = null; priorMatch = null; deathDraft = {choiceId:null,instanceIds:[]}; close(); closeGraveyard(); closeColorDialog(); reactionDialog().classList.add('hidden'); choiceDialog().classList.add('hidden'); }).catch(fail));
   document.addEventListener('keydown',e => { if (e.key === 'Escape' && !obligatory()) { if (!$('deck-color-dialog')?.classList.contains('hidden') && !busy) closeColorDialog(); else if (!$('graveyard-dialog')?.classList.contains('hidden')) closeGraveyard(); else if (view) close(); } });
