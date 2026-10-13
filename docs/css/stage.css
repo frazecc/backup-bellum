@@ -1252,30 +1252,30 @@ body:has(#stage.calm) .narrator-medallion.bob { animation: none !important; }
   100% { background-position: 0% 50%; }
 }
 
-/* Pillola bonus sotto la cella */
+/* Pillola bonus sotto la cella — va a capo se serve */
 #stage .board-cell.center-cell::after {
-  content: "+1 attacco a fine turno";
+  content: "+1 attacco\a a fine turno";
+  white-space: pre-line;
   position: absolute;
   left: 50%;
-  bottom: calc(-14 * var(--p));
+  bottom: calc(-18 * var(--p));
   transform: translateX(-50%);
   z-index: 6;
   width: max-content;
-  max-width: 110%;
-  padding: calc(2 * var(--p)) calc(7 * var(--p));
+  max-width: 96%;
+  padding: calc(2 * var(--p)) calc(6 * var(--p));
   border-radius: calc(10 * var(--p));
   background: var(--tomb-gold-light, #e8c565);
   border: 2px solid var(--tomb-bg, #0b0806);
   color: var(--tomb-bg, #0b0806);
   font-family: var(--font-title, 'Lilita One', Georgia, serif);
-  font-size: calc(11 * var(--p));
+  font-size: calc(9.5 * var(--p));
   font-weight: 400;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   text-align: center;
+  line-height: 1.15;
   pointer-events: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
   box-shadow: 0 2px 0 var(--tomb-chunky-shadow, #1a0a05);
 }
 
@@ -1372,6 +1372,122 @@ body:has(#stage.calm) .narrator-medallion.bob { animation: none !important; }
   font-weight: 700;
   color: var(--tomb-sand, #c9b98a);
   letter-spacing: 0;
+}
+#stage .phase-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(12 * var(--p));
+}
+#stage .phase-banner-text {
+  display: block;
+}
+#stage .phase-banner-ok {
+  min-height: calc(40 * var(--p));
+  padding: 0 calc(18 * var(--p));
+  border: 3px solid var(--tomb-gold-border, #8a5a14);
+  border-radius: calc(14 * var(--p));
+  background: linear-gradient(180deg, var(--tomb-gold-btn-start, #e8c565), var(--tomb-gold-btn-end, #e0a22a));
+  color: #4a1f08;
+  font-family: var(--font-title, 'Lilita One', Georgia, serif);
+  font-size: calc(16 * var(--p));
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--tomb-gold-shadow, #6b3f0c);
+}
+body.notice-open #stage .board-cell,
+body.notice-open #stage .hand-card,
+body.notice-open #stage .mostrissimo-card,
+body.notice-open #stage .action-panel button {
+  pointer-events: none;
+}
+
+/* Mostrissimi: stessi stati visivi della mano */
+#stage #mostrissimo-panel .mostrissimo-card.playable .fan-card {
+  border: 3px solid #ffffff !important;
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 4px 0 var(--tomb-chunky-shadow, #1a0a05),
+    0 0 16px #ffffffaa;
+  animation: playable-frame 1.1s ease-in-out infinite;
+}
+#stage #mostrissimo-panel .mostrissimo-card.too-expensive .fan-card {
+  border-color: #94a4ba !important;
+  filter: saturate(0.85) brightness(0.92);
+}
+#stage #mostrissimo-panel .mostrissimo-card.too-expensive .fan-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 5;
+  background:
+    repeating-linear-gradient(
+      -32deg,
+      rgba(245, 236, 214, 0) 0 5px,
+      rgba(245, 236, 214, 0.55) 5px 9px,
+      rgba(210, 190, 150, 0.35) 9px 11px,
+      rgba(245, 236, 214, 0) 11px 18px
+    );
+  opacity: 0.9;
+}
+#stage.calm #mostrissimo-panel .mostrissimo-card.playable .fan-card {
+  animation: none !important;
+}
+
+/* ---------- Login: mummia che stringe la porta ---------- */
+.auth-screen {
+  position: relative;
+  overflow: hidden;
+}
+.mummy-login-frame {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.auth-screen .auth-card {
+  position: relative;
+  z-index: 1;
+}
+.mummy-eyes {
+  position: absolute;
+  top: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 48px;
+}
+.mummy-eye {
+  width: 28px;
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #ffb02e 0 35%, #3a1c0a 40% 100%);
+  box-shadow: 0 0 18px #ffb02ecc, 0 0 40px #ffb02e66;
+}
+.mummy-bandage {
+  position: absolute;
+  left: -10%;
+  width: 120%;
+  height: 42px;
+  background:
+    repeating-linear-gradient(
+      -18deg,
+      #e8dcc0 0 14px,
+      #c9b48a 14px 18px,
+      #f0e6c8 18px 28px
+    );
+  box-shadow: 0 4px 0 #1a0a0588;
+  opacity: 0.92;
+  transform: rotate(-6deg);
+}
+.mummy-bandage-top { top: 22%; }
+.mummy-bandage-mid { top: 48%; transform: rotate(5deg); }
+.mummy-bandage-bot { bottom: 12%; transform: rotate(-3deg); }
+.auth-screen .mummy-quote {
+  color: #c9a96a;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 /* Riduci animazioni: spegne torcia, fiamma, prism, glow, transition carte */
