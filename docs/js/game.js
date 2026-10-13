@@ -315,38 +315,86 @@ function summonCells(p) {
   return found;
 }
 let noticeTimer = null;
+let noticeResolver = null;
+let noticeOpen = false;
 
-function notice(text, type = '') {
-  const el = $('phase-banner') || $('game-message');
-  if (!el) return;
-
-  // fallback se per qualche motivo manca il banner
-  if (el.id === 'game-message') {
-    el.textContent = text;
-    el.className = `game-message ${type}`;
+function dismissNotice() {
+  const el = $('phase-banner');
+  if (!el) {
+    const r0 = noticeResolver; noticeResolver = null; noticeOpen = false;
+    if (r0) r0();
     return;
   }
-
   clearTimeout(noticeTimer);
-  el.hidden = false;
-  el.className = `phase-banner${type ? ' ' + type : ''}`;
-  el.innerHTML = escape(text);
-  // forza reflow poi mostra
-  void el.offsetWidth;
-  el.classList.add('is-visible');
-
-  noticeTimer = setTimeout(() => {
-    el.classList.remove('is-visible');
-    setTimeout(() => { el.hidden = true; el.textContent = ''; }, 240);
-  }, 2800);
-
-  // tap per chiudere subito
-  el.onclick = () => {
-    clearTimeout(noticeTimer);
-    el.classList.remove('is-visible');
-    setTimeout(() => { el.hidden = true; el.textContent = ''; }, 200);
-  };
+  el.classList.remove('is-visible');
+  setTimeout(() => {
+    if (!noticeOpen) {
+      el.hidden = true;
+      el.innerHTML = '';
+    }
+  }, 200);
+  noticeOpen = false;
+  document.body.classList.remove('notice-open');
+  const r = noticeResolver;
+  noticeResolver = null;
+  if (r) r();
 }
+
+/** Mostra un messaggio e mette in pausa finché l’utente non clicca «Ho capito» o fuori. */
+function notice(text, type = '') {
+  const msg = String(text ?? '').trim();
+  if (!msg) return Promise.resolve();
+
+  const el = $('phase-banner') || $('game-message');
+  if (!el) return Promise.resolve();
+
+  if (el.id === 'game-message') {
+    el.textContent = msg;
+    el.className = `game-message ${type}`;
+    return Promise.resolve();
+  }
+
+  // Chiude eventuale notice precedente
+  if (noticeResolver) {
+    const prev = noticeResolver;
+    noticeResolver = null;
+    prev();
+  }
+
+  return new Promise(resolve => {
+    noticeResolver = resolve;
+    noticeOpen = true;
+    document.body.classList.add('notice-open');
+    clearTimeout(noticeTimer);
+    el.hidden = false;
+    el.className = `phase-banner${type ? ' ' + type : ''}`;
+    el.innerHTML =
+      `<span class="phase-banner-text">${escape(msg)}</span>` +
+      `<button type="button" class="phase-banner-ok" id="phase-banner-ok">Ho capito</button>`;
+    void el.offsetWidth;
+    el.classList.add('is-visible');
+
+    const ok = $('phase-banner-ok');
+    if (ok) ok.onclick = e => { e.stopPropagation(); dismissNotice(); };
+    el.onclick = e => {
+      // click sul banner (anche fuori dal bottone) chiude
+      if (e.target === el || e.target.classList?.contains('phase-banner-text')) dismissNotice();
+    };
+  });
+}
+
+function wireNoticeDismiss() {
+  if (document.body.dataset.noticeWire) return;
+  document.body.dataset.noticeWire = 'true';
+  document.addEventListener('click', e => {
+    if (!noticeOpen) return;
+    // click ovunque fuori dai controlli del banner chiude
+    const el = $('phase-banner');
+    if (el && el.contains(e.target)) return; // gestito dal banner
+    dismissNotice();
+  }, true);
+}
+
 function fail(e) { console.error(e); notice(e instanceof Error ? e.message : 'Errore inatteso','error'); }
 function close() {
   view = null;
@@ -703,7 +751,7 @@ function updateCardPreview(d, cell = null) {
   slot.setAttribute('aria-hidden', 'false');
 }
 async function inspect(kind,id,extra={}) {
-  if (busy || obligatory() || (reaction() && kind !== 'grave')) return;
+  if (busy || noticeOpen || obligatory() || (reaction() && kind !== 'grave')) return;
   view = {kind,id,...extra};
   const current = view, d = await card(id);
   if (current !== view) return;
@@ -830,8 +878,19 @@ async function drawMostrissimi() {
   for (const inst of state.shared_mostrissimi ?? []) {
     const d = await card(inst.card_id), b = document.createElement('button');
     b.type = 'button'; b.className = 'mostrissimo-card'; b.innerHTML = handCardHTML(d);
-    b.setAttribute('aria-label',`Apri ${d.name}, ${d.sacrifice_cost} sacrifici`);
-    b.disabled = busy || !!reaction() || obligatory(); b.onclick = () => inspect('mostrissimo',inst.card_id); strip.append(b);
+    // Stessa logica visiva della mano: bende se non puoi pagare; lampeggio se evocabile ora.
+    const cost = Number(d.sacrifice_cost ?? 0);
+    const own = board().flat().filter(c => isCreatureCell(c) && c.owner_index === 1).length;
+    const canPay = Number.isInteger(cost) && cost >= 0 && permanents().length >= cost;
+    const spaceOk = board()[2].some(c => !c) || (cost > 0 && own > 0);
+    const onceOk = state.last_mostrissimo_turn?.[1] !== state.current_turn;
+    const legal = active() && canPay && spaceOk && onceOk && cost <= 6;
+    if (legal) b.classList.add('playable');
+    else if (!canPay) b.classList.add('too-expensive');
+    b.setAttribute('aria-label',`Apri ${d.name}, ${cost} sacrifici${legal ? ', evocabile' : !canPay ? ', sacrifici insufficienti' : ''}`);
+    b.disabled = busy || noticeOpen || !!reaction() || obligatory();
+    b.onclick = () => { if (noticeOpen) return; inspect('mostrissimo',inst.card_id); };
+    strip.append(b);
   }
   const p = pending(); if (!p) return;
   const zone = document.createElement('div'); zone.className = 'tribute-zone is-info'; panel.append(zone);
@@ -911,7 +970,7 @@ async function request(path, body, message) {
 
     if (state.status === 'finished') {
       const won = state.winner_index === 1;
-      notice(won ? 'HAI VINTO!' : 'HAI PERSO!', won ? 'success' : 'error');
+      await notice(won ? 'HAI VINTO!' : 'HAI PERSO!', won ? 'success' : 'error');
       if (!won) {
         // Sconfitta: anima persa → torna alla mummia (sessione resta attiva → "Sono io")
         localStorage.removeItem('bellum:last-match');
@@ -940,7 +999,7 @@ async function request(path, body, message) {
       else if (deathTarget()) text = 'Scegli il bersaglio dell’effetto alla morte.';
       else if (state.pending_reaction) text = reactionDescription(state.pending_reaction.event);
       else if (message && !(path === 'end-turn' && state.active_player_index !== 1)) text = message;
-      if (text) notice(text, kind);
+      if (text) await notice(text, kind);
     }
   } catch (e) {
     fail(e);
@@ -982,7 +1041,7 @@ async function playerClick() {
   }
 }
 async function boardClick(pos) {
-  if (busy || obligatory()) return;
+  if (busy || noticeOpen || obligatory()) return;
   const c = at(pos), r = reaction();
   if (r) {
     if (flow?.kind === 'trap-target') {
@@ -1213,8 +1272,9 @@ async function newMatch(primaryColor, secondaryColor) {
     const humanColors = state?.deck_colors?.[1];
     const aiColors = state?.deck_colors?.[0];
     await showCurseDialog(humanColors, aiColors);
-    await showNarrator('La tomba si è aperta. Tocca una carta della mano per iniziare, coraggioso.');
-    notice('Partita pronta. Tocca una carta.', 'success');
+    const uname = usernameFromEmail((await getCurrentUser())?.email) || 'coraggioso';
+    await showNarrator(`${uname}, la tomba si è aperta. Tocca una carta della mano per iniziare.`);
+    await notice('Partita pronta. Tocca una carta.', 'success');
   } catch (e) {
     fail(e);
     if ($('deck-color-validation')) {
@@ -1241,7 +1301,7 @@ async function init() {
   initialized = true;
   if ($('signed-in-user')) $('signed-in-user').textContent = `@${usernameFromEmail(user.email)}`;
   if ($('player-title')) $('player-title').textContent = usernameFromEmail(user.email) || 'Tu';
-  overlay(); reactionDialog(); choiceDialog(); graveyardDialog(); colorDialog(); wireGraveyards(); wireMenu(); fitStage();
+  overlay(); reactionDialog(); choiceDialog(); graveyardDialog(); colorDialog(); wireGraveyards(); wireMenu(); wireNoticeDismiss(); fitStage();
   $('new-match-button')?.addEventListener('click',openColorDialog);
   $('cancel-selection-button')?.addEventListener('click',() => {
     if (obligatory()) return;
