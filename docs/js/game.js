@@ -1093,7 +1093,7 @@ async function boardClick(pos) {
     if (c || !summonCells(p).some(x => eq(x,pos))) return notice('Cella non valida.','error');
     const d = await card(p.card_id);
     if (targetEffect(d) && hasTargets(d)) {
-      flow = {kind:'mostrissimo-target',position:pos,id:d.id}; await render(); notice('Cella scelta. Tocca il bersaglio ETB evidenziato.','success'); return;
+      flow = {kind:'mostrissimo-target',position:pos,id:d.id}; await render(); notice('ora scegli il bersaglio','success'); return;
     }
     return request('mostrissimo/complete',{position:pos},'Mostrissimo dichiarato.');
   }
@@ -1102,7 +1102,7 @@ async function boardClick(pos) {
     if (flow.step === 'cell') {
       if (c || pos.row !== 2) return notice('Scegli una cella libera della tua riga.','error');
       flow.position = pos;
-      if (d.card_type === 'monster' && targetEffect(d) && hasTargets(d)) { flow.step = 'target'; await render(); notice('Cella scelta. Tocca il bersaglio ETB.','success'); return; }
+      if (d.card_type === 'monster' && targetEffect(d) && hasTargets(d)) { flow.step = 'target'; await render(); notice('ora scegli il bersaglio','success'); return; }
       return request('play-card',{cardInstanceId:flow.instanceId,options:{position:pos}},'Carta dichiarata.');
     }
     if (flow.step === 'target') {
@@ -1253,22 +1253,29 @@ function showCurseDialog(humanColors, aiColors) {
     }
     const tertiary = humanColors?.tertiary;
     const tName = deckFactionNames[tertiary] || tertiary || 'sconosciuto';
-    const aiPrimary = aiColors?.primary;
-    const aiName = deckFactionNames[aiPrimary] || aiPrimary || 'nemico';
     el.innerHTML = '';
     const panel = document.createElement('div');
     panel.className = 'panel';
     panel.style.cssText = 'width:min(92vw,440px);margin:auto;padding:1.2rem;text-align:center;border:1px solid #d5a758;box-shadow:0 12px 48px #000';
-    const title = document.createElement('h2');
-    title.textContent = 'La maledizione si chiude';
     const body = document.createElement('p');
-    body.innerHTML = `Un terzo colore ti è stato imposto: <strong>${tName} (${tertiary})</strong>.<br><br>È anche il colore primario del nemico: <strong>${aiName}</strong>.`;
+    body.style.cssText = 'margin:0 0 .8rem;line-height:1.45;font-size:1.05rem';
+    body.innerHTML = `Oh no. Un’ombra ti afferra e ti marchia.<br><strong>${tName}</strong> fa parte di te ora.`;
+    const glyph = document.createElement('img');
+    glyph.src = 'img/geroglifico.png';
+    glyph.alt = 'Marchio geroglifico';
+    glyph.width = 120;
+    glyph.height = 280;
+    glyph.style.cssText = 'display:block;margin:.6rem auto 1rem;max-width:120px;height:auto;filter:drop-shadow(0 0 12px rgba(232,197,101,.35))';
+    glyph.onerror = () => { glyph.style.display = 'none'; };
+    const wait = document.createElement('p');
+    wait.style.cssText = 'margin:0 0 1.1rem;font-family:"Lilita One",Georgia,serif;font-size:1.25rem;color:#e8c565;letter-spacing:.02em';
+    wait.textContent = 'La piramide ti attende';
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'primary-button';
     btn.textContent = 'Affronto il destino';
     btn.onclick = () => { el.classList.add('hidden'); resolve(); };
-    panel.append(title, body, btn);
+    panel.append(body, glyph, wait, btn);
     el.append(panel);
     el.classList.remove('hidden');
   });
