@@ -1147,13 +1147,14 @@ body:has(#stage.calm) .narrator-medallion.bob { animation: none !important; }
   text-overflow: ellipsis;
 }
 /* Effetto sulla mini (mano / griglia): sotto l’arte, troncato con … */
+/* Padding laterale/inferiore così non resta sotto i badge ATK/PV agli angoli. */
 #stage .fc-fx,
 #stage .cc-fx {
   flex: none;
-  margin: 0 calc(2 * var(--p));
+  margin: 0 calc(10 * var(--p)) calc(10 * var(--p));
   padding: calc(2 * var(--p)) calc(3 * var(--p));
   border-radius: calc(4 * var(--p));
-  background: #e8d9b0cc;
+  background: #e8d9b0ee;
   border: 1px solid #5a341055;
   color: #3a1c0a;
   font-family: var(--font-body, 'Nunito', system-ui, sans-serif);
@@ -1166,14 +1167,21 @@ body:has(#stage.calm) .narrator-medallion.bob { animation: none !important; }
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
   max-height: calc(38 * var(--p));
+  position: relative;
+  z-index: 2;
 }
 #stage .cc-fx {
   font-size: calc(8 * var(--p));
   -webkit-line-clamp: 2;
-  max-height: calc(24 * var(--p));
-  margin: 0 calc(1 * var(--p));
+  max-height: calc(22 * var(--p));
+  margin: 0 calc(8 * var(--p)) calc(8 * var(--p));
   padding: calc(1 * var(--p)) calc(2 * var(--p));
 }
+/* Spazio sotto l’arte per il testo effetto (non lo schiacciano i badge angolo). */
+#stage .fan-card { padding-bottom: calc(4 * var(--p)); }
+#stage .cell-card { padding-bottom: calc(3 * var(--p)); }
+#stage .fan-card .fc-art { flex: 1 1 auto; min-height: 0; max-height: 46%; }
+#stage .cell-card .cc-art { flex: 1 1 auto; min-height: 0; max-height: 42%; }
 /* Carta grande / dettaglio allineata alle mini (badge angoli) */
 #stage .game-card.fan-like,
 #stage .board-card.fan-like {
