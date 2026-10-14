@@ -1223,7 +1223,11 @@ function colorDialog() {
   panel.append(title, form); el.append(panel); stageRoot().append(el);
   return el;
 }
-function closeColorDialog() { $('deck-color-dialog')?.classList.add('hidden'); if (!state && !busy && !$('game-screen')?.classList.contains('hidden')) showStart(); }
+function closeColorDialog() {
+  $('deck-color-dialog')?.classList.add('hidden');
+  // Solo se non c’è partita in corso e non stiamo creando: evita «Le spoglie…» dopo moneta/maledizione.
+  if (!state && !busy && !matchId && !$('game-screen')?.classList.contains('hidden')) showStart();
+}
 // ---------- Schermata iniziale: recupera partita precedente / nuova partita ----------
 let priorMatch = null, probing = false;
 async function probePrior() {
@@ -1284,6 +1288,7 @@ async function recoverPrior() {
 function openColorDialog() {
   if (busy || reaction() || pending() || obligatory()) return;
   close(); closeGraveyard();
+  hideStart(); // non deve restare sotto e riapparire dopo moneta/maledizione
   const el = colorDialog();
   $('deck-color-validation').textContent = '';
   if ($('deck-primary-color').value === $('deck-secondary-color').value) $('deck-secondary-color').value = 'INF';
@@ -1403,6 +1408,7 @@ async function newMatch(primaryColor, secondaryColor) {
     deathDraft = { choiceId: null, instanceIds: [] };
     close();
     closeGraveyard();
+    hideStart();
     closeColorDialog();
     localStorage.setItem('bellum:last-match', matchId);
     // Griglia ancora nascosta: prima maledizione → moneta → benedizione.
