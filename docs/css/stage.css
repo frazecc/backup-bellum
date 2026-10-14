@@ -1550,28 +1550,33 @@ body.notice-open #stage .action-panel button {
 }
 .mummy-eyes {
   position: absolute;
-  top: 6%;
+  top: 5%;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 10px;
+  gap: 56px;
   align-items: center;
+  z-index: 2;
 }
 .mummy-eye {
-  width: 22px;
-  height: 14px;
+  width: 42px;
+  height: 28px;
   border-radius: 50%;
   flex: none;
   background: radial-gradient(circle at 50% 40%, var(--eye-iris, #ffb02e) 0 38%, #1a0a05 42% 100%);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--eye-iris, #ffb02e) 70%, transparent), 0 0 28px color-mix(in srgb, var(--eye-iris, #ffb02e) 35%, transparent);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--eye-iris, #ffb02e) 75%, transparent), 0 0 36px color-mix(in srgb, var(--eye-iris, #ffb02e) 40%, transparent);
 }
-.mummy-eye.eye-chi { --eye-iris: #c9b88a; } /* Chiericanza — papiro / beige */
-.mummy-eye.eye-inf { --eye-iris: #5a8dc2; } /* Infamia — blu */
-.mummy-eye.eye-pes { --eye-iris: #8a72b8; } /* Pestilenza — viola */
-.mummy-eye.eye-bul { --eye-iris: #c4684f; } /* Bullismo — rosso */
-.mummy-eye.eye-gro { --eye-iris: #5aa87c; } /* Grossanza — verde */
-.mummy-eye.eye-clo { --eye-iris: #e0a22a; } /* Clownerie — giallo oro */
-.mummy-eye.eye-ind { --eye-iris: #8a96a3; } /* Indrazzico — grigio */
+.mummy-grin {
+  position: absolute;
+  top: 28%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  opacity: 0.95;
+  filter: drop-shadow(0 2px 4px #000a);
+  pointer-events: none;
+}
+.mummy-grin svg { display: block; width: min(52vw, 220px); height: auto; }
 .mummy-bandage {
   position: absolute;
   left: -10%;
