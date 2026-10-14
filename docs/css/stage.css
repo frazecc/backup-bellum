@@ -1583,6 +1583,8 @@ body.notice-open #stage .action-panel button {
   box-sizing: border-box;
   border-radius: 10% / 6%;
   background: transparent;
+  /* DEBUG: rettangolo form — togliere quando allineato */
+  border: 3px solid red !important;
 }
 
 .auth-screen .auth-card {
