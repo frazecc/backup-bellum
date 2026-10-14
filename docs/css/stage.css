@@ -1568,6 +1568,7 @@ body.notice-open #stage .action-panel button {
 */
 .auth-phone-screen {
   position: absolute;
+  /* mummy-phone.html di riferimento */
   top: 26%;
   left: 34%;
   width: 33%;
@@ -1578,9 +1579,9 @@ body.notice-open #stage .action-panel button {
   justify-content: center;
   align-items: stretch;
   overflow: hidden;
-  padding: 3% 4%;
+  padding: 6% 7%;
   box-sizing: border-box;
-  border-radius: 8% / 5%;
+  border-radius: 10% / 6%;
   background: transparent;
 }
 
@@ -1606,7 +1607,7 @@ body.notice-open #stage .action-panel button {
 }
 .auth-screen .auth-card h1 {
   margin: 0 0 0.15rem;
-  font-size: clamp(0.78rem, 2.8vw, 0.98rem);
+  font-size: clamp(0.7rem, 2.4vw, 0.88rem);
   line-height: 1.12;
   color: #2a1205;
   font-family: 'Lilita One', Georgia, serif;
@@ -1617,12 +1618,13 @@ body.notice-open #stage .action-panel button {
   margin: 0 0 0.3rem;
   color: #4a3210;
   font-weight: 700;
-  font-size: clamp(0.58rem, 1.9vw, 0.72rem);
+  font-size: clamp(0.55rem, 1.7vw, 0.68rem);
   line-height: 1.25;
   text-shadow: none;
 }
 .auth-screen.auth-known-mode .mummy-quote,
-.auth-screen.auth-known-mode .eyebrow { display: none; }
+.auth-screen.auth-known-mode .eyebrow,
+.auth-screen.auth-known-mode .auth-card h1 { display: none; }
 .auth-screen.auth-known-mode #auth-known {
   justify-items: center; /* grid: asse orizzontale */
   align-items: center;
@@ -1636,11 +1638,12 @@ body.notice-open #stage .action-panel button {
 }
 .auth-screen.auth-known-mode #auth-sono-io,
 .auth-screen.auth-known-mode #auth-altro-utente {
-  width: 50%;
-  max-width: 50%;
-  justify-self: center;
-  margin-left: auto;
-  margin-right: auto;
+  width: 100%;
+  max-width: 100%;
+  justify-self: stretch;
+  margin-left: 0;
+  margin-right: 0;
+  white-space: nowrap;
 }
 .auth-screen .form-stack {
   gap: 0.38rem !important;
@@ -1655,19 +1658,20 @@ body.notice-open #stage .action-panel button {
   text-shadow: none;
 }
 .auth-screen #login-form {
-  justify-items: center;
+  justify-items: stretch;
   text-align: center;
+  width: 100%;
 }
 .auth-screen #login-form label {
-  width: 50%;
-  max-width: 50%;
-  justify-self: center;
+  width: 100%;
+  max-width: 100%;
+  justify-self: stretch;
   text-align: left;
 }
 .auth-screen .form-stack input {
   width: 100%;
   box-sizing: border-box;
-  min-height: 1.85rem;
+  min-height: 1.7rem;
   padding: 0.28rem 0.5rem;
   border: 2px solid #8a5a14;
   border-radius: 9px;
@@ -1682,8 +1686,8 @@ body.notice-open #stage .action-panel button {
 }
 .auth-screen .primary-button,
 .auth-screen .secondary-button {
-  min-height: 1.9rem;
-  font-size: clamp(0.72rem, 2.2vw, 0.85rem);
+  min-height: 1.75rem;
+  font-size: clamp(0.68rem, 2vw, 0.8rem);
   border-radius: 11px;
   width: 100%;
   padding: 0.32rem 0.55rem;
@@ -1711,9 +1715,11 @@ body.notice-open #stage .action-panel button {
 .auth-screen .muted {
   color: #3a2810;
   font-weight: 700;
-  font-size: clamp(0.7rem, 2.3vw, 0.85rem);
+  font-size: clamp(0.62rem, 1.9vw, 0.75rem);
   margin: 0 0 0.25rem;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
   text-shadow: none;
 }
 
