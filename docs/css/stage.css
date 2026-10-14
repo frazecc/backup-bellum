@@ -1568,7 +1568,7 @@ body.notice-open #stage .action-panel button {
 */
 .auth-phone-screen {
   position: absolute;
-  /* mummy-phone.html di riferimento */
+  /* mummy-phone.html di riferimento — bordo rosso = questo box */
   top: 26%;
   left: 34%;
   width: 33%;
@@ -1578,14 +1578,74 @@ body.notice-open #stage .action-panel button {
   flex-direction: column;
   justify-content: center;
   align-items: stretch;
-  overflow: hidden;
-  padding: 6% 7%;
+  overflow: hidden; /* niente sbordi */
+  padding: 5% 6%;
   box-sizing: border-box;
   border-radius: 10% / 6%;
   background: transparent;
-  /* DEBUG: rettangolo form — togliere quando allineato */
+  /* DEBUG */
   border: 3px solid red !important;
 }
+/* Tutto il contenuto DEVE stare nel box: niente overflow orizzontale */
+.auth-phone-screen,
+.auth-phone-screen * {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+}
+.auth-phone-screen .auth-card {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden;
+}
+.auth-phone-screen .form-stack {
+  width: 100%;
+  gap: 0.28rem !important;
+}
+.auth-phone-screen label,
+.auth-phone-screen input,
+.auth-phone-screen button,
+.auth-phone-screen .muted,
+.auth-phone-screen h1,
+.auth-phone-screen p {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.auth-phone-screen input,
+.auth-phone-screen .primary-button,
+.auth-phone-screen .secondary-button {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 1.55rem !important;
+  padding: 0.22rem 0.35rem !important;
+  font-size: 0.68rem !important;
+  line-height: 1.15 !important;
+}
+.auth-phone-screen h1 {
+  font-size: 0.72rem !important;
+  margin: 0 0 0.12rem !important;
+  line-height: 1.1 !important;
+}
+.auth-phone-screen .eyebrow {
+  font-size: 0.5rem !important;
+  margin: 0 0 0.08rem !important;
+}
+.auth-phone-screen .mummy-quote {
+  font-size: 0.58rem !important;
+  margin: 0 0 0.2rem !important;
+  line-height: 1.2 !important;
+}
+.auth-phone-screen .muted {
+  font-size: 0.62rem !important;
+  line-height: 1.25 !important;
+  margin: 0 0 0.2rem !important;
+}
+.auth-phone-screen .form-message {
+  font-size: 0.55rem !important;
+}
+
+
 
 .auth-screen .auth-card {
   background: transparent !important;
