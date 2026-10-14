@@ -1624,17 +1624,23 @@ body.notice-open #stage .action-panel button {
 .auth-screen.auth-known-mode .mummy-quote,
 .auth-screen.auth-known-mode .eyebrow { display: none; }
 .auth-screen.auth-known-mode #auth-known {
+  justify-items: center; /* grid: asse orizzontale */
   align-items: center;
+  text-align: center;
 }
 .auth-screen.auth-known-mode #auth-known-name {
   line-height: 1.35;
   margin-bottom: 0.35rem;
+  width: 100%;
+  text-align: center;
 }
 .auth-screen.auth-known-mode #auth-sono-io,
 .auth-screen.auth-known-mode #auth-altro-utente {
   width: 50%;
   max-width: 50%;
-  align-self: center;
+  justify-self: center;
+  margin-left: auto;
+  margin-right: auto;
 }
 .auth-screen .form-stack {
   gap: 0.38rem !important;
