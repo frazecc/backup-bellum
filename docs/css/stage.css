@@ -1564,24 +1564,24 @@ body.notice-open #stage .action-panel button {
   user-select: none;
 }
 /*
-  Area schermo del telefono nell'illustrazione (coordinate % sull'immagine).
-  Calibrate sul device art: schermo scuro sotto PENUMBRUM.
+  Area schermo del telefono nell'illustrazione (luce ciano/bianca sotto PENUMBRUM).
+  Coordinate % sull'immagine intera — solo form, nessuna seconda cornice.
 */
 .auth-phone-screen {
   position: absolute;
-  left: 23.5%;
-  right: 23.5%;
-  top: 26.5%;
-  bottom: 40.5%;
+  left: 24.2%;
+  right: 24.2%;
+  top: 27.8%;
+  bottom: 41.2%;
   z-index: 2;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: stretch;
-  overflow: hidden; /* niente scroll: layout compatto */
-  padding: 4% 5%;
+  overflow: hidden;
+  padding: 5% 6% 6%;
   box-sizing: border-box;
-  border-radius: 3% / 2.2%;
+  border-radius: 4% / 3%;
   background: transparent;
 }
 .auth-screen .auth-card {
@@ -1592,72 +1592,72 @@ body.notice-open #stage .action-panel button {
   margin: 0 !important;
   max-width: none !important;
   width: 100%;
-  color: #f2e6c8;
+  color: #2a1808;
   text-align: center;
 }
 .auth-screen .auth-card .eyebrow {
-  margin: 0 0 0.15rem;
-  font-size: clamp(0.55rem, 2.1vw, 0.68rem);
+  margin: 0 0 0.12rem;
+  font-size: clamp(0.52rem, 2vw, 0.65rem);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #e8c565;
+  color: #6a4a18;
   font-weight: 800;
-  text-shadow: 0 1px 2px #000a;
+  text-shadow: none;
 }
 .auth-screen .auth-card h1 {
-  margin: 0 0 0.25rem;
-  font-size: clamp(0.95rem, 3.6vw, 1.2rem);
-  line-height: 1.1;
-  color: #fff6dc;
+  margin: 0 0 0.2rem;
+  font-size: clamp(0.92rem, 3.4vw, 1.15rem);
+  line-height: 1.12;
+  color: #2a1205;
   font-family: 'Lilita One', Georgia, serif;
   font-weight: 400;
-  text-shadow: 0 1px 3px #000c;
+  text-shadow: none;
 }
 .auth-screen .mummy-quote {
-  margin: 0 0 0.45rem;
-  color: #e8d9a8;
+  margin: 0 0 0.4rem;
+  color: #4a3210;
   font-weight: 700;
-  font-size: clamp(0.68rem, 2.3vw, 0.8rem);
+  font-size: clamp(0.66rem, 2.2vw, 0.78rem);
   line-height: 1.25;
-  text-shadow: 0 1px 2px #000a;
+  text-shadow: none;
 }
 .auth-screen.auth-known-mode .mummy-quote,
 .auth-screen.auth-known-mode .eyebrow { display: none; }
 .auth-screen .form-stack {
-  gap: 0.4rem !important;
+  gap: 0.38rem !important;
 }
 .auth-screen .form-stack label {
   display: grid;
-  gap: 0.12rem;
+  gap: 0.1rem;
   text-align: left;
-  font-size: clamp(0.65rem, 2.2vw, 0.78rem);
+  font-size: clamp(0.62rem, 2.1vw, 0.75rem);
   font-weight: 700;
-  color: #f0e2b0;
-  text-shadow: 0 1px 2px #000a;
+  color: #3a1c08;
+  text-shadow: none;
 }
 .auth-screen .form-stack input {
   width: 100%;
   box-sizing: border-box;
-  min-height: 2.15rem;
-  padding: 0.3rem 0.5rem;
-  border: 2px solid #c9a043;
+  min-height: 2.1rem;
+  padding: 0.28rem 0.5rem;
+  border: 2px solid #8a5a14;
   border-radius: 9px;
-  background: #fffef8f2;
+  background: #fffef8;
   color: #1a0a05;
-  font-size: 16px; /* evita zoom iOS */
+  font-size: 16px;
 }
 .auth-screen .form-stack input:focus {
-  outline: 2px solid #e8c565;
+  outline: 2px solid #c9a043;
   outline-offset: 1px;
-  border-color: #e8c565;
+  border-color: #c9a043;
 }
 .auth-screen .primary-button,
 .auth-screen .secondary-button {
-  min-height: 2.2rem;
-  font-size: clamp(0.82rem, 2.6vw, 0.95rem);
+  min-height: 2.15rem;
+  font-size: clamp(0.8rem, 2.5vw, 0.92rem);
   border-radius: 11px;
   width: 100%;
-  padding: 0.35rem 0.6rem;
+  padding: 0.32rem 0.55rem;
 }
 .auth-screen .primary-button {
   background: linear-gradient(180deg, #e8c565, #c98a20);
@@ -1666,26 +1666,28 @@ body.notice-open #stage .action-panel button {
   font-weight: 800;
 }
 .auth-screen .secondary-button {
-  background: #f3e6c4ee;
+  background: #f7efd8;
   color: #3a1c08;
   border: 2px solid #8a5a14;
   font-weight: 700;
 }
 .auth-screen .form-message {
-  margin: 0.25rem 0 0;
-  font-size: clamp(0.62rem, 2.1vw, 0.75rem);
-  color: #ffc9a0;
+  margin: 0.2rem 0 0;
+  font-size: clamp(0.6rem, 2vw, 0.72rem);
+  color: #8a2010;
   min-height: 1em;
-  text-shadow: 0 1px 2px #000a;
+  text-shadow: none;
+  font-weight: 700;
 }
 .auth-screen .muted {
-  color: #f2e6c8;
+  color: #3a2810;
   font-weight: 700;
-  font-size: clamp(0.72rem, 2.4vw, 0.88rem);
-  margin: 0 0 0.2rem;
+  font-size: clamp(0.7rem, 2.3vw, 0.85rem);
+  margin: 0 0 0.25rem;
   overflow-wrap: anywhere;
-  text-shadow: 0 1px 2px #000a;
+  text-shadow: none;
 }
+
 @media (min-width: 900px) {
   .auth-scene {
     width: min(420px, calc(100dvh * 768 / 1376));
