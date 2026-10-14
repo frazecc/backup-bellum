@@ -21,40 +21,33 @@
     <noscript>Bellum Penumbrum richiede JavaScript per funzionare.</noscript>
     <main class="app-shell">
        <section id="auth-screen" class="screen auth-screen" aria-labelledby="auth-title">
-        <div class="mummy-login-frame" aria-hidden="true">
-          <div class="mummy-eyes" id="mummy-eyes" aria-hidden="true">
-            <span class="mummy-eye" id="mummy-eye-l"></span>
-            <span class="mummy-eye" id="mummy-eye-r"></span>
-          </div>
-          <div class="mummy-bandage mummy-bandage-top"></div>
-          <div class="mummy-grin" aria-hidden="true">
-            <svg viewBox="0 0 200 48" width="200" height="48">
-              <path d="M20 8 Q100 52 180 8" fill="none" stroke="#1a0a05" stroke-width="5" stroke-linecap="round"/>
-              <path d="M36 18 L42 28 L48 16 M64 22 L70 32 L76 18 M92 24 L100 34 L108 24 M124 18 L130 32 L136 20 M152 16 L158 28 L164 16"
-                fill="none" stroke="#f0e6c8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </div>
-          <div class="mummy-bandage mummy-bandage-mid"></div>
-          <div class="mummy-bandage mummy-bandage-bot"></div>
-        </div>
-        <div class="auth-card panel mummy-gate">
-          <p class="eyebrow">Bellum Penumbrum</p>
-          <h1 id="auth-title">Dimostrami chi sei, coraggioso</h1>
-          <p class="mummy-quote">La mummia stringe la porta della tomba. Scrivi il tuo nome e dimostra chi sei.</p>
+        <div class="auth-phone-scene">
+          <img class="auth-phone-art"
+            src="img/login-mummy-phone.png"
+            alt="Mani mummificate tengono un telefono d’oro nella tomba"
+            width="768" height="1376"
+            decoding="async" />
+          <div class="auth-phone-screen">
+            <div class="auth-card mummy-gate">
+              <p class="eyebrow">Bellum Penumbrum</p>
+              <h1 id="auth-title">Dimostrami chi sei</h1>
+              <p class="mummy-quote">Scrivi il tuo nome e dimostra chi sei.</p>
 
-          <div id="auth-known" class="form-stack hidden">
-            <p id="auth-known-name" class="muted"></p>
-            <button id="auth-sono-io" class="primary-button" type="button">Sono io</button>
-            <button id="auth-altro-utente" class="secondary-button" type="button">Non sono io</button>
+              <div id="auth-known" class="form-stack hidden">
+                <p id="auth-known-name" class="muted"></p>
+                <button id="auth-sono-io" class="primary-button" type="button">Sono io</button>
+                <button id="auth-altro-utente" class="secondary-button" type="button">Non sono io</button>
+              </div>
+
+              <form id="login-form" class="form-stack" novalidate>
+                <label><span>Nome utente</span><input id="login-username" name="username" type="text" autocomplete="username" minlength="2" maxlength="32" required placeholder="francesco" /></label>
+                <label><span>Password</span><input id="login-password" name="password" type="password" autocomplete="current-password" minlength="6" required placeholder="••••••••" /></label>
+                <button id="login-button" class="primary-button" type="submit">Accedi</button>
+              </form>
+
+              <p id="auth-message" class="form-message" role="status" aria-live="polite"></p>
+            </div>
           </div>
-
-          <form id="login-form" class="form-stack" novalidate>
-            <label><span>Nome utente</span><input id="login-username" name="username" type="text" autocomplete="username" minlength="2" maxlength="32" required placeholder="francesco" /></label>
-            <label><span>Password</span><input id="login-password" name="password" type="password" autocomplete="current-password" minlength="6" required placeholder="••••••••" /></label>
-            <button id="login-button" class="primary-button" type="submit">Accedi</button>
-          </form>
-
-          <p id="auth-message" class="form-message" role="status" aria-live="polite"></p>
         </div>
       </section>     <section id="game-screen" class="screen game-screen hidden" aria-live="polite">
         <div class="stage-frame">
