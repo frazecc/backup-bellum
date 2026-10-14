@@ -507,30 +507,54 @@ async function renderDeathChoice() {
     deathDraft = {choiceId:null,instanceIds:[]};
     const d = await card(selected.task.card_id);
     if (deathTarget()?.choice_id !== selected.choice_id) return;
-    title.textContent = 'Bersaglio dell’effetto';
-    text.textContent = `${d.name}: scegli il bersaglio. La scelta è obbligatoria e si risolve prima dell’effetto successivo.`;
-    for (const instanceId of selected.eligible_instance_ids ?? []) {
-      let found = null;
-      for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
-        const cell = at({row,col});
-        if (cell?.kind === 'creature' && cell.instance_id === instanceId) found = {cell,row,col};
-      }
-      if (!found) continue;
-      const targetCard = await card(found.cell.card_id);
-      if (deathTarget()?.choice_id !== selected.choice_id) return;
-      const b = button(`${targetCard.name} · ${found.cell.owner_index === 1 ? 'tua' : 'IA'} · [${found.row},${found.col}] · HP ${found.cell.hp}`,() => {
+    const isEtb = selected.task?.source === 'on_play';
+    if (isEtb) {
+      // ETB dopo ingresso: popup con anteprima + testo, poi scelta sulla griglia (creatura già visibile).
+      title.textContent = 'Effetto in entrata';
+      const fxText = plainText(d) || 'Nessun testo effetto.';
+      text.innerHTML = `Hai evocato <strong>${escape(d.name)}</strong>.<br>Si attiva il suo effetto in entrata:<br><em>${escape(fxText)}</em>`;
+      const preview = document.createElement('div');
+      preview.style.cssText = 'margin:.6rem auto;max-width:200px';
+      preview.innerHTML = cardHTML(d, true);
+      options.append(preview);
+      actions.append(button('Scegli il bersaglio sulla griglia', async () => {
         if (busy || deathTarget()?.choice_id !== selected.choice_id) return;
-        return request('death/target',{choiceId:selected.choice_id,targetInstanceId:instanceId},'Effetto alla morte risolto.');
-      });
-      options.append(b);
-    }
-    if ((selected.eligible_instance_ids ?? []).includes(AI_TARGET)) {
-      options.append(button(`IA · giocatore avversario · PV ${them()?.life ?? '?'}`,() => {
-        if (busy || deathTarget()?.choice_id !== selected.choice_id) return;
-        return request('death/target',{choiceId:selected.choice_id,targetInstanceId:AI_TARGET},'Effetto risolto.');
+        flow = {
+          kind: 'etb-target',
+          choiceId: selected.choice_id,
+          eligible: selected.eligible_instance_ids ?? [],
+          sourceId: selected.task?.source_instance_id,
+        };
+        el.classList.add('hidden');
+        await render();
+        notice('ora scegli il bersaglio', 'success');
       }));
+    } else {
+      title.textContent = 'Bersaglio dell’effetto';
+      text.textContent = `${d.name}: scegli il bersaglio. La scelta è obbligatoria e si risolve prima dell’effetto successivo.`;
+      for (const instanceId of selected.eligible_instance_ids ?? []) {
+        let found = null;
+        for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
+          const cell = at({row,col});
+          if (cell?.kind === 'creature' && cell.instance_id === instanceId) found = {cell,row,col};
+        }
+        if (!found) continue;
+        const targetCard = await card(found.cell.card_id);
+        if (deathTarget()?.choice_id !== selected.choice_id) return;
+        const b = button(`${targetCard.name} · ${found.cell.owner_index === 1 ? 'tua' : 'IA'} · [${found.row},${found.col}] · HP ${found.cell.hp}`,() => {
+          if (busy || deathTarget()?.choice_id !== selected.choice_id) return;
+          return request('death/target',{choiceId:selected.choice_id,targetInstanceId:instanceId},'Effetto alla morte risolto.');
+        });
+        options.append(b);
+      }
+      if ((selected.eligible_instance_ids ?? []).includes(AI_TARGET)) {
+        options.append(button(`IA · giocatore avversario · PV ${them()?.life ?? '?'}`,() => {
+          if (busy || deathTarget()?.choice_id !== selected.choice_id) return;
+          return request('death/target',{choiceId:selected.choice_id,targetInstanceId:AI_TARGET},'Effetto risolto.');
+        }));
+      }
+      if (!options.childElementCount) text.textContent = 'Nessun bersaglio visibile: aggiorna la partita per recuperare lo stato.';
     }
-    if (!options.childElementCount) text.textContent = 'Nessun bersaglio visibile: aggiorna la partita per recuperare lo stato.';
   }
   el.classList.remove('hidden');
 }
@@ -855,9 +879,9 @@ async function drawBoard() {
       if (flow?.kind === 'move' && steps(flow.from).some(x => eq(x,pos))) b.classList.add('valid-move');
       if (flow?.kind === 'attack' && attackable(flow.from).some(x => eq(x,pos))) b.classList.add('valid-target');
       if (flow?.kind === 'hand' && flow.step === 'cell' && row === 2 && !c) b.classList.add('valid-summon');
-      // Cella di evocazione evidenziata come bersaglio «se stessa» (ETB dopo l’ingresso).
       if (flow?.kind === 'hand' && flow.step === 'target' && flow.position && eq(flow.position, pos) && !c) b.classList.add('valid-target');
       if (flow?.kind === 'mostrissimo-target' && flow.position && eq(flow.position, pos) && !c) b.classList.add('valid-target');
+      if (flow?.kind === 'etb-target' && c && (flow.eligible ?? []).includes(c.instance_id)) b.classList.add('valid-target');
       if (['hand','mostrissimo-target','trap-target'].includes(flow?.kind) && (flow?.step === 'target' || flow?.kind !== 'hand') && d && targetAllowed(d,c,flow?.kind === 'trap-target' ? reaction()?.event : null)) b.classList.add('valid-target');
       if (legal.some(x => eq(x,pos))) b.classList.add('valid-summon');
       b.setAttribute('aria-label',c ? `${definition?.name ?? 'Permanente'} ${c.owner_index === 1 ? 'Tu' : 'IA'}${isCreatureCell(c) ? ` ATK ${c.attack} HP ${c.hp}` : `, Terraforma${c.hp !== undefined ? `, PV ${c.hp}` : ' non attaccabile'}`}${isCreatureCell(c) && c.auras?.length ? `, ${c.auras.length} Aura` : ''}` : `Cella [${row},${col}]`);
@@ -865,7 +889,9 @@ async function drawBoard() {
         ? `<svg class="altar-svg" aria-hidden="true" width="68" height="96" viewBox="0 0 68 100"><path d="M10 20Q22 8 34 16Q46 8 58 20" fill="none" stroke="#c9a043" stroke-width="2" stroke-linecap="round"/><circle cx="34" cy="14" r="6.5" fill="#e8c565"/><path d="M21 36Q34 26 47 36Q34 46 21 36Z" fill="#0b0806" stroke="#e8c565" stroke-width="1.6"/><circle cx="34" cy="36" r="3.4" fill="#2fe0c4"/><path d="M28 43Q27 49 22 51M34 45V51" fill="none" stroke="#e8c565" stroke-width="1.6" stroke-linecap="round"/><g class="flame"><path d="M34 52Q26 60 30 68Q32 64 33 62Q34 66 37 69Q43 61 34 52Z" fill="#2fe0c4"/><path d="M34 60Q31 64 33 68Q35 66 34 60Z" fill="#e8f9f5"/></g><path d="M24 70h20l-2 6H26Z" fill="#3a2e22" stroke="#c9a043" stroke-width="1.5"/><rect x="18" y="76" width="32" height="8" fill="#3a2e22" stroke="#c9a043" stroke-width="1.5"/><rect x="12" y="84" width="44" height="9" fill="#2a2016" stroke="#c9a043" stroke-width="1.5"/></svg>`
         : '';
       b.innerHTML = altar + (c && definition ? cellHTML(definition,c) + (isCreatureCell(c) && c.auras?.length ? `<span class="cell-aura-count" title="Aure assegnate">✧ ${c.auras.length}</span>` : '') + `<span class="cell-coordinate">[${row},${col}]</span>` : '');
-      b.disabled = busy || obligatory();
+      // Durante etb-target le celle eleggibili restano cliccabili anche se obligatory.
+      const etbPick = flow?.kind === 'etb-target' && c && (flow.eligible ?? []).includes(c.instance_id);
+      b.disabled = busy || (obligatory() && !etbPick);
       b.onclick = () => boardClick(pos).catch(fail); line.append(b);
     }
     root.append(line);
@@ -1066,7 +1092,16 @@ async function playerClick() {
   }
 }
 async function boardClick(pos) {
-  if (busy || noticeOpen || obligatory()) return;
+  // Durante scelta ETB post-ingresso il motore è in pending_target_choice (obligatory): i click restano attivi.
+  if (busy || noticeOpen) return;
+  if (obligatory() && flow?.kind !== 'etb-target') return;
+  if (flow?.kind === 'etb-target') {
+    const c = at(pos);
+    if (!c || !(flow.eligible ?? []).includes(c.instance_id)) return notice('Bersaglio non valido.','error');
+    const choiceId = flow.choiceId;
+    flow = null;
+    return request('death/target',{choiceId,targetInstanceId:c.instance_id},'Effetto in entrata risolto.');
+  }
   const c = at(pos), r = reaction();
   if (r) {
     if (flow?.kind === 'trap-target') {
@@ -1108,15 +1143,10 @@ async function boardClick(pos) {
     if (flow.step === 'cell') {
       if (c || pos.row !== 2) return notice('Scegli una cella libera della tua riga.','error');
       flow.position = pos;
-      // ETB mirato: chiede sempre il bersaglio (anche se in campo non c’è ancora nessuno → si può colpire se stessa).
-      if (d.card_type === 'monster' && targetEffect(d)) { flow.step = 'target'; await render(); notice('ora scegli il bersaglio','success'); return; }
+      // Mostro: entra in campo subito; l’ETB mirato apre la scelta bersaglio dopo (creatura già visibile).
       return request('play-card',{cardInstanceId:flow.instanceId,options:{position:pos}},'Carta dichiarata.');
     }
     if (flow.step === 'target') {
-      // Cella di evocazione = bersaglio «se stessa» (effetto dopo l’ingresso; instance_id della carta in mano).
-      if (!c && flow.position && eq(flow.position, pos) && creature(d)) {
-        return request('play-card',{cardInstanceId:flow.instanceId,options:{position:flow.position,targetInstanceId:flow.instanceId}},'Creatura dichiarata.');
-      }
       if (!targetAllowed(d,c)) return notice('Bersaglio non valido.','error');
       return request('play-card',{cardInstanceId:flow.instanceId,options:{...(flow.position ? {position:flow.position} : {}),targetInstanceId:c.instance_id}},creature(d) ? 'Creatura dichiarata.' : 'Carta dichiarata.');
     }

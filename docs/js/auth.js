@@ -79,11 +79,41 @@ function showKnownUser(user) {
   authKnown?.classList.remove('hidden');
 }
 
+/** Due occhi grandi: colori a caso tra le 7 fazioni, diversi dall’ultima coppia vista. */
+const EYE_COLORS = [
+  { id: 'chi', iris: '#c9b88a' },
+  { id: 'inf', iris: '#5a8dc2' },
+  { id: 'pes', iris: '#8a72b8' },
+  { id: 'bul', iris: '#c4684f' },
+  { id: 'gro', iris: '#5aa87c' },
+  { id: 'clo', iris: '#e0a22a' },
+  { id: 'ind', iris: '#8a96a3' },
+];
+function paintLoginEyes() {
+  const left = document.getElementById('mummy-eye-l');
+  const right = document.getElementById('mummy-eye-r');
+  if (!left || !right) return;
+  let prev = [];
+  try { prev = JSON.parse(sessionStorage.getItem('bellum:last-eyes') || '[]'); } catch { prev = []; }
+  const pool = EYE_COLORS.slice();
+  // Evita la stessa coppia (stesso ordine) della volta precedente.
+  let a, b, guard = 0;
+  do {
+    a = pool[Math.floor(Math.random() * pool.length)];
+    b = pool[Math.floor(Math.random() * pool.length)];
+    guard++;
+  } while (guard < 20 && prev.length === 2 && a.id === prev[0] && b.id === prev[1]);
+  left.style.setProperty('--eye-iris', a.iris);
+  right.style.setProperty('--eye-iris', b.iris);
+  try { sessionStorage.setItem('bellum:last-eyes', JSON.stringify([a.id, b.id])); } catch { /* ignore */ }
+}
+
 /** Schermata mummia: sempre visibile all’ingresso / dopo sconfitta. */
 export function showAuthScreen(options = {}) {
   authScreen?.classList.remove('hidden');
   gameScreen?.classList.add('hidden');
   setAuthMessage();
+  paintLoginEyes();
 
   if (signedInUser) signedInUser.textContent = '';
 
@@ -204,4 +234,5 @@ supabase.auth.onAuthStateChange((event, session) => {
   }
 });
 
+paintLoginEyes();
 loadSession();
