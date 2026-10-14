@@ -1415,8 +1415,7 @@ async function newMatch(primaryColor, secondaryColor) {
     const humanColors = state?.deck_colors?.[1];
     const aiColors = state?.deck_colors?.[0];
     await showCurseDialog(humanColors, aiColors);
-    const firstIsHuman = state?.active_player_index === 1;
-    await showCoinFlip(firstIsHuman);
+    await showCoinFlip(state?.active_player_index === 1);
     const uname = usernameFromEmail((await getCurrentUser())?.email) || 'coraggioso';
     const bless = `Che le bestie divine ti assistano, ${uname}.`;
     const desk = $('narrator-desk-speech');
@@ -1424,6 +1423,19 @@ async function newMatch(primaryColor, secondaryColor) {
     await notice(bless, 'success');
     await render();
     await logs();
+    // Popup di fase come nel resto della partita (primo turno / giocatore attivo).
+    const actor = state?.active_player_index ?? 1;
+    const phase = state?.phase === 'main' ? 'main'
+      : state?.phase === 'end' ? 'end'
+      : 'upkeep';
+    await presentPublic({
+      kind: 'phase',
+      phase,
+      actor,
+      turn: state?.current_turn ?? 1,
+      max_mana: state?.players?.[actor]?.max_mana ?? 1,
+      text: '',
+    }, presentationGeneration);
   } catch (e) {
     fail(e);
     if ($('deck-color-validation')) {
