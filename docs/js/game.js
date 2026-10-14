@@ -69,8 +69,6 @@ function cellHTML(d, c) {
     ? Number(d.sacrifice_cost ?? 0)
     : Number(d.mana_cost ?? 0);
   const costIcon = d.card_type === 'mostrissimo' ? '✦' : '';
-  const subtype = d.subtype ? String(d.subtype) : '';
-  const factionLabel = (deckFactionNames[f.toUpperCase()] || f.toUpperCase()).slice(0, 3);
   const fx = effectPreview(d, 48);
 
   return `<article class="cell-card faction-${f}${c.kind === 'terraforma' ? ' is-terra' : ''}">
@@ -78,7 +76,6 @@ function cellHTML(d, c) {
     <div class="cc-art">${artHTML(d)}</div>
     <span class="cc-cost shape-${f}" title="Costo">${costIcon}${cost}</span>
     ${fx ? `<div class="cc-fx">${escape(fx)}</div>` : ''}
-    <span class="cc-meta">${escape(factionLabel)}${subtype ? ' · ' + escape(subtype) : ''}</span>
     ${isCreature
       ? `<span class="cc-atk${buff}">${atk}</span><span class="cc-hp${hurt}">${hp}</span>`
       : (c.kind === 'terraforma' && c.hp !== undefined
@@ -93,8 +90,6 @@ function handCardHTML(d) {
     ? Number(d.sacrifice_cost ?? 0)
     : Number(d.mana_cost ?? 0);
   const costIcon = d.card_type === 'mostrissimo' ? '✦' : '';
-  const subtype = d.subtype ? String(d.subtype) : '';
-  const factionLabel = (deckFactionNames[f.toUpperCase()] || f.toUpperCase()).slice(0, 3);
   const fx = effectPreview(d, 72);
 
   return `<article class="fan-card faction-${f}${isCreature ? '' : ' no-stats'}">
@@ -103,7 +98,6 @@ function handCardHTML(d) {
     <span class="fc-cost shape-${f}" title="Costo">${costIcon}${cost}</span>
     ${fx ? `<div class="fc-fx">${escape(fx)}</div>` : ''}
     ${isCreature ? `<span class="fc-stat atk">${d.attack ?? 0}</span><span class="fc-stat hp">${d.hp ?? 0}</span>` : ''}
-    <span class="fc-meta">${escape(factionLabel)}${subtype ? ' · ' + escape(subtype) : ''}</span>
   </article>`;
 }
 // Geometria del ventaglio, in "px di riferimento" della colonna 455x768 (vedi css/stage.css).
@@ -257,7 +251,6 @@ function cardHTML(d, mini = false, cell = null) {
       <span class="fc-cost shape-${f}" title="Costo">${costIcon}${costNum}</span>
       ${fxShort ? `<div class="fc-fx">${escape(fxShort)}</div>` : ''}
       ${isCreature ? `<span class="fc-stat atk">${atk}</span><span class="fc-stat hp">${hp}</span>` : ''}
-      <span class="fc-meta">${escape(factionLabel.slice(0, 3))}${subtype ? ' · ' + escape(subtype) : ''}</span>
     </article>`;
   }
 
@@ -265,11 +258,10 @@ function cardHTML(d, mini = false, cell = null) {
     <div class="fc-nameband"><span class="fc-name">${escape(d.name)}</span></div>
     <div class="fc-art">${art}</div>
     <span class="fc-cost shape-${f}" title="Costo">${costIcon}${costNum}</span>
-    <div class="gc-type">${escape(typeLabel)}</div>
+    <div class="gc-type">${escape(typeLabel)}${subtype ? ' · ' + escape(subtype) : ''} · ${escape(factionLabel)}</div>
     <div class="game-card-rules">${rulesFull || '<em>Nessun effetto.</em>'}</div>
     ${d.flavor_text ? `<div class="game-card-flavor">${escape(d.flavor_text)}</div>` : ''}
     ${isCreature ? `<span class="fc-stat atk">${atk}</span><span class="fc-stat hp">${hp}</span>` : ''}
-    <span class="fc-meta">${escape(factionLabel)}${subtype ? ' · ' + escape(subtype) : ''}</span>
     <div class="gc-rarity">${escape(rarities[d.rarity] ?? d.rarity ?? 'Comune')}</div>
   </article>`;
 }
@@ -863,6 +855,9 @@ async function drawBoard() {
       if (flow?.kind === 'move' && steps(flow.from).some(x => eq(x,pos))) b.classList.add('valid-move');
       if (flow?.kind === 'attack' && attackable(flow.from).some(x => eq(x,pos))) b.classList.add('valid-target');
       if (flow?.kind === 'hand' && flow.step === 'cell' && row === 2 && !c) b.classList.add('valid-summon');
+      // Cella di evocazione evidenziata come bersaglio «se stessa» (ETB dopo l’ingresso).
+      if (flow?.kind === 'hand' && flow.step === 'target' && flow.position && eq(flow.position, pos) && !c) b.classList.add('valid-target');
+      if (flow?.kind === 'mostrissimo-target' && flow.position && eq(flow.position, pos) && !c) b.classList.add('valid-target');
       if (['hand','mostrissimo-target','trap-target'].includes(flow?.kind) && (flow?.step === 'target' || flow?.kind !== 'hand') && d && targetAllowed(d,c,flow?.kind === 'trap-target' ? reaction()?.event : null)) b.classList.add('valid-target');
       if (legal.some(x => eq(x,pos))) b.classList.add('valid-summon');
       b.setAttribute('aria-label',c ? `${definition?.name ?? 'Permanente'} ${c.owner_index === 1 ? 'Tu' : 'IA'}${isCreatureCell(c) ? ` ATK ${c.attack} HP ${c.hp}` : `, Terraforma${c.hp !== undefined ? `, PV ${c.hp}` : ' non attaccabile'}`}${isCreatureCell(c) && c.auras?.length ? `, ${c.auras.length} Aura` : ''}` : `Cella [${row},${col}]`);
@@ -1096,6 +1091,10 @@ async function boardClick(pos) {
   if (flow?.kind === 'mostrissimo-target') {
     if (!p || p.stage !== 'paying' || p.paid.length !== p.required) { flow = null; await render(); return notice('Evocazione non più valida.','error'); }
     const d = await card(p.card_id);
+    // Cella di evocazione = se stessa (dopo l’ingresso).
+    if (!c && flow.position && eq(flow.position, pos) && p.offered_instance_id) {
+      return request('mostrissimo/complete',{position:flow.position,targetInstanceId:p.offered_instance_id},'Mostrissimo dichiarato.');
+    }
     if (!targetAllowed(d,c)) return notice('Bersaglio ETB non valido.','error');
     return request('mostrissimo/complete',{position:flow.position,targetInstanceId:c.instance_id},'Mostrissimo dichiarato.');
   }
@@ -1107,7 +1106,8 @@ async function boardClick(pos) {
     }
     if (c || !summonCells(p).some(x => eq(x,pos))) return notice('Cella non valida.','error');
     const d = await card(p.card_id);
-    if (targetEffect(d) && hasTargets(d)) {
+    // Sempre chiedere il bersaglio ETB se la carta è mirata (anche solo se stessa).
+    if (targetEffect(d)) {
       flow = {kind:'mostrissimo-target',position:pos,id:d.id}; await render(); notice('ora scegli il bersaglio','success'); return;
     }
     return request('mostrissimo/complete',{position:pos},'Mostrissimo dichiarato.');
@@ -1117,10 +1117,15 @@ async function boardClick(pos) {
     if (flow.step === 'cell') {
       if (c || pos.row !== 2) return notice('Scegli una cella libera della tua riga.','error');
       flow.position = pos;
-      if (d.card_type === 'monster' && targetEffect(d) && hasTargets(d)) { flow.step = 'target'; await render(); notice('ora scegli il bersaglio','success'); return; }
+      // ETB mirato: chiede sempre il bersaglio (anche se in campo non c’è ancora nessuno → si può colpire se stessa).
+      if (d.card_type === 'monster' && targetEffect(d)) { flow.step = 'target'; await render(); notice('ora scegli il bersaglio','success'); return; }
       return request('play-card',{cardInstanceId:flow.instanceId,options:{position:pos}},'Carta dichiarata.');
     }
     if (flow.step === 'target') {
+      // Cella di evocazione = bersaglio «se stessa» (effetto dopo l’ingresso; instance_id della carta in mano).
+      if (!c && flow.position && eq(flow.position, pos) && creature(d)) {
+        return request('play-card',{cardInstanceId:flow.instanceId,options:{position:flow.position,targetInstanceId:flow.instanceId}},'Creatura dichiarata.');
+      }
       if (!targetAllowed(d,c)) return notice('Bersaglio non valido.','error');
       return request('play-card',{cardInstanceId:flow.instanceId,options:{...(flow.position ? {position:flow.position} : {}),targetInstanceId:c.instance_id}},creature(d) ? 'Creatura dichiarata.' : 'Carta dichiarata.');
     }
