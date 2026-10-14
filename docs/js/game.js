@@ -9,6 +9,7 @@ const cache = new Map();
 let state = null, matchId = null, busy = false, initialized = false, view = null, flow = null;
 let deathDraft = { choiceId: null, instanceIds: [] };
 let presentationRunning = false, presentationGeneration = 0;
+let lastPhaseKey = null; // scandisce ogni cambio fase anche se vuota
 const waitPresentation = ms => new Promise(resolve => setTimeout(resolve,ms));
 const board = () => state?.board?.rows ?? [[null,null,null],[null,null,null],[null,null,null]];
 const at = p => board()[p.row]?.[p.col] ?? null;
