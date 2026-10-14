@@ -575,7 +575,7 @@ async function presentPublic(a, generation) {
       try { who = usernameFromEmail((await getCurrentUser())?.email) || 'Tu'; }
       catch { who = 'Tu'; }
     }
-    title.style.cssText = 'text-align:left;line-height:1.55;font-family:"Nunito",system-ui,sans-serif;font-weight:800;letter-spacing:.02em';
+    title.style.cssText = 'text-align:center;line-height:1.55;font-family:"Nunito",system-ui,sans-serif;font-weight:800;letter-spacing:.02em';
     title.innerHTML =
       `TURNO: <strong>${a.turn ?? '—'}</strong><br>` +
       `GIOCATORE ATTIVO: <strong>${escape(who)}</strong><br>` +
@@ -949,20 +949,11 @@ function controls() {
   const disable = (id,v) => { if ($(id)) $(id).disabled = !!v; };
   disable('new-match-button',busy || obligatory()); disable('end-turn-button',!active()); disable('refresh-button',busy || !matchId);
   disable('cancel-selection-button',busy || obligatory() || !flow || (!!pending() && flow?.kind !== 'trap-target'));
+  // Riga sotto la griglia disabilitata: non fa «saltare» il layout.
+  // Le indicazioni restano nei notice/popup (Ho capito).
   if ($('selection-instructions')) {
-    const hint = deathOrder() ? 'Scegli l’ordine delle creature morte.'
-      : deathTarget() ? 'Scegli il bersaglio dell’effetto alla morte.'
-      : flow?.kind === 'trap-target' ? (reaction()?.event?.kind === 'monster_etb' ? 'Scegli la creatura che ha generato l’ETB.' : 'Scegli il bersaglio della Trappola.')
-      : reaction() ? 'Rispondi alla finestra reattiva o passa.'
-      : flow?.kind === 'mostrissimo-target' ? 'Scegli il bersaglio ETB.'
-      : pending() ? 'Evocazione obbligatoria in corso.'
-      : flow?.kind === 'hand' && flow.step === 'cell' ? 'Scegli una cella.'
-      : flow?.kind === 'hand' && flow.step === 'target' ? 'Scegli un bersaglio.'
-      : flow?.kind === 'attack' ? 'Scegli il nemico.'
-      : flow?.kind === 'move' ? 'Scegli una cella adiacente.'
-      : '';
-    $('selection-instructions').textContent = hint;
-    $('selection-instructions').hidden = !hint;
+    $('selection-instructions').textContent = '';
+    $('selection-instructions').hidden = true;
   }
 }
 function showDeckColors() {
