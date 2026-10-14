@@ -609,21 +609,39 @@ function humanizePublicText(a) {
 }
 
 /** Mostra il popup di fase a ogni cambio turno/fase/giocatore, anche senza eventi. */
-async function ensurePhaseBanner() {
+/** Popup di fase (Manatenimento / Svolgimento / Chiusura). */
+async function presentPhase(phase, actor, turn, maxMana) {
   if (!state || state.status !== 'running') return;
-  const actor = state.active_player_index;
-  const phase = state.phase === 'main' ? 'main' : state.phase === 'end' ? 'end' : 'upkeep';
-  const key = `${state.current_turn}|${actor}|${phase}`;
-  if (key === lastPhaseKey) return;
-  // lastPhaseKey lo aggiorna presentPublic quando mostra il banner
+  const ph = phase === 'main' ? 'main' : phase === 'end' ? 'end' : 'upkeep';
   await presentPublic({
     kind: 'phase',
-    phase,
+    phase: ph,
     actor,
-    turn: state.current_turn ?? 1,
-    max_mana: state.players?.[actor]?.max_mana ?? 0,
+    turn: turn ?? state.current_turn ?? 1,
+    max_mana: maxMana ?? state.players?.[actor]?.max_mana ?? 0,
     text: '',
   }, presentationGeneration);
+}
+
+/**
+ * Scandisce le fasi richieste in ordine.
+ * Ogni turno: manatenimento → svolgimento → (in fine turno) chiusura.
+ */
+async function scanPhases(phases, actor = null, turn = null) {
+  if (!state || state.status !== 'running') return;
+  const who = actor ?? state.active_player_index;
+  const tnum = turn ?? state.current_turn ?? 1;
+  const max = state.players?.[who]?.max_mana ?? 0;
+  for (const phase of phases) {
+    await presentPhase(phase, who, tnum, max);
+  }
+}
+
+/** Allinea il banner alla fase corrente del motore (senza saltare se già mostrata). */
+async function ensurePhaseBanner() {
+  if (!state || state.status !== 'running') return;
+  const phase = state.phase === 'main' ? 'main' : state.phase === 'end' ? 'end' : 'upkeep';
+  await presentPhase(phase, state.active_player_index, state.current_turn ?? 1, state.players?.[state.active_player_index]?.max_mana ?? 0);
 }
 
 async function presentPublic(a, generation) {
@@ -642,8 +660,8 @@ async function presentPublic(a, generation) {
   const title = document.createElement('div');
   if (a.kind === 'phase') {
     const phaseName = a.phase === 'upkeep' ? 'MANATENIMENTO'
-      : a.phase === 'main' ? 'PRINCIPALE'
-      : a.phase === 'end' ? 'FINE' : 'INIZIO';
+      : a.phase === 'main' ? 'SVOLGIMENTO'
+      : a.phase === 'end' ? 'CHIUSURA' : 'INIZIO';
     let who = '—';
     if (a.actor === 0) who = 'Mummy';
     else if (a.actor === 1) {
@@ -1117,7 +1135,16 @@ async function request(path, body, message) {
   } finally {
     busy = false;
     await render().catch(fail);
-    await ensurePhaseBanner().catch(fail);
+    // Fine turno umano: sempre popup CHIUSURA (anche se il motore è già passato all'IA).
+    if (path === 'end-turn' && state) {
+      // Se l'IA ha già avviato il suo turno, current_turn è avanzato → chiusura = turno precedente.
+      const endedTurn = state.active_player_index === 0
+        ? Math.max(1, (state.current_turn ?? 1) - 1)
+        : (state.current_turn ?? 1);
+      await presentPhase('end', 1, endedTurn, state.players?.[1]?.max_mana ?? 0).catch(fail);
+    } else {
+      await ensurePhaseBanner().catch(fail);
+    }
     queuePresentation();
   }
 }
@@ -1452,7 +1479,9 @@ async function newMatch(primaryColor, secondaryColor) {
     await notice(bless, 'success');
     await render();
     await logs();
-    await ensurePhaseBanner();
+    // Ogni partita apre con Manatenimento + Svolgimento del primo giocatore (anche se il motore è già in main).
+    lastPhaseKey = null;
+    await scanPhases(['upkeep', 'main'], state.active_player_index, state.current_turn ?? 1);
   } catch (e) {
     fail(e);
     if ($('deck-color-validation')) {
