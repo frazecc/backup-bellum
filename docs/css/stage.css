@@ -1533,56 +1533,100 @@ body.notice-open #stage .action-panel button {
   animation: none !important;
 }
 
-/* ---------- Login: telefono d’oro in mano alla mummia ---------- */
+/* ---------- Login: telefono HTML + illustrazione come fondale (opzione A) ---------- */
 .auth-screen {
   position: relative;
   overflow: hidden;
   display: grid;
   place-items: center;
   min-height: 100dvh;
-  padding: 0;
-  /* Barre laterali su PC: tono tomba, non nero piatto */
-  background:
-    radial-gradient(ellipse 55% 70% at 50% 45%, #3a2410 0%, #1a0e08 55%, #0c0704 100%);
+  padding: 1rem;
+  box-sizing: border-box;
+  background: #120a06;
 }
-.auth-phone-scene {
-  position: relative;
-  width: min(100vw, calc(100dvh * 768 / 1376));
-  aspect-ratio: 768 / 1376;
-  max-height: 100dvh;
-  /* ombra soft così su desktop non “galleggia” nel vuoto */
-  filter: drop-shadow(0 12px 40px #0008);
+/* Illustrazione a tutto schermo, dietro il telefono HTML */
+.auth-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
 }
-.auth-phone-art {
-  display: block;
+.auth-bg img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center;
-  pointer-events: none;
-  user-select: none;
+  object-position: center 40%;
+  filter: brightness(0.55) saturate(1.05);
+  transform: scale(1.05);
 }
-/* Area bianca dello schermo (calibrata sull’illustrazione) */
-.auth-phone-screen {
-  position: absolute;
-  left: 24%;
-  right: 24%;
-  top: 27%;
-  bottom: 39.5%;
-  z-index: 2;
+/* Telefono = componente HTML: form non può uscire dallo schermo */
+.auth-phone {
+  position: relative;
+  z-index: 1;
+  width: min(92vw, 340px);
+  filter: drop-shadow(0 16px 40px #000c);
+}
+.auth-phone-bezel {
+  background:
+    linear-gradient(160deg, #f0d078 0%, #c9a043 35%, #8a5a14 70%, #5a3a10 100%);
+  border-radius: 28px;
+  padding: 12px 14px 16px;
+  border: 3px solid #3a2410;
+  box-shadow:
+    inset 0 1px 0 #ffe9a8aa,
+    inset 0 -2px 6px #5a341088,
+    0 0 0 2px #d5a75855;
+}
+.auth-phone-top {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  align-items: center;
   justify-content: center;
-  overflow: hidden;
-  border-radius: 2.5% / 1.8%;
-  background: transparent;
-  padding: 3% 4%;
+  gap: 8px;
+  margin-bottom: 10px;
+  min-height: 28px;
+}
+.auth-phone-title {
+  font-family: 'Lilita One', Georgia, serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.18em;
+  color: #2a1205;
+  text-shadow: 0 1px 0 #f5e6b0;
+}
+.auth-phone-scarab {
+  font-size: 1.1rem;
+  line-height: 1;
+  filter: drop-shadow(0 1px 1px #0006);
+}
+.auth-phone-gem {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: none;
+  box-shadow: inset 0 1px 2px #fff8, 0 0 6px currentColor;
+}
+.auth-phone-gem.gem-blue { background: radial-gradient(circle at 35% 30%, #8ec8ff, #1f4f94); color: #5a8dc2; }
+.auth-phone-gem.gem-red { background: radial-gradient(circle at 35% 30%, #ff9a7a, #8f2a24); color: #c4684f; }
+.auth-phone-gem.gem-teal { background: radial-gradient(circle at 35% 30%, #7fe0c8, #1f6d44); color: #5aa87c; }
+.auth-phone-gem.gem-amber { background: radial-gradient(circle at 35% 30%, #ffe08a, #8f6a12); color: #e0a22a; }
+.auth-phone-bottom {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 18px 0;
+}
+/* Schermo = box vero: overflow hidden, form dentro */
+.auth-phone-screen {
+  background: linear-gradient(180deg, #f7f2e4 0%, #ebe0c8 100%);
+  border-radius: 16px;
+  border: 2px solid #3a2410;
+  box-shadow: inset 0 0 0 1px #fff6, inset 0 8px 24px #0001;
+  padding: 14px 14px 16px;
+  max-height: min(62dvh, 420px);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
 }
 .auth-screen .auth-card {
-  position: relative;
-  z-index: 1;
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
@@ -1595,52 +1639,47 @@ body.notice-open #stage .action-panel button {
 }
 .auth-screen .auth-card .eyebrow {
   margin: 0 0 0.2rem;
-  font-size: clamp(0.62rem, 2.2vw, 0.78rem);
+  font-size: 0.72rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #6a4a18;
   font-weight: 800;
 }
 .auth-screen .auth-card h1 {
-  margin: 0 0 0.3rem;
-  font-size: clamp(1rem, 3.8vw, 1.35rem);
+  margin: 0 0 0.35rem;
+  font-size: 1.2rem;
   line-height: 1.15;
   color: #3a1c08;
   font-family: 'Lilita One', Georgia, serif;
   font-weight: 400;
 }
 .auth-screen .mummy-quote {
-  margin: 0 0 0.6rem;
+  margin: 0 0 0.7rem;
   color: #5a3a14;
   font-weight: 700;
-  font-size: clamp(0.72rem, 2.5vw, 0.88rem);
+  font-size: 0.85rem;
   line-height: 1.3;
-  /* evita taglio a metà riga */
-  overflow-wrap: anywhere;
-  hyphens: auto;
 }
-/* In “utente conosciuto” nascondi la frase «scrivi il nome» */
 .auth-screen.auth-known-mode .mummy-quote { display: none; }
-
 .auth-screen .form-stack {
   gap: 0.55rem !important;
 }
 .auth-screen .form-stack label {
   display: grid;
-  gap: 0.18rem;
+  gap: 0.2rem;
   text-align: left;
-  font-size: clamp(0.72rem, 2.4vw, 0.85rem);
+  font-size: 0.82rem;
   font-weight: 700;
   color: #3a1c08;
 }
 .auth-screen .form-stack input {
   width: 100%;
   box-sizing: border-box;
-  min-height: 2.4rem;
-  padding: 0.4rem 0.6rem;
+  min-height: 2.45rem;
+  padding: 0.4rem 0.65rem;
   border: 2px solid #8a5a14;
   border-radius: 10px;
-  background: #fffef8ee;
+  background: #fffef8;
   color: #1a0a05;
   font-size: 16px;
 }
@@ -1652,7 +1691,7 @@ body.notice-open #stage .action-panel button {
 .auth-screen .primary-button,
 .auth-screen .secondary-button {
   min-height: 2.55rem;
-  font-size: clamp(0.88rem, 2.8vw, 1.05rem);
+  font-size: 0.95rem;
   border-radius: 12px;
   width: 100%;
 }
@@ -1669,35 +1708,26 @@ body.notice-open #stage .action-panel button {
   font-weight: 700;
 }
 .auth-screen .form-message {
-  margin: 0.4rem 0 0;
-  font-size: clamp(0.7rem, 2.3vw, 0.84rem);
+  margin: 0.45rem 0 0;
+  font-size: 0.8rem;
   color: #6a2010;
   min-height: 1.1em;
 }
 .auth-screen .muted {
   color: #5a3a14;
   font-weight: 700;
-  font-size: clamp(0.75rem, 2.5vw, 0.92rem);
-  margin: 0 0 0.15rem;
+  font-size: 0.88rem;
+  margin: 0 0 0.2rem;
   overflow-wrap: anywhere;
 }
-
-/* Desktop largo: scena un filo più grande e leggibile */
-@media (min-width: 900px) and (min-height: 800px) {
-  .auth-phone-scene {
-    width: min(420px, calc(100dvh * 768 / 1376));
-  }
-  .auth-screen .auth-card h1 { font-size: 1.35rem; }
-  .auth-screen .primary-button,
-  .auth-screen .secondary-button { min-height: 2.7rem; }
+@media (min-width: 900px) {
+  .auth-phone { width: min(360px, 34vw); }
+  .auth-bg img { object-position: center 35%; filter: brightness(0.5) saturate(1.1); }
 }
-
-@media (max-height: 700px) {
-  .auth-screen .auth-card h1 { font-size: 0.95rem; }
+@media (max-height: 640px) {
   .auth-screen .mummy-quote { display: none; }
-  .auth-screen .form-stack input { min-height: 2.1rem; }
-  .auth-screen .primary-button,
-  .auth-screen .secondary-button { min-height: 2.2rem; }
+  .auth-phone-screen { max-height: 70dvh; padding: 10px 12px; }
+  .auth-screen .auth-card h1 { font-size: 1.05rem; }
 }
 
 /* Riduci animazioni: spegne torcia, fiamma, prism, glow, transition carte */
