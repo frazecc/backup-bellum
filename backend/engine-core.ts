@@ -922,12 +922,13 @@ export async function createNewMatch(userId: string, primary: DeckFaction, secon
   if (firstPlayer === 1) {
     for (let i = 0; i < secondHand; i++) ai.hand.push(ai.deck.shift()!);
     for (let i = 0; i < firstHand; i++) human.hand.push(human.deck.shift()!);
-    human.max_mana = human.current_mana = 1;
   } else {
     for (let i = 0; i < firstHand; i++) ai.hand.push(ai.deck.shift()!);
     for (let i = 0; i < secondHand; i++) human.hand.push(human.deck.shift()!);
-    ai.max_mana = ai.current_mana = 1;
   }
+  // Entrambi partono con mana max 1; si aggiorna solo nel proprio manatenimento.
+  human.max_mana = human.current_mana = 1;
+  ai.max_mana = ai.current_mana = 1;
   const state: GameState = {
     state_version: 4, state_revision: 0, match_id: matchId, status: 'running',
     players: [ai, human], deck_colors: [aiColors, humanColors], board: blank(),
@@ -976,8 +977,17 @@ export async function playCard(id: string, p: PlayerIndex, cardInstanceId: strin
     if (d.card_type === 'aura' && (!options.targetInstanceId || !findCreature(s, options.targetInstanceId))) throw new Error('Seleziona una creatura alleata o nemica per l’Aura');
     if (!playableEffects(d)) throw new Error('Effetto carta non ancora supportato');
     if (d.card_type !== 'aura') for (const fx of effects(d.effect_json).filter(x => targeted(x) && x.trigger === undefined)) {
-      if (options.targetInstanceId && !validTarget(s, p, fx, options.targetInstanceId)) throw new Error('Bersaglio non valido');
-      if (!options.targetInstanceId && targetChoices(s, p, fx).length && !(d.card_type === 'monster' && fx.type === 'heal' && units(s, p).length === 0)) throw new Error('Seleziona una creatura bersaglio');
+      // ETB dopo l’ingresso: bersaglio = creatura in mano (stesso instance_id) valido per buff/cura.
+      const selfEtb = d.card_type === 'monster'
+        && options.targetInstanceId === inst.instance_id
+        && (fx.type === 'buff' || fx.type === 'heal')
+        && (fx.target === 'any_creature' || fx.target === 'any_target');
+      if (options.targetInstanceId && !selfEtb && !validTarget(s, p, fx, options.targetInstanceId))
+        throw new Error('Bersaglio non valido');
+      if (!options.targetInstanceId && targetChoices(s, p, fx).length
+        && !(d.card_type === 'monster' && (fx.type === 'heal' || fx.type === 'buff')
+          && (fx.target === 'any_creature' || fx.target === 'any_target')))
+        throw new Error('Seleziona una creatura bersaglio');
       if (!options.targetInstanceId && d.card_type !== 'monster') throw new Error('Questa carta richiede un bersaglio');
     }
     owner.hand = owner.hand.filter(x => x.instance_id !== inst.instance_id);
@@ -1052,8 +1062,14 @@ export async function completeMostrissimoSummon(id: string, p: PlayerIndex, posi
     const d = await getCardData(pending.card_id);
     if (!playableEffects(d)) throw new Error('Effetto del Mostrissimo non supportato');
     const aimed = effects(d.effect_json).filter(targeted);
-    if (targetId && !aimed.every(fx => validTarget(s, p, fx, targetId))) throw new Error('Bersaglio non valido');
-    if (!targetId && aimed.some(fx => targetChoices(s, p, fx).length)) throw new Error('Seleziona un bersaglio');
+    const selfEtb = targetId === pending.offered_instance_id
+      && aimed.every(fx => (fx.type === 'buff' || fx.type === 'heal')
+        && (fx.target === 'any_creature' || fx.target === 'any_target'));
+    if (targetId && !selfEtb && !aimed.every(fx => validTarget(s, p, fx, targetId))) throw new Error('Bersaglio non valido');
+    if (!targetId && aimed.some(fx => targetChoices(s, p, fx).length)
+      && !aimed.every(fx => (fx.type === 'buff' || fx.type === 'heal')
+        && (fx.target === 'any_creature' || fx.target === 'any_target')))
+      throw new Error('Seleziona un bersaglio');
     pending.stage = 'before_entry'; pending.position = position; pending.target_instance_id = targetId;
     prepend(s, { kind: 'declare_event', event: { kind: 'mostrissimo_before_entry', actor: p, card_id: d.id, offered_instance_id: pending.offered_instance_id, position, target_instance_id: targetId } });
   });
