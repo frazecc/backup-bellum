@@ -1654,6 +1654,16 @@ body.notice-open #stage .action-panel button {
   color: #3a1c08;
   text-shadow: none;
 }
+.auth-screen #login-form {
+  justify-items: center;
+  text-align: center;
+}
+.auth-screen #login-form label {
+  width: 50%;
+  max-width: 50%;
+  justify-self: center;
+  text-align: left;
+}
 .auth-screen .form-stack input {
   width: 100%;
   box-sizing: border-box;
