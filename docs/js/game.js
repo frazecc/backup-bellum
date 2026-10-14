@@ -591,7 +591,7 @@ function humanizePublicText(a) {
   let t = String(a?.text ?? '');
   t = t.replace(/\[3e\]\s*/gi, '');
   t = t.replace(/\([^)]*fonte[^)]*\)/gi, '');
-  t = t.replace(/monster_etb/gi, "effetto all'entrata");
+  t = t.replace(/monster_etb/gi, "effetto all’entrata");
   t = t.replace(/mostrissimo_before_entry/gi, 'ingresso del Mostrissimo');
   t = t.replace(/upkeep_start/gi, 'inizio manatenimento');
   t = t.replace(/upkeep_end/gi, 'fine manatenimento');
@@ -993,7 +993,7 @@ async function drawMostrissimi() {
     }
     zone.append(list);
   } else {
-    const msg = document.createElement('p'); msg.className = 'tribute-hint'; msg.textContent = flow?.kind === 'mostrissimo-target' ? 'Tocca il bersaglio dell'effetto all'entrata.' : 'Tocca una cella evidenziata.'; zone.append(msg);
+    const msg = document.createElement('p'); msg.className = 'tribute-hint'; msg.textContent = flow?.kind === 'mostrissimo-target' ? 'Tocca il bersaglio dell’effetto all’entrata.' : 'Tocca una cella evidenziata.'; zone.append(msg);
   }
 }
 function controls() {
@@ -1148,7 +1148,7 @@ async function boardClick(pos) {
     if (!c && flow.position && eq(flow.position, pos) && p.offered_instance_id) {
       return request('mostrissimo/complete',{position:flow.position,targetInstanceId:p.offered_instance_id},'Mostrissimo dichiarato.');
     }
-    if (!targetAllowed(d,c)) return notice('Bersaglio dell'effetto all'entrata non valido.','error');
+    if (!targetAllowed(d,c)) return notice('Bersaglio dell’effetto all’entrata non valido.','error');
     return request('mostrissimo/complete',{position:flow.position,targetInstanceId:c.instance_id},'Mostrissimo dichiarato.');
   }
   if (p) {
