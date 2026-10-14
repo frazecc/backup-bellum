@@ -1391,7 +1391,8 @@ async function newMatch(primaryColor, secondaryColor) {
   if (busy || obligatory()) return;
   busy = true; controls();
   if ($('deck-color-confirm')) $('deck-color-confirm').disabled = true;
-  notice('Creazione partita…');
+  // Niente popup «Creazione partita / Ho capito»: solo feedback sul form.
+  if ($('deck-color-validation')) $('deck-color-validation').textContent = 'Il patto si sta sigillando…';
   try {
     const result = await api('/match/create', { method: 'POST', body: { primaryColor, secondaryColor } });
     presentationGeneration++;
@@ -1404,16 +1405,19 @@ async function newMatch(primaryColor, secondaryColor) {
     closeGraveyard();
     closeColorDialog();
     localStorage.setItem('bellum:last-match', matchId);
-    await render();
-    await logs();
+    // Griglia ancora nascosta: prima maledizione → moneta → benedizione.
     const humanColors = state?.deck_colors?.[1];
     const aiColors = state?.deck_colors?.[0];
-    // Dopo «Sigilla il patto» → maledizione → moneta → battuta narratore.
     await showCurseDialog(humanColors, aiColors);
     const firstIsHuman = state?.active_player_index === 1;
     await showCoinFlip(firstIsHuman);
     const uname = usernameFromEmail((await getCurrentUser())?.email) || 'coraggioso';
-    await showNarrator(`Che le bestie divine ti assistano, ${uname}.`);
+    const bless = `Che le bestie divine ti assistano, ${uname}.`;
+    const desk = $('narrator-desk-speech');
+    if (desk) desk.textContent = bless;
+    await notice(bless, 'success');
+    await render();
+    await logs();
   } catch (e) {
     fail(e);
     if ($('deck-color-validation')) {
