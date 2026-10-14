@@ -571,7 +571,7 @@ function reactionDescription(e) {
     move:'L’avversario ha dichiarato un movimento.',attack:'L’avversario ha dichiarato un attacco.',
     mostrissimo_sacrifice:'L’avversario ha dichiarato un sacrificio.',
     mostrissimo_before_entry:'Il Mostrissimo ha pagato i sacrifici e sta per entrare nella cella scelta.',
-    monster_etb:'Sta per risolversi un ETB di una creatura avversaria.',
+    monster_etb:'Sta per risolversi un effetto all’entrata di una creatura avversaria.',
   };
   return names[e?.kind] ?? 'L’avversario ha dichiarato un’azione.';
 }
@@ -585,6 +585,26 @@ function presentationLayer() {
     alignItems:'center',justifyContent:'center',background:'rgba(5,6,18,.78)',
     padding:'1.2rem',boxSizing:'border-box',pointerEvents:'auto'});
   stageRoot().append(layer); return layer;
+}
+/** Testo annuncio pubblico senza dump tecnici (UUID, monster_etb, [3e]). */
+function humanizePublicText(a) {
+  let t = String(a?.text ?? '');
+  t = t.replace(/\[3e\]\s*/gi, '');
+  t = t.replace(/\([^)]*fonte[^)]*\)/gi, '');
+  t = t.replace(/monster_etb/gi, "effetto all'entrata");
+  t = t.replace(/mostrissimo_before_entry/gi, 'ingresso del Mostrissimo');
+  t = t.replace(/upkeep_start/gi, 'inizio manatenimento');
+  t = t.replace(/upkeep_end/gi, 'fine manatenimento');
+  t = t.replace(/hand_card/gi, 'carta dalla mano');
+  t = t.replace(/;\s*evento da riprendere dopo gli effetti\.?/gi, '');
+  t = t.replace(/;\s*evento contrastato\.?/gi, ' — effetto annullato');
+  t = t.replace(/\s+/g, ' ').trim();
+  // Se resta solo rumore e c'è una carta, titolo generico.
+  if ((!t || t.length < 3) && a?.kind === 'card') {
+    const who = a.actor === 0 ? 'Mummy' : a.actor === 1 ? 'Tu' : 'Qualcuno';
+    return `${who} gioca una carta.`;
+  }
+  return t;
 }
 async function presentPublic(a, generation) {
   const layer = presentationLayer(); layer.replaceChildren();
@@ -611,7 +631,7 @@ async function presentPublic(a, generation) {
       `FASE ATTUALE: <strong>${phaseName}</strong><br>` +
       `MANA MAX: <strong>${a.max_mana ?? 0}</strong>`;
   } else {
-    title.textContent = a.text;
+    title.textContent = humanizePublicText(a);
   }
   panel.append(title);
   if (a.kind === 'card' && a.card_id) {
@@ -725,7 +745,7 @@ async function beginTrap(inst,d) {
   if (targetEffect(d)) {
     flow = {kind:'trap-target',windowId:r.window_id,instanceId:inst.instance_id,id:d.id};
     reactionDialog().classList.add('hidden');
-    await render(); notice(r.event?.kind === 'monster_etb' ? 'Scegli la creatura che ha generato l’ETB.' : `Scegli il bersaglio di ${d.name}${playerTargetEffect(d) ? ' (tocca i PV dell’IA per colpire il giocatore)' : ''}.`, 'success'); return;
+    await render(); notice(r.event?.kind === 'monster_etb' ? 'Scegli la creatura che ha generato l’effetto all’entrata.' : `Scegli il bersaglio di ${d.name}${playerTargetEffect(d) ? ' (tocca i PV dell’IA per colpire il giocatore)' : ''}.`, 'success'); return;
   }
   await chooseTrap({windowId:r.window_id,action:'play',cardInstanceId:inst.instance_id});
 }
@@ -960,7 +980,7 @@ async function drawMostrissimi() {
   const p = pending(); if (!p) return;
   const zone = document.createElement('div'); zone.className = 'tribute-zone is-info'; panel.append(zone);
   const info = document.createElement('p'); info.className = 'tribute-progress';
-  info.textContent = p.stage === 'etb' ? 'Risoluzione degli ETB…' : p.stage === 'before_entry' ? 'Evocazione dichiarata: attendi la reazione.' : `Sacrifici ${p.paid.length}/${p.required}. Non puoi annullare.`;
+  info.textContent = p.stage === 'etb' ? 'Risoluzione degli effetti all’entrata…' : p.stage === 'before_entry' ? 'Evocazione dichiarata: attendi la reazione.' : `Sacrifici ${p.paid.length}/${p.required}. Non puoi annullare.`;
   zone.append(info);
   if (p.stage !== 'paying' || reaction() || obligatory()) return;
   if (p.paid.length < p.required) {
@@ -973,7 +993,7 @@ async function drawMostrissimi() {
     }
     zone.append(list);
   } else {
-    const msg = document.createElement('p'); msg.className = 'tribute-hint'; msg.textContent = flow?.kind === 'mostrissimo-target' ? 'Tocca il bersaglio ETB evidenziato.' : 'Tocca una cella evidenziata.'; zone.append(msg);
+    const msg = document.createElement('p'); msg.className = 'tribute-hint'; msg.textContent = flow?.kind === 'mostrissimo-target' ? 'Tocca il bersaglio dell'effetto all'entrata.' : 'Tocca una cella evidenziata.'; zone.append(msg);
   }
 }
 function controls() {
@@ -1054,7 +1074,9 @@ async function request(path, body, message) {
       } else if (deathOrder()) text = 'Scegli l’ordine delle creature morte.';
       else if (deathTarget()) text = 'Scegli il bersaglio dell’effetto alla morte.';
       else if (state.pending_reaction) text = reactionDescription(state.pending_reaction.event);
-      else if (message && !(path === 'end-turn' && state.active_player_index !== 1)) text = message;
+      // Niente «Carta/Creatura dichiarata»: resta solo l'anteprima pubblica della carta.
+      else if (message && !(path === 'end-turn' && state.active_player_index !== 1)
+        && !/dichiarat/i.test(message)) text = message;
       if (text) await notice(text, kind);
     }
   } catch (e) {
@@ -1126,7 +1148,7 @@ async function boardClick(pos) {
     if (!c && flow.position && eq(flow.position, pos) && p.offered_instance_id) {
       return request('mostrissimo/complete',{position:flow.position,targetInstanceId:p.offered_instance_id},'Mostrissimo dichiarato.');
     }
-    if (!targetAllowed(d,c)) return notice('Bersaglio ETB non valido.','error');
+    if (!targetAllowed(d,c)) return notice('Bersaglio dell'effetto all'entrata non valido.','error');
     return request('mostrissimo/complete',{position:flow.position,targetInstanceId:c.instance_id},'Mostrissimo dichiarato.');
   }
   if (p) {
@@ -1175,8 +1197,6 @@ function colorDialog() {
   const panel = document.createElement('div'); panel.className = 'panel';
   panel.style.cssText = 'width:min(92vw,440px);max-height:88dvh;overflow:auto;margin:auto;padding:1.2rem;text-align:center;border:1px solid #d5a758;box-shadow:0 12px 48px #000';
   const title = document.createElement('h2'); title.id = 'deck-color-title'; title.textContent = 'Scegli i tuoi poteri';
-  const explanation = document.createElement('p');
-  explanation.textContent = 'Il colore dell’anima definisce la carta più forte del mazzo. Il potere dell’amuleto le magie secondarie. La maledizione (terzo colore) arriverà da sola.';
   const form = document.createElement('form'); form.id = 'deck-color-form'; form.style.cssText = 'display:grid;gap:.8rem';
   const makeSelect = (id, text) => {
     const label = document.createElement('label'); label.textContent = text; label.style.cssText = 'display:grid;gap:.3rem;text-align:left';
@@ -1194,20 +1214,13 @@ function colorDialog() {
   const validation = document.createElement('p'); validation.id = 'deck-color-validation';
   validation.setAttribute('role', 'alert'); validation.style.color = '#ffbd92'; form.append(validation);
   const actions = document.createElement('div'); actions.style.cssText = 'display:flex;justify-content:center;flex-wrap:wrap;gap:.6rem';
-  const stats = document.createElement('button'); stats.type = 'button'; stats.className = 'secondary-button';
-  stats.id = 'deck-color-stats'; stats.textContent = '👁 Statistiche della mummia';
-  stats.onclick = () => {
-    const p = $('deck-primary-color')?.value, s = $('deck-secondary-color')?.value;
-    const pn = deckFactionNames[p] || p, sn = deckFactionNames[s] || s;
-    $('deck-color-validation').textContent = `Anima: ${pn}. Amuleto: ${sn}. La maledizione sarà rivelata all’inizio.`;
-  };
   const confirm = document.createElement('button'); confirm.type = 'submit'; confirm.className = 'primary-button';
   confirm.textContent = 'Sigilla il patto'; confirm.id = 'deck-color-confirm';
   const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'secondary-button';
   cancel.textContent = 'Annulla'; cancel.onclick = () => closeColorDialog();
-  actions.append(stats, confirm, cancel); form.append(actions);
+  actions.append(confirm, cancel); form.append(actions);
   form.addEventListener('submit', e => { e.preventDefault(); submitColors().catch(fail); });
-  panel.append(title, explanation, form); el.append(panel); stageRoot().append(el);
+  panel.append(title, form); el.append(panel); stageRoot().append(el);
   return el;
 }
 function closeColorDialog() { $('deck-color-dialog')?.classList.add('hidden'); if (!state && !busy && !$('game-screen')?.classList.contains('hidden')) showStart(); }
@@ -1395,12 +1408,12 @@ async function newMatch(primaryColor, secondaryColor) {
     await logs();
     const humanColors = state?.deck_colors?.[1];
     const aiColors = state?.deck_colors?.[0];
+    // Dopo «Sigilla il patto» → maledizione → moneta → battuta narratore.
     await showCurseDialog(humanColors, aiColors);
     const firstIsHuman = state?.active_player_index === 1;
     await showCoinFlip(firstIsHuman);
     const uname = usernameFromEmail((await getCurrentUser())?.email) || 'coraggioso';
-    await showNarrator(`${uname}, la tomba si è aperta.${firstIsHuman ? ' Tocca una carta della mano per iniziare.' : ' Mummy ha la priorità.'}`);
-    if (firstIsHuman) await notice('Partita pronta. Tocca una carta.', 'success');
+    await showNarrator(`Che le bestie divine ti assistano, ${uname}.`);
   } catch (e) {
     fail(e);
     if ($('deck-color-validation')) {
