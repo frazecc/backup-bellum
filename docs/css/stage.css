@@ -1533,73 +1533,143 @@ body.notice-open #stage .action-panel button {
   animation: none !important;
 }
 
-/* ---------- Login: mummia che stringe la porta ---------- */
+/* ---------- Login: telefono d’oro in mano alla mummia ---------- */
 .auth-screen {
   position: relative;
   overflow: hidden;
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: 0;
+  background: #120a06;
 }
-.mummy-login-frame {
-  position: absolute;
-  inset: 0;
+.auth-phone-scene {
+  position: relative;
+  /* Stesso rapporto dell’illustrazione 768×1376 */
+  width: min(100vw, calc(100dvh * 768 / 1376));
+  aspect-ratio: 768 / 1376;
+  max-height: 100dvh;
+}
+.auth-phone-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
   pointer-events: none;
-  z-index: 0;
+  user-select: none;
+}
+/* Area bianca dello schermo del telefono (percentuali sull’illustrazione) */
+.auth-phone-screen {
+  position: absolute;
+  left: 23.5%;
+  right: 23.5%;
+  top: 26.5%;
+  bottom: 40%;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 2.5% / 1.8%;
+  background: transparent;
+  padding: 2% 3%;
+  box-sizing: border-box;
 }
 .auth-screen .auth-card {
   position: relative;
   z-index: 1;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  max-width: none !important;
+  width: 100%;
+  color: #2a1808;
+  text-align: center;
 }
-.mummy-eyes {
-  position: absolute;
-  top: 5%;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 56px;
-  align-items: center;
-  z-index: 2;
+.auth-screen .auth-card .eyebrow {
+  margin: 0 0 0.15rem;
+  font-size: clamp(0.65rem, 2.4vw, 0.8rem);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6a4a18;
+  font-weight: 800;
 }
-.mummy-eye {
-  width: 42px;
-  height: 28px;
-  border-radius: 50%;
-  flex: none;
-  background: radial-gradient(circle at 50% 40%, var(--eye-iris, #ffb02e) 0 38%, #1a0a05 42% 100%);
-  box-shadow: 0 0 16px color-mix(in srgb, var(--eye-iris, #ffb02e) 75%, transparent), 0 0 36px color-mix(in srgb, var(--eye-iris, #ffb02e) 40%, transparent);
+.auth-screen .auth-card h1 {
+  margin: 0 0 0.25rem;
+  font-size: clamp(0.95rem, 4.2vw, 1.25rem);
+  line-height: 1.15;
+  color: #3a1c08;
+  font-family: 'Lilita One', Georgia, serif;
+  font-weight: 400;
 }
-.mummy-grin {
-  position: absolute;
-  top: 28%;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 2;
-  opacity: 0.95;
-  filter: drop-shadow(0 2px 4px #000a);
-  pointer-events: none;
-}
-.mummy-grin svg { display: block; width: min(52vw, 220px); height: auto; }
-.mummy-bandage {
-  position: absolute;
-  left: -10%;
-  width: 120%;
-  height: 42px;
-  background:
-    repeating-linear-gradient(
-      -18deg,
-      #e8dcc0 0 14px,
-      #c9b48a 14px 18px,
-      #f0e6c8 18px 28px
-    );
-  box-shadow: 0 4px 0 #1a0a0588;
-  opacity: 0.92;
-  transform: rotate(-6deg);
-}
-.mummy-bandage-top { top: 22%; }
-.mummy-bandage-mid { top: 48%; transform: rotate(5deg); }
-.mummy-bandage-bot { bottom: 12%; transform: rotate(-3deg); }
 .auth-screen .mummy-quote {
-  color: #c9a96a;
+  margin: 0 0 0.55rem;
+  color: #5a3a14;
   font-weight: 700;
-  line-height: 1.35;
+  font-size: clamp(0.7rem, 2.8vw, 0.85rem);
+  line-height: 1.25;
+}
+.auth-screen .form-stack {
+  gap: 0.45rem !important;
+}
+.auth-screen .form-stack label {
+  display: grid;
+  gap: 0.15rem;
+  text-align: left;
+  font-size: clamp(0.7rem, 2.6vw, 0.82rem);
+  font-weight: 700;
+  color: #3a1c08;
+}
+.auth-screen .form-stack input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 2.35rem;
+  padding: 0.35rem 0.55rem;
+  border: 2px solid #8a5a14;
+  border-radius: 10px;
+  background: #fffef8ee;
+  color: #1a0a05;
+  font-size: 16px; /* evita zoom iOS */
+}
+.auth-screen .form-stack input:focus {
+  outline: 2px solid #e8c565;
+  outline-offset: 1px;
+  border-color: #c9a043;
+}
+.auth-screen .primary-button,
+.auth-screen .secondary-button {
+  min-height: 2.5rem;
+  font-size: clamp(0.85rem, 3vw, 1rem);
+  border-radius: 12px;
+}
+.auth-screen .primary-button {
+  background: linear-gradient(180deg, #e8c565, #c98a20);
+  color: #2a1205;
+  border: 2px solid #8a5a14;
+  font-weight: 800;
+}
+.auth-screen .secondary-button {
+  background: #e8d9b0;
+  color: #3a1c08;
+  border: 2px solid #8a5a14;
+}
+.auth-screen .form-message {
+  margin: 0.35rem 0 0;
+  font-size: clamp(0.7rem, 2.5vw, 0.82rem);
+  color: #6a2010;
+  min-height: 1.1em;
+}
+.auth-screen .muted { color: #5a3a14; font-weight: 700; }
+
+@media (max-height: 700px) {
+  .auth-screen .auth-card h1 { font-size: 0.95rem; }
+  .auth-screen .mummy-quote { display: none; }
+  .auth-screen .form-stack input { min-height: 2.1rem; }
 }
 
 /* Riduci animazioni: spegne torcia, fiamma, prism, glow, transition carte */
