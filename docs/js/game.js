@@ -606,7 +606,32 @@ function humanizePublicText(a) {
   }
   return t;
 }
+
+/** Mostra il popup di fase a ogni cambio turno/fase/giocatore, anche senza eventi. */
+async function ensurePhaseBanner() {
+  if (!state || state.status !== 'running') return;
+  const actor = state.active_player_index;
+  const phase = state.phase === 'main' ? 'main' : state.phase === 'end' ? 'end' : 'upkeep';
+  const key = `${state.current_turn}|${actor}|${phase}`;
+  if (key === lastPhaseKey) return;
+  // lastPhaseKey lo aggiorna presentPublic quando mostra il banner
+  await presentPublic({
+    kind: 'phase',
+    phase,
+    actor,
+    turn: state.current_turn ?? 1,
+    max_mana: state.players?.[actor]?.max_mana ?? 0,
+    text: '',
+  }, presentationGeneration);
+}
+
 async function presentPublic(a, generation) {
+  if (a?.kind === 'phase') {
+    const ph = a.phase === 'main' ? 'main' : a.phase === 'end' ? 'end' : 'upkeep';
+    const key = `${a.turn ?? state?.current_turn ?? 1}|${a.actor ?? state?.active_player_index}|${ph}`;
+    if (key === lastPhaseKey) return; // già scandita
+    lastPhaseKey = key;
+  }
   const layer = presentationLayer(); layer.replaceChildren();
   const panel = document.createElement('div');
   Object.assign(panel.style,{width:'100%',maxHeight:'100%',overflowY:'auto',
@@ -696,6 +721,7 @@ function queuePresentation(onlyLast = false) {
           state = (await api(`/match/${encodeURIComponent(id)}/advance`,
             {method:'POST',body:{expectedAnnouncementId:a.id}})).state;
           await render(); await logs();
+          await ensurePhaseBanner().catch(fail);
         } catch(e) {
           fail(e);
           try { state = (await api(`/match/${encodeURIComponent(id)}`)).state; await render(); } catch(refreshError) { console.warn(refreshError); }
@@ -1090,6 +1116,7 @@ async function request(path, body, message) {
   } finally {
     busy = false;
     await render().catch(fail);
+    await ensurePhaseBanner().catch(fail);
     queuePresentation();
   }
 }
@@ -1393,6 +1420,7 @@ function showCoinFlip(firstIsHuman) {
 }
 async function newMatch(primaryColor, secondaryColor) {
   cardLoaded.clear();
+  lastPhaseKey = null;
   if (busy || obligatory()) return;
   busy = true; controls();
   if ($('deck-color-confirm')) $('deck-color-confirm').disabled = true;
@@ -1423,19 +1451,7 @@ async function newMatch(primaryColor, secondaryColor) {
     await notice(bless, 'success');
     await render();
     await logs();
-    // Popup di fase come nel resto della partita (primo turno / giocatore attivo).
-    const actor = state?.active_player_index ?? 1;
-    const phase = state?.phase === 'main' ? 'main'
-      : state?.phase === 'end' ? 'end'
-      : 'upkeep';
-    await presentPublic({
-      kind: 'phase',
-      phase,
-      actor,
-      turn: state?.current_turn ?? 1,
-      max_mana: state?.players?.[actor]?.max_mana ?? 1,
-      text: '',
-    }, presentationGeneration);
+    await ensurePhaseBanner();
   } catch (e) {
     fail(e);
     if ($('deck-color-validation')) {
