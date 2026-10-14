@@ -853,7 +853,7 @@ body:has(#stage.calm) .narrator-medallion.bob { animation: none !important; }
 
 /* ---------- Eventi, messaggi, istruzioni ---------- */
 #stage .info-zone { position: relative; flex: none; display: flex; flex-direction: column; gap: calc(2 * var(--p)); }
-#stage .selection-instructions { min-height: calc(16 * var(--p)); color: #f0c870; font-size: calc(13 * var(--p)); line-height: 1.2; text-align: center; }
+#stage .selection-instructions { display: none !important; } /* niente riga sotto la griglia: evita il «saltello» */
 #stage .game-message,
 #stage .game-message:empty {
   position: static !important; display: block; transform: none; width: auto; min-height: calc(16 * var(--p)); margin: 0; padding: 0;
@@ -1550,19 +1550,28 @@ body.notice-open #stage .action-panel button {
 }
 .mummy-eyes {
   position: absolute;
-  top: 8%;
+  top: 6%;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 48px;
+  gap: 10px;
+  align-items: center;
 }
 .mummy-eye {
-  width: 28px;
-  height: 18px;
+  width: 22px;
+  height: 14px;
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 40%, #ffb02e 0 35%, #3a1c0a 40% 100%);
-  box-shadow: 0 0 18px #ffb02ecc, 0 0 40px #ffb02e66;
+  flex: none;
+  background: radial-gradient(circle at 50% 40%, var(--eye-iris, #ffb02e) 0 38%, #1a0a05 42% 100%);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--eye-iris, #ffb02e) 70%, transparent), 0 0 28px color-mix(in srgb, var(--eye-iris, #ffb02e) 35%, transparent);
 }
+.mummy-eye.eye-chi { --eye-iris: #c9b88a; } /* Chiericanza — papiro / beige */
+.mummy-eye.eye-inf { --eye-iris: #5a8dc2; } /* Infamia — blu */
+.mummy-eye.eye-pes { --eye-iris: #8a72b8; } /* Pestilenza — viola */
+.mummy-eye.eye-bul { --eye-iris: #c4684f; } /* Bullismo — rosso */
+.mummy-eye.eye-gro { --eye-iris: #5aa87c; } /* Grossanza — verde */
+.mummy-eye.eye-clo { --eye-iris: #e0a22a; } /* Clownerie — giallo oro */
+.mummy-eye.eye-ind { --eye-iris: #8a96a3; } /* Indrazzico — grigio */
 .mummy-bandage {
   position: absolute;
   left: -10%;
