@@ -70,6 +70,7 @@ function setLoginLoading(isLoading) {
 function showLoginForm() {
   loginForm?.classList.remove('hidden');
   authKnown?.classList.add('hidden');
+  authScreen?.classList.remove('auth-known-mode');
 }
 
 function showKnownUser(user) {
@@ -77,6 +78,7 @@ function showKnownUser(user) {
   if (authKnownName) authKnownName.textContent = `Riconosco l’ombra di @${name}.`;
   loginForm?.classList.add('hidden');
   authKnown?.classList.remove('hidden');
+  authScreen?.classList.add('auth-known-mode');
 }
 
 /** Due occhi grandi: colori a caso tra le 7 fazioni, diversi dall’ultima coppia vista. */
