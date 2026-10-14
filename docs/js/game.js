@@ -505,11 +505,16 @@ async function renderDeathChoice() {
     }));
   } else if (selected) {
     deathDraft = {choiceId:null,instanceIds:[]};
+    // ETB già confermato con «Ho capito»: non riaprire il dialog, resta la scelta sulla griglia.
+    if (flow?.kind === 'etb-target' && flow.choiceId === selected.choice_id) {
+      el.classList.add('hidden');
+      return;
+    }
     const d = await card(selected.task.card_id);
     if (deathTarget()?.choice_id !== selected.choice_id) return;
     const isEtb = selected.task?.source === 'on_play';
     if (isEtb) {
-      // ETB dopo ingresso: popup con anteprima + testo, poi scelta sulla griglia (creatura già visibile).
+      // ETB dopo ingresso: popup con anteprima + testo → «Ho capito» → griglia.
       title.textContent = 'Effetto in entrata';
       const fxText = plainText(d) || 'Nessun testo effetto.';
       text.innerHTML = `Hai evocato <strong>${escape(d.name)}</strong>.<br>Si attiva il suo effetto in entrata:<br><em>${escape(fxText)}</em>`;
@@ -517,7 +522,7 @@ async function renderDeathChoice() {
       preview.style.cssText = 'margin:.6rem auto;max-width:200px';
       preview.innerHTML = cardHTML(d, true);
       options.append(preview);
-      actions.append(button('Scegli il bersaglio sulla griglia', async () => {
+      actions.append(button('Ho capito', async () => {
         if (busy || deathTarget()?.choice_id !== selected.choice_id) return;
         flow = {
           kind: 'etb-target',
@@ -526,7 +531,7 @@ async function renderDeathChoice() {
           sourceId: selected.task?.source_instance_id,
         };
         el.classList.add('hidden');
-        await render();
+        await drawBoard();
         notice('ora scegli il bersaglio', 'success');
       }));
     } else {
