@@ -374,7 +374,12 @@ function queueOnPlay(s: GameState, p: PlayerIndex, d: CardData, sourceId: string
     kind: 'declare_event', event: {
       kind: 'monster_etb', actor: p, source_instance_id: sourceId,
       card_id: d.id, effect_index,
-      target_instance_id: targetId ?? (fx.type === 'heal' && fx.target === 'any_creature' && units(s, p).length === 1 ? sourceId : null),
+      // Buff/cura senza bersaglio scelto → default sulla creatura appena evocata (effetto dopo l’ingresso).
+      target_instance_id: targetId ?? (
+        (fx.type === 'heal' || fx.type === 'buff') && (fx.target === 'any_creature' || fx.target === 'any_target')
+          ? sourceId
+          : null
+      ),
     },
   } as PendingWork : {
     kind: 'resolve_effect', owner: p, card_id: d.id, source_instance_id: sourceId,
