@@ -75,7 +75,9 @@ function showLoginForm() {
 
 function showKnownUser(user) {
   const name = usernameFromEmail(user?.email) || 'viaggiatore';
-  if (authKnownName) authKnownName.textContent = `Riconosco l’ombra di @${name}.`;
+  if (authKnownName) {
+    authKnownName.innerHTML = `Riconosco quest’ombra…<br><strong>@${name}</strong>`;
+  }
   loginForm?.classList.add('hidden');
   authKnown?.classList.remove('hidden');
   authScreen?.classList.add('auth-known-mode');
