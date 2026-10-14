@@ -261,7 +261,9 @@ async function applyEffect(c: Context, task: ResolveEffectWork) {
   checkWinner(c, 'PV esauriti dopo un effetto.');
 }
 async function resolveEffectOrChoose(c: Context, task: ResolveEffectWork) {
-  const interactive = task.source === 'on_death' || task.source === 'terraforma_trigger' || task.source === 'aura_attack';
+  // on_play = ETB dopo l’ingresso: la creatura è già in campo e può essere scelta (anche se stessa).
+  const interactive = task.source === 'on_death' || task.source === 'terraforma_trigger'
+    || task.source === 'aura_attack' || task.source === 'on_play';
   if (interactive && task.target_instance_id === null) {
     const d = await getCardData(task.card_id);
     const fx = effects(task.source === 'on_death' ? d.effect_on_death_json : d.effect_json)[task.effect_index];
@@ -274,13 +276,17 @@ async function resolveEffectOrChoose(c: Context, task: ResolveEffectWork) {
       }
       if (choices.length) {
         let picked: string | undefined;
-        if (fx.target === 'any_target') picked = aiDamageTarget(c.s, Number(fx.amount ?? 1)) ?? undefined;
+        // ETB IA: buff/cura preferiscono la fonte appena evocata se eleggibile.
+        if (task.source === 'on_play' && (fx.type === 'buff' || fx.type === 'heal')
+          && task.source_instance_id && choices.includes(task.source_instance_id)) {
+          picked = task.source_instance_id;
+        } else if (fx.target === 'any_target') picked = aiDamageTarget(c.s, Number(fx.amount ?? 1)) ?? undefined;
         else {
           const options = eligible(c.s, task.owner, fx);
           const preferred = fx.type === 'heal' || fx.type === 'buff'
             ? options.filter(x => x.cell.owner_index === task.owner).sort((a, b) => (b.cell.max_hp - b.cell.hp) - (a.cell.max_hp - a.cell.hp))
             : options.filter(x => x.cell.owner_index !== task.owner).sort((a, b) => a.cell.hp - b.cell.hp);
-          picked = (preferred[0] ?? options[0]).cell.instance_id;
+          picked = (preferred[0] ?? options[0])?.cell.instance_id;
         }
         task = { ...task, target_instance_id: picked ?? choices[0] };
       }
@@ -374,12 +380,8 @@ function queueOnPlay(s: GameState, p: PlayerIndex, d: CardData, sourceId: string
     kind: 'declare_event', event: {
       kind: 'monster_etb', actor: p, source_instance_id: sourceId,
       card_id: d.id, effect_index,
-      // Buff/cura senza bersaglio scelto → default sulla creatura appena evocata (effetto dopo l’ingresso).
-      target_instance_id: targetId ?? (
-        (fx.type === 'heal' || fx.type === 'buff') && (fx.target === 'any_creature' || fx.target === 'any_target')
-          ? sourceId
-          : null
-      ),
+      // Senza bersaglio: resta null → dopo l’ingresso si apre la scelta (umano) o l’IA auto-sceglie.
+      target_instance_id: targetId ?? null,
     },
   } as PendingWork : {
     kind: 'resolve_effect', owner: p, card_id: d.id, source_instance_id: sourceId,
@@ -523,11 +525,13 @@ async function applyEvent(c: Context, e: PendingEvent) {
     if (!findCreature(s, e.source_instance_id)) { log(c, p, 'etb_source_gone', 'ETB saltato: creatura non più sul campo.'); return; }
     const d = await getCardData(e.card_id), fx = effects(d.effect_json)[e.effect_index];
     if (!fx) return;
-    if (targeted(fx) && !validTarget(s, p, fx, e.target_instance_id)) {
-      log(c, p, 'etb_no_target', `${d.name}: ETB senza bersaglio valido.`); return;
-    }
-    prepend(s, { kind: 'resolve_effect', owner: p, card_id: e.card_id, source_instance_id: e.source_instance_id,
-      source: 'on_play', effect_index: e.effect_index, target_instance_id: e.target_instance_id, require_source_on_board: true });
+    // Sempre via resolveEffectOrChoose: se manca il bersaglio e l’effetto è mirato, l’umano sceglie (creatura già in campo).
+    prepend(s, {
+      kind: 'resolve_effect', owner: p, card_id: e.card_id, source_instance_id: e.source_instance_id,
+      source: 'on_play', effect_index: e.effect_index,
+      target_instance_id: e.target_instance_id ?? null,
+      require_source_on_board: true,
+    });
   }
 }
 async function validTraps(c: Context, e: PendingEvent) {
