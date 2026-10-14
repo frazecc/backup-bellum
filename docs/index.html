@@ -21,35 +21,48 @@
     <noscript>Bellum Penumbrum richiede JavaScript per funzionare.</noscript>
     <main class="app-shell">
        <section id="auth-screen" class="screen auth-screen" aria-labelledby="auth-title">
-        <div class="auth-phone-scene">
-          <img class="auth-phone-art"
-            src="img/login-mummy-phone.png"
-            alt="Mani mummificate tengono un telefono d’oro nella tomba"
-            width="768" height="1376"
-            decoding="async" />
-          <div class="auth-phone-screen">
-            <div class="auth-card mummy-gate">
-              <p class="eyebrow">Bellum Penumbrum</p>
-              <h1 id="auth-title">Dimostrami chi sei</h1>
-              <p class="mummy-quote">Scrivi il nome. Entra nella tomba.</p>
+        <!-- Fondale: illustrazione tomba + mani (opzione A) -->
+        <div class="auth-bg" aria-hidden="true">
+          <img src="img/login-mummy-phone.png" alt="" width="768" height="1376" decoding="async" />
+        </div>
+        <!-- Telefono HTML: cornice + schermo = form (niente overflow) -->
+        <div class="auth-phone">
+          <div class="auth-phone-bezel">
+            <div class="auth-phone-top">
+              <span class="auth-phone-gem gem-blue"></span>
+              <span class="auth-phone-title">PENUMBRUM</span>
+              <span class="auth-phone-scarab" aria-hidden="true">🪲</span>
+              <span class="auth-phone-gem gem-red"></span>
+            </div>
+            <div class="auth-phone-screen">
+              <div class="auth-card mummy-gate">
+                <p class="eyebrow">Bellum Penumbrum</p>
+                <h1 id="auth-title">Dimostrami chi sei</h1>
+                <p class="mummy-quote">Scrivi il nome. Entra nella tomba.</p>
 
-              <div id="auth-known" class="form-stack hidden">
-                <p id="auth-known-name" class="muted"></p>
-                <button id="auth-sono-io" class="primary-button" type="button">Sono io</button>
-                <button id="auth-altro-utente" class="secondary-button" type="button">Non sono io</button>
+                <div id="auth-known" class="form-stack hidden">
+                  <p id="auth-known-name" class="muted"></p>
+                  <button id="auth-sono-io" class="primary-button" type="button">Sono io</button>
+                  <button id="auth-altro-utente" class="secondary-button" type="button">Non sono io</button>
+                </div>
+
+                <form id="login-form" class="form-stack" novalidate>
+                  <label><span>Nome utente</span><input id="login-username" name="username" type="text" autocomplete="username" minlength="2" maxlength="32" required placeholder="francesco" /></label>
+                  <label><span>Password</span><input id="login-password" name="password" type="password" autocomplete="current-password" minlength="6" required placeholder="••••••••" /></label>
+                  <button id="login-button" class="primary-button" type="submit">Accedi</button>
+                </form>
+
+                <p id="auth-message" class="form-message" role="status" aria-live="polite"></p>
               </div>
-
-              <form id="login-form" class="form-stack" novalidate>
-                <label><span>Nome utente</span><input id="login-username" name="username" type="text" autocomplete="username" minlength="2" maxlength="32" required placeholder="francesco" /></label>
-                <label><span>Password</span><input id="login-password" name="password" type="password" autocomplete="current-password" minlength="6" required placeholder="••••••••" /></label>
-                <button id="login-button" class="primary-button" type="submit">Accedi</button>
-              </form>
-
-              <p id="auth-message" class="form-message" role="status" aria-live="polite"></p>
+            </div>
+            <div class="auth-phone-bottom">
+              <span class="auth-phone-gem gem-teal"></span>
+              <span class="auth-phone-gem gem-amber"></span>
             </div>
           </div>
         </div>
-      </section>     <section id="game-screen" class="screen game-screen hidden" aria-live="polite">
+      </section>
+<section id="game-screen" class="screen game-screen hidden" aria-live="polite">
         <div class="stage-frame">
           <!-- Colonna sinistra PC: narratore Mummy (visibile da ~1100px). -->
           <aside class="stage-side stage-side-left" aria-label="Il narratore">
