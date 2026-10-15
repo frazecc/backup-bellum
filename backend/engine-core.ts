@@ -7,7 +7,7 @@ import type {
   AiProgress, AttackTarget, BoardCell, CardData, CardInstance, CreatureCell, DeathOrderChoice,
   DeathTriggerSource, DeckFaction, GameState, MatchLogEntry, PendingEvent,
   PendingWork, PlayerIndex, PlayCardOptions, Position, ReactionTriggerEvent,
-  ResolveEffectWork, TargetChoice, TrapChoice, PublicAnnouncement,
+  ResolveEffectWork, TargetChoice, TrapChoice, PublicAnnouncement, StoryModifiers,
 } from './types.js';
 import {
   adjacent, allowed, around, at, blank, cells, effects, eligible, enemyNeighbours, enemyTerraformas,
@@ -21,6 +21,35 @@ export { getCardData, logMatchAction, saveGameState } from './engine-storage.js'
 type Context = { id: string; s: GameState; logs: MatchLogEntry[]; deaths: DeathTriggerSource[] };
 function log(c: Context, owner: number, action: string, description: string, extra: Partial<MatchLogEntry> = {}) {
   c.logs.push({ turn: c.s.current_turn, phase: c.s.phase, player_index: owner, action_type: action, description, ...extra });
+}
+
+/** Opzioni Modalità Storia alla creazione partita. */
+export type CreateMatchOptions = {
+  aiStartingLife?: number;
+  humanMedallion?: DeckFaction | null;
+};
+
+function humanMedallion(s: GameState): DeckFaction | null {
+  return s.story_modifiers?.human_medallion ?? null;
+}
+
+/** Costo mana effettivo (Medaglione CLO: creature del giocatore costano 1 in meno, min 1). */
+function effectiveManaCost(d: CardData, s: GameState, p: PlayerIndex): number {
+  let cost = Number(d.mana_cost ?? 0);
+  if (p === 1 && humanMedallion(s) === 'CLO' && d.card_type === 'monster') {
+    cost = Math.max(1, cost - 1);
+  }
+  return cost;
+}
+
+/** Bonus attacco/vita dalle creature del giocatore (Medaglioni BUL / CHI). */
+function medallionCreatureBonuses(s: GameState, p: PlayerIndex): { attack: number; hp: number } {
+  if (p !== 1) return { attack: 0, hp: 0 };
+  const m = humanMedallion(s);
+  return {
+    attack: m === 'BUL' ? 1 : 0,
+    hp: m === 'CHI' ? 1 : 0,
+  };
 }
 function checkWinner(c: Context, reason: string) {
   if (c.s.status !== 'running') return;
@@ -476,8 +505,31 @@ async function applyEvent(c: Context, e: PendingEvent) {
       });
     }
 
-    const count = draw(c, p, 1);
+    let count = draw(c, p, 1);
     log(c, p, 'upkeep', `${label(p)} ottiene ${player.current_mana}/${player.max_mana} mana e pesca ${count} carta/e.`);
+
+    // Medaglione del giocatore (solo Modalità Storia, solo nel turno del giocatore umano)
+    if (p === 1) {
+      const med = humanMedallion(s);
+      if (med === 'INF') {
+        const extra = draw(c, 1, 1);
+        if (extra > 0) log(c, 1, 'medallion', `Medaglione dell’Infamia: peschi ${extra} carta in più.`, { amount: extra });
+      }
+      if (med === 'GRO') {
+        player.life += 1;
+        log(c, 1, 'medallion', 'Medaglione della Grossanza: guadagni 1 vita.', { amount: 1 });
+      }
+      if (med === 'PES') {
+        const foe = s.players[0];
+        if (foe.hand.length > 0) {
+          const i = Math.floor(Math.random() * foe.hand.length);
+          const discarded = foe.hand.splice(i, 1)[0];
+          foe.graveyard.push(discarded);
+          log(c, 1, 'medallion', 'Medaglione della Pestilenza: l’avversario scarta 1 carta.', { amount: 1 });
+        }
+      }
+    }
+
     if (s.status !== 'running') return;
     prepend(s, { kind: 'declare_event', event: { kind: 'upkeep_end', actor: p } });
     await queueTerraformaTriggers(c, p, 'own_turn_start');
@@ -497,9 +549,17 @@ async function applyEvent(c: Context, e: PendingEvent) {
       s.players[p].graveyard = s.players[p].graveyard.filter(x => x.instance_id !== paid.instance_id);
       if (d.card_type === 'terraforma') put(s, e.options.position, { ...paid, kind: 'terraforma', owner_index: p,
         ...(Number.isInteger(d.hp) && Number(d.hp) > 0 ? { hp: Number(d.hp), max_hp: Number(d.hp) } : {}) });
-      else put(s, e.options.position, { ...paid, kind: 'creature', owner_index: p,
-        attack: Number(d.attack ?? 0), hp: Number(d.hp ?? 1), max_hp: Number(d.hp ?? 1),
-        tired: !keyword(d, 'iperattivo'), auras: [] });
+      else {
+        const bonus = medallionCreatureBonuses(s, p);
+        const atk = Number(d.attack ?? 0) + bonus.attack;
+        const hp = Number(d.hp ?? 1) + bonus.hp;
+        put(s, e.options.position, { ...paid, kind: 'creature', owner_index: p,
+          attack: atk, hp, max_hp: hp,
+          tired: !keyword(d, 'iperattivo'), auras: [] });
+        if (bonus.attack || bonus.hp) {
+          log(c, p, 'medallion', `Medaglione: ${d.name} entra con ${bonus.attack ? '+' + bonus.attack + ' attacco' : ''}${bonus.attack && bonus.hp ? ' e ' : ''}${bonus.hp ? '+' + bonus.hp + ' vita' : ''}.`);
+        }
+      }
       await reconcilePassives(c);
     } else if (d.card_type === 'aura') {
       const host = e.options.targetInstanceId ? findCreature(s, e.options.targetInstanceId) : null;
@@ -952,7 +1012,12 @@ async function advanceAi(c: Context) {
 
 // Id delle fazioni nella tabella factions, per le statistiche in matches (P4).
 const FACTION_IDS: Record<DeckFaction, number> = { CHI: 1, INF: 2, PES: 3, BUL: 4, GRO: 5, CLO: 6 };
-export async function createNewMatch(userId: string, primary: DeckFaction, secondary: DeckFaction): Promise<{ matchId: string; state: GameState }> {
+export async function createNewMatch(
+  userId: string,
+  primary: DeckFaction,
+  secondary: DeckFaction,
+  options: CreateMatchOptions = {},
+): Promise<{ matchId: string; state: GameState }> {
   const [pool, catalogue] = await Promise.all([deckPool(), offer()]);
   const available = availableFactions(pool), bosses = bossFactions(pool);
   const humanColors = chosenColors(primary, secondary, available, bosses);
@@ -981,6 +1046,19 @@ export async function createNewMatch(userId: string, primary: DeckFaction, secon
   }).select('id').single();
   if (error || !data) throw new Error(`Creazione partita: ${error?.message ?? 'nessun ID'}`);
   const matchId = String(data.id), ai = player(0, null, aiCards), human = player(1, userId, humanCards);
+
+  // Modalità Storia: vita boss e Medaglione
+  const aiLife = Number.isFinite(options.aiStartingLife) && options.aiStartingLife! > 0
+    ? Math.min(200, Math.max(1, Math.floor(options.aiStartingLife!)))
+    : 20;
+  ai.life = aiLife;
+  const medallion = options.humanMedallion && ['CHI','INF','PES','BUL','GRO','CLO'].includes(options.humanMedallion)
+    ? options.humanMedallion
+    : null;
+  const storyModifiers: StoryModifiers | null = (options.aiStartingLife != null || medallion)
+    ? { ai_starting_life: aiLife, human_medallion: medallion }
+    : null;
+
   // Lancio di moneta: chi inizia è casuale. Il primo ha 3 carte in mano, il secondo 4.
   const firstPlayer: PlayerIndex = Math.random() < 0.5 ? 1 : 0;
   const firstHand = 3, secondHand = 4;
@@ -1001,6 +1079,7 @@ export async function createNewMatch(userId: string, primary: DeckFaction, secon
     winner_index: null, shared_mostrissimi: catalogue.shared,
     remaining_mostrissimi: catalogue.remaining, used_mostrissimi: [],
     work_queue: [], last_mostrissimo_turn: {}, mostrissimo_result: null,
+    story_modifiers: storyModifiers,
   };
   // Se inizia l’IA: fase principale già attiva con 1 mana (come l’umano quando inizia lui).
   if (firstPlayer === 0) {
@@ -1037,7 +1116,8 @@ export async function playCard(id: string, p: PlayerIndex, cardInstanceId: strin
     if (!inst) throw new Error('Carta non presente nella mano');
     const d = await getCardData(inst.card_id);
     if (d.card_type === 'mostrissimo' || d.card_type === 'instant') throw new Error('Questa carta non si gioca dalla mano nella fase principale');
-    if (owner.current_mana < d.mana_cost) throw new Error('Mana insufficiente');
+    const manaCost = effectiveManaCost(d, s, p);
+    if (owner.current_mana < manaCost) throw new Error('Mana insufficiente');
     if ((d.card_type === 'monster' || d.card_type === 'terraforma') && (!options.position || !valid(options.position) || options.position.row !== home(p) || at(s, options.position))) throw new Error('Scegli una cella libera della tua riga');
     if (d.card_type === 'aura' && (!options.targetInstanceId || !findCreature(s, options.targetInstanceId))) throw new Error('Seleziona una creatura alleata o nemica per l’Aura');
     if (!playableEffects(d)) throw new Error('Effetto carta non ancora supportato');
@@ -1056,9 +1136,9 @@ export async function playCard(id: string, p: PlayerIndex, cardInstanceId: strin
       if (!options.targetInstanceId && d.card_type !== 'monster') throw new Error('Questa carta richiede un bersaglio');
     }
     owner.hand = owner.hand.filter(x => x.instance_id !== inst.instance_id);
-    owner.graveyard.push(inst); owner.current_mana -= d.mana_cost;
-    log(c, p, 'card_declared', `${label(p)} dichiara ${d.name} e paga ${d.mana_cost} mana.`, { card_id: d.id, instance_id: inst.instance_id });
-    prepend(s, { kind: 'declare_event', event: { kind: 'hand_card', actor: p, instance_id: inst.instance_id, card_id: d.id, options, paid_mana: d.mana_cost } });
+    owner.graveyard.push(inst); owner.current_mana -= manaCost;
+    log(c, p, 'card_declared', `${label(p)} dichiara ${d.name} e paga ${manaCost} mana.`, { card_id: d.id, instance_id: inst.instance_id });
+    prepend(s, { kind: 'declare_event', event: { kind: 'hand_card', actor: p, instance_id: inst.instance_id, card_id: d.id, options, paid_mana: manaCost } });
   });
 }
 export async function moveCreature(id: string, p: PlayerIndex, from: Position, to: Position): Promise<GameState> {

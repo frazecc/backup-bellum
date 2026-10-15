@@ -9,6 +9,14 @@ export type DeckColors = {
   secondary: DeckFaction;
   tertiary: DeckFaction;
 };
+
+/** Modificatori Modalità Storia (vita boss + Medaglione del giocatore). */
+export type StoryModifiers = {
+  /** Vita iniziale dell’IA/boss (20 / 25 / 30; Indrazzico ridotto a 20). */
+  ai_starting_life: number;
+  /** Cheat code scelto dal giocatore (colore del Medaglione), o null. */
+  human_medallion: DeckFaction | null;
+};
 export type EffectType =
   | 'draw' | 'damage' | 'damage_creature' | 'heal' | 'discard'
   | 'return_hand' | 'destroy' | 'buff' | 'movement_cost'
@@ -285,6 +293,8 @@ export type GameState = {
   public_announcements?: PublicAnnouncement[];
   last_mostrissimo_turn: Partial<Record<PlayerIndex, number>>;
   mostrissimo_result: MostrissimoResult | null;
+  /** Presente solo nelle partite di Modalità Storia. */
+  story_modifiers?: StoryModifiers | null;
 };
 
 export type MatchLogEntry = {

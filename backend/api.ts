@@ -162,7 +162,25 @@ apiRouter.post('/match/create', async (req: Request, res: Response) => {
     const primary = deckFactionValue(body.primaryColor, 'Colore principale');
     const secondary = deckFactionValue(body.secondaryColor, 'Colore secondario');
     if (primary === secondary) throw new Error('Scegli due colori diversi');
-    const { matchId, state } = await createNewMatch(userId, primary, secondary);
+
+    // Opzioni Modalità Storia (opzionali): vita boss + Medaglione del giocatore
+    let createOpts: { aiStartingLife?: number; humanMedallion?: DeckFaction | null } = {};
+    const story = body.story;
+    if (story && typeof story === 'object' && !Array.isArray(story)) {
+      const st = story as Record<string, unknown>;
+      if (st.aiStartingLife != null) {
+        const life = Number(st.aiStartingLife);
+        if (!Number.isFinite(life) || life < 1 || life > 200) throw new Error('Vita boss non valida');
+        createOpts.aiStartingLife = Math.floor(life);
+      }
+      if (st.humanMedallion != null && st.humanMedallion !== '') {
+        createOpts.humanMedallion = deckFactionValue(st.humanMedallion, 'Medaglione');
+      } else if (st.humanMedallion === null) {
+        createOpts.humanMedallion = null;
+      }
+    }
+
+    const { matchId, state } = await createNewMatch(userId, primary, secondary, createOpts);
     res.status(201).json({ match_id: matchId, state });
   } catch (error) { respondError(res, error); }
 });
