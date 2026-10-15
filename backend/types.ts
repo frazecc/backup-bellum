@@ -21,10 +21,15 @@ export type EffectTarget =
 export type ReactionTriggerEvent =
   | 'opponent_upkeep_start'
   | 'opponent_upkeep_end'
-  | 'opponent_hand_card'
+  | 'card_played_from_hand'          // NEW – sostituisce opponent_hand_card
   | 'mostrissimo_before_entry'
+  | 'card_enters_field'              // NEW
+  | 'creature_enters_field'          // NEW
+  | 'own_creature_enters_field'      // NEW
+  | 'opponent_creature_enters_field' // NEW
+  // DEPRECATED – mantenuti solo per retrocompatibilità durante la migrazione
+  | 'opponent_hand_card'
   | 'monster_etb';
-export type ReactionTrigger = { event: ReactionTriggerEvent };
 
 export type EffectDefinition = {
   type: EffectType;
