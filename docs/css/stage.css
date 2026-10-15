@@ -1967,18 +1967,18 @@ body.notice-open #stage .action-panel button {
   filter: grayscale(0.4);
 }
 
-/* Immagine piramide (es. piramide1.png) */
+/* Immagine piramide (piramide1/2/3.png – formato largo 1408×768) */
 .home-pyramid .pyramid-img {
   display: block;
-  width: clamp(140px, 28vw, 240px);
+  width: clamp(160px, 30vw, 280px);
   height: auto;
-  max-height: 160px;
+  max-height: 180px;
   object-fit: contain;
-  border-radius: 8px;
-  filter: drop-shadow(0 6px 14px #0009);
+  border-radius: 10px;
+  filter: drop-shadow(0 6px 16px #000a);
 }
 
-/* SVG di fallback */
+/* SVG di fallback (se manca un’immagine) */
 .home-pyramid .pyramid-svg {
   display: block;
   width: clamp(100px, 22vw, 150px);
@@ -1987,7 +1987,7 @@ body.notice-open #stage .action-panel button {
 }
 
 .home-pyramid .pyramid-label {
-  max-width: 10rem;
+  max-width: 11rem;
   line-height: 1.25;
 }
 
@@ -1996,24 +1996,24 @@ body.notice-open #stage .action-panel button {
   .home-pyramids {
     flex-direction: column;
     align-items: center;
-    gap: 1.3rem;
+    gap: 1.2rem;
   }
   .home-pyramid .pyramid-img {
-    width: min(260px, 78vw);
-    max-height: 150px;
+    width: min(300px, 82vw);
+    max-height: 170px;
   }
   .home-pyramid .pyramid-svg {
     width: 130px;
   }
 }
 
-/* Schermi molto larghi (PC con colonne laterali): tieni le piramidi in una fascia centrale */
+/* Schermi larghi (PC): piramidi in fascia centrale, un po’ più grandi */
 @media (min-width: 1100px) {
   .home-content {
-    max-width: 720px;
+    max-width: 900px;
   }
   .home-pyramid .pyramid-img {
-    width: 220px;
-    max-height: 140px;
+    width: 260px;
+    max-height: 160px;
   }
 }
