@@ -1280,7 +1280,20 @@ async function boardClick(pos) {
     if (flow.step === 'cell') {
       if (c || pos.row !== 2) return notice('Scegli una cella libera della tua riga.','error');
       flow.position = pos;
-      // Mostro: entra in campo subito; l’ETB mirato apre la scelta bersaglio dopo (creatura già visibile).
+      // Mostri con danno/rimozione mirati: il server ESIGE il bersaglio già in play-card.
+      // (Buff/cura possono essere scelti dopo l’ingresso; maledizioni usano già lo step target.)
+      const needsTargetNow = creature(d) && effects(d).some(e =>
+        !e?.trigger
+        && (e?.target === 'any_creature' || e?.target === 'any_target' || e?.type === 'return_hand')
+        && e.type !== 'heal'
+        && e.type !== 'buff'
+      );
+      if (needsTargetNow && hasTargets(d)) {
+        flow.step = 'target';
+        await render();
+        notice('Scegli il bersaglio dell’effetto.','success');
+        return;
+      }
       return request('play-card',{cardInstanceId:flow.instanceId,options:{position:pos}},'Carta dichiarata.');
     }
     if (flow.step === 'target') {
