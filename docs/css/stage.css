@@ -2017,3 +2017,56 @@ body.notice-open #stage .action-panel button {
     max-height: 160px;
   }
 }
+
+/* Trofeo Abitante della Piramide nella Home */
+.home-trophy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 1.2rem;
+  padding: 0.6rem 1rem;
+  border: 2px solid #c9a043;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #2a2218, #17110b);
+  box-shadow: 0 0 20px #e8c56544;
+}
+.home-trophy.hidden {
+  display: none !important;
+}
+.home-trophy img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 8px #e8c56566);
+}
+.home-trophy span {
+  font-family: 'Lilita One', Georgia, serif;
+  font-size: 0.95rem;
+  color: #e8c565;
+  letter-spacing: 0.02em;
+}
+
+/* Indicatore Medaglione attivo durante la partita Storia */
+.story-medallion-banner {
+  position: fixed;
+  top: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  max-width: min(92vw, 420px);
+  padding: 0.35rem 0.85rem;
+  border: 2px solid #c9a043;
+  border-radius: 999px;
+  background: #1a140ecc;
+  color: #e8c565;
+  font-family: 'Nunito', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 0.82rem;
+  text-align: center;
+  box-shadow: 0 4px 16px #0008;
+  pointer-events: none;
+}
+.story-medallion-banner.hidden {
+  display: none !important;
+}
