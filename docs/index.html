@@ -91,12 +91,17 @@
                   <div class="hud-menu">
                     <button id="menu-button" class="menu-button" type="button" aria-label="Menu" aria-haspopup="true" aria-expanded="false" aria-controls="menu-panel">☰</button>
                     <div id="menu-panel" class="menu-panel hidden" role="menu" aria-label="Menu di gioco">
-                      <button id="new-match-button" class="primary-button" type="button">Nuova partita</button>
-                      <button id="refresh-button" class="secondary-button" type="button" disabled>Aggiorna</button>
                       <div class="menu-line"><span>Tuo mazzo</span><p id="player-deck-colors" class="menu-colors" aria-label="Colori del tuo mazzo"></p></div>
                       <div class="menu-line"><span>Mazzo IA</span><p id="opponent-deck-colors" class="menu-colors" aria-label="Colori del mazzo IA"></p></div>
                       <div class="menu-line menu-user"><span id="signed-in-user" class="signed-in-user"></span><button id="logout-button" class="secondary-button" type="button">Esci</button></div>
                       <div class="menu-sep" aria-hidden="true"></div>
+                      <button id="auto-notice-toggle" role="switch" aria-checked="false" class="reduce-toggle" type="button">
+                        <span class="reduce-text">
+                          <span class="reduce-title">Auto «Ho capito»</span>
+                          <span class="reduce-desc">Conferma da sola i popup brevi</span>
+                        </span>
+                        <span class="reduce-switch" aria-hidden="true"><span class="reduce-knob"></span></span>
+                      </button>
                       <button id="reduce-motion-toggle" role="switch" aria-checked="false" class="reduce-toggle" type="button">
                         <span class="reduce-text">
                           <span class="reduce-title">Riduci animazioni</span>
