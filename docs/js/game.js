@@ -2089,12 +2089,17 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
     const humanColors = state?.deck_colors?.[1];
     const aiColors = state?.deck_colors?.[0];
 
-    // --- Modalità Storia: inizializza o continua i progressi ---
-    if (currentMode === 'story') {
+    // --- Modalità Storia ---
+    // Ordine corretto:
+    //   Nuova Storia → Maledizione → Dialogo boss → Moneta → Partita
+    //   Continua     → Dialogo boss → Moneta → Partita
+    const isStory = currentMode === 'story';
+    const isNewStoryRun = isStory && (options.isNewStory || !getStoryProgress());
+
+    if (isStory) {
       let progress = getStoryProgress();
 
-      if (options.isNewStory || !progress) {
-        // Nuova Storia
+      if (isNewStoryRun || !progress) {
         progress = {
           primary: humanColors?.primary || primaryColor,
           secondary: humanColors?.secondary || secondaryColor,
@@ -2108,7 +2113,12 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
         saveStoryProgress(progress);
       }
 
-      // Scegli il prossimo boss e prepara dialoghi (Medaglioni / cheat code)
+      // 1) Maledizione solo se è una NUOVA Storia
+      if (isNewStoryRun) {
+        await showCurseDialog(humanColors, aiColors);
+      }
+
+      // 2) Scegli e presenta il boss
       const nextBoss = pickNextBoss(progress);
       progress.currentBoss = nextBoss;
       saveStoryProgress(progress);
@@ -2152,11 +2162,15 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
           await showMummyDialog(`Il tuo ${med.medaglioneName} è attivo:\n«${med.powerDesc}»`);
         }
       }
+
+      // 3) Moneta del destino
+      await showCoinFlip(state?.active_player_index === 1);
+    } else {
+      // Modalità normale / Endless: maledizione + moneta come sempre
+      await showCurseDialog(humanColors, aiColors);
+      await showCoinFlip(state?.active_player_index === 1);
     }
 
-    // Griglia ancora nascosta: prima maledizione → moneta → benedizione.
-    await showCurseDialog(humanColors, aiColors);
-    await showCoinFlip(state?.active_player_index === 1);
     const uname = usernameFromEmail((await getCurrentUser())?.email) || 'coraggioso';
     const bless = `Che le bestie divine ti assistano, ${uname}.`;
     const desk = $('narrator-desk-speech');
