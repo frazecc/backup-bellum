@@ -532,8 +532,15 @@ async function renderDeathChoice() {
           sourceId: selected.task?.source_instance_id,
         };
         el.classList.add('hidden');
+        // Chiudi eventuali notice bloccanti prima di abilitare i click sulla griglia
+        try { dismissNotice(); } catch (_) { /* ignore */ }
         await drawBoard();
-        notice('ora scegli il bersaglio', 'success');
+        // Messaggio non bloccante (non usare notice() qui: bloccherebbe i click sul bersaglio)
+        const gm = $('game-message');
+        if (gm) {
+          gm.textContent = 'Tocca il bersaglio evidenziato.';
+          gm.className = 'game-message success';
+        }
       }));
     } else {
       title.textContent = 'Bersaglio dell’effetto';
@@ -1121,7 +1128,8 @@ async function request(path, body, message) {
         // ---------- VITTORIA IN STORIA ----------
         await handleStoryVictory();
       } else if (!won) {
-        // Sconfitta: anima persa → torna alla mummia
+        // Sconfitta: anima persa → torna alla mummia (sempre, Storia o no)
+        const wasStory = currentMode === 'story';
         localStorage.removeItem('bellum:last-match');
         matchId = null;
         state = null;
@@ -1137,14 +1145,18 @@ async function request(path, body, message) {
         hideHome();
         reactionDialog().classList.add('hidden');
         choiceDialog().classList.add('hidden');
+        // Nascondi subito anche il banner Medaglione
+        const medBanner = $('story-medallion-banner');
+        if (medBanner) medBanner.classList.add('hidden');
 
-        // Se eravamo in Modalità Storia → azzera i progressi (morte del personaggio)
-        if (currentMode === 'story') {
+        if (wasStory) {
           clearStoryProgress();
-          notice('Sei caduto nella piramide. Le tue spoglie sono state perdute.', 'error');
+          currentMode = 'story'; // resta story solo come info; i progressi sono già azzerati
         }
 
-        setTimeout(() => showAuthScreen(), 1200);
+        // Forza il ritorno al login (niente attese lunghe che possono lasciare la schermata bloccata)
+        try { dismissNotice(); } catch (_) { /* ignore */ }
+        showAuthScreen({ forceLoginForm: false });
       }
     } else {
       // Un solo canale: phase-banner. Evita messaggi generici fuori tempo
@@ -1212,11 +1224,17 @@ async function playerClick() {
 }
 async function boardClick(pos) {
   // Durante scelta ETB post-ingresso il motore è in pending_target_choice (obligatory): i click restano attivi.
-  if (busy || noticeOpen) return;
+  // In etb-target non bloccare per noticeOpen (altrimenti non si riesce a scegliere il bersaglio).
+  if (busy) return;
+  if (noticeOpen && flow?.kind !== 'etb-target') return;
   if (obligatory() && flow?.kind !== 'etb-target') return;
   if (flow?.kind === 'etb-target') {
     const c = at(pos);
-    if (!c || !(flow.eligible ?? []).includes(c.instance_id)) return notice('Bersaglio non valido.','error');
+    if (!c || !(flow.eligible ?? []).includes(c.instance_id)) {
+      const gm = $('game-message');
+      if (gm) { gm.textContent = 'Bersaglio non valido.'; gm.className = 'game-message error'; }
+      return;
+    }
     const choiceId = flow.choiceId;
     flow = null;
     return request('death/target',{choiceId,targetInstanceId:c.instance_id},'Effetto in entrata risolto.');
@@ -2181,9 +2199,7 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
         await showMummyDialog(`Il prossimo avversario è ${boss.name}.\n${boss.threat}`);
 
         if (fightIndex < 2) {
-          await showMummyDialog(
-            `Per ora ${boss.name} combatte senza il suo Medaglione.\nSfrutta questo vantaggio!`
-          );
+          await showMummyDialog('Preparati, sarà una sfida impegnativa.');
         }
 
         if (fightIndex === 2 && !progress.chosenPower) {
