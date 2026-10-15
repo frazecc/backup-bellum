@@ -2047,54 +2047,88 @@ body.notice-open #stage .action-panel button {
   letter-spacing: 0.02em;
 }
 
-/* Indicatore Medaglione attivo durante la partita Storia */
-.story-medallion-banner {
-  position: fixed;
-  top: 0.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 50;
-  max-width: min(92vw, 420px);
-  padding: 0.35rem 0.85rem;
-  border: 2px solid #c9a043;
-  border-radius: 999px;
-  background: #1a140ecc;
-  color: #e8c565;
-  font-family: 'Nunito', system-ui, sans-serif;
-  font-weight: 700;
-  font-size: 0.82rem;
-  text-align: center;
-  box-shadow: 0 4px 16px #0008;
-  pointer-events: none;
-}
-.story-medallion-banner.hidden {
-  display: none !important;
-}
+/* Vecchio banner flottante: nascosto di default (compatibilità) */
+.story-medallion-banner { display: none !important; }
 
-/* Contatore progresso Storia (cliccabile → elenco boss sconfitti) */
+/* Contatore Storia: sotto il nome Mummy, nel HUD in alto */
+#stage .story-progress-badge,
 .story-progress-badge {
-  position: fixed;
-  top: 0.5rem;
-  right: 0.6rem;
-  z-index: 55;
-  padding: 0.4rem 0.75rem;
-  border: 2px solid #c9a043;
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0.12rem 0.55rem;
+  border: 1.5px solid #c9a043;
   border-radius: 999px;
   background: #1a140ef0;
   color: #e8c565;
   font-family: 'Nunito', system-ui, sans-serif;
   font-weight: 800;
-  font-size: 0.78rem;
+  font-size: 0.68rem;
   letter-spacing: 0.02em;
   cursor: pointer;
-  box-shadow: 0 4px 14px #000a;
-  min-height: 36px;
+  box-shadow: 0 2px 8px #0006;
+  min-height: 22px;
+  line-height: 1.2;
+  white-space: nowrap;
 }
+#stage .story-progress-badge:hover,
+#stage .story-progress-badge:focus-visible,
 .story-progress-badge:hover,
 .story-progress-badge:focus-visible {
   background: #2a1c10f5;
   outline: none;
 }
+#stage .story-progress-badge.hidden,
 .story-progress-badge.hidden {
   display: none !important;
+}
+
+/* Chip Medaglione sotto i nomi (giocatore e boss) */
+#stage .hud-medallion,
+.hud-medallion {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.1rem 0.5rem;
+  border: 1.5px solid #a78355;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #2a1c10, #1a120a);
+  color: #e8c565;
+  font-family: 'Nunito', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 0.65rem;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: 0 2px 6px #0007;
+  min-height: 20px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#stage .hud-medallion:hover,
+#stage .hud-medallion:focus-visible,
+.hud-medallion:hover,
+.hud-medallion:focus-visible {
+  border-color: #e8c565;
+  outline: none;
+}
+#stage .hud-medallion.hidden,
+.hud-medallion.hidden {
+  display: none !important;
+}
+
+/* Un po' più di spazio verticale nel centro HUD se ci sono chip */
+#stage .ai-hud .hud-center,
+#stage .player-hud .hud-center {
+  gap: calc(2 * var(--p));
+}
+#stage .ai-hud {
+  min-height: calc(48 * var(--p));
+  padding-top: calc(4 * var(--p));
+  padding-bottom: calc(4 * var(--p));
 }
