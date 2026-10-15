@@ -1368,24 +1368,27 @@ function homeDialog() {
     return wrap;
   }
 
-  // Storia – usa l’immagine piramide1.png
+  // Storia – piramide1.png (sempre cliccabile)
   const storyBtn = makePyramid('home-story', 'Modalità Storia', false, () => {
     currentMode = 'story';
     hideHome();
     startScreen().catch(fail);
   }, 'img/piramide1.png');
 
-  // Endless (fotocopia di Storia per ora) – ancora SVG, arriverà l’immagine
-  const endlessLabel = isStoryCompleted() ? 'Modalità Endless' : '???';
-  const endlessLocked = false; // per ora sempre cliccabile (è una copia)
+  // Endless – piramide2.png
+  // Per ora BLOCCATA. Diventerà cliccabile solo dopo aver vinto la Modalità Storia.
+  // Quando sarà sbloccata mostrerà «Modalità Endless», finché è bloccata mostra «???»
+  const storyDone = isStoryCompleted();
+  const endlessLabel = storyDone ? 'Modalità Endless' : '???';
+  const endlessLocked = !storyDone; // bloccata finché non si vince la Storia
   const endlessBtn = makePyramid('home-endless', endlessLabel, endlessLocked, () => {
     currentMode = 'endless';
     hideHome();
-    startScreen().catch(fail); // stessa logica di Storia
-  }, null);
+    startScreen().catch(fail); // stessa logica di Storia (fotocopia per ora)
+  }, 'img/piramide2.png');
 
-  // Coming Soon – ancora SVG
-  const soonBtn = makePyramid('home-soon', 'Coming Soon', true, null, null);
+  // Coming Soon – piramide3.png (sempre bloccata per ora)
+  const soonBtn = makePyramid('home-soon', 'Coming Soon', true, null, 'img/piramide3.png');
 
   pyramids.append(storyBtn, endlessBtn, soonBtn);
   content.append(title, subtitle, pyramids);
@@ -1400,11 +1403,19 @@ function showHome() {
   if (state || busy) return;
   const el = homeDialog();
 
-  // Aggiorna etichetta Endless se la storia è stata completata
+  // Aggiorna etichetta e stato di blocco di Endless
+  const storyDone = isStoryCompleted();
   const endlessBtn = $('home-endless');
   if (endlessBtn) {
     const label = endlessBtn.querySelector('.pyramid-label');
-    if (label) label.textContent = isStoryCompleted() ? 'Modalità Endless' : '???';
+    if (label) label.textContent = storyDone ? 'Modalità Endless' : '???';
+    if (storyDone) {
+      endlessBtn.classList.remove('is-locked');
+      endlessBtn.disabled = false;
+    } else {
+      endlessBtn.classList.add('is-locked');
+      endlessBtn.disabled = true;
+    }
   }
 
   el.classList.remove('hidden');
