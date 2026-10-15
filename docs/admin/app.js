@@ -654,6 +654,47 @@ function requireAdmin() {
   });
 }
 
+
+/* ---------- Migrazione trigger (Fase 5) ---------- */
+const TRIGGER_MAP = {
+  opponent_hand_card: 'card_played_from_hand',
+  monster_etb: 'creature_enters_field',
+};
+
+function migrateEffectJson(j) {
+  if (!j || typeof j !== 'object') return { changed: false, json: j };
+  let changed = false;
+  const out = structuredClone(j);
+  const ev = out.reaction_trigger?.event;
+  if (ev && TRIGGER_MAP[ev]) {
+    out.reaction_trigger = { ...out.reaction_trigger, event: TRIGGER_MAP[ev] };
+    changed = true;
+  }
+  return { changed, json: out };
+}
+
+async function migrateTriggers() {
+  const msg = $('migrateMsg');
+  msg.textContent = 'Scansione carte…';
+  msg.className = 'hint';
+  let updated = 0, skipped = 0, errors = 0;
+  for (const c of S.cards) {
+    const { changed, json } = migrateEffectJson(c.effect_json);
+    if (!changed) { skipped++; continue; }
+    const { error } = await sb.from('cards').update({ effect_json: json }).eq('id', c.id);
+    if (error) {
+      errors++;
+      console.error('Migrazione fallita', c.id, c.name, error);
+    } else {
+      c.effect_json = json;
+      updated++;
+    }
+  }
+  msg.textContent = `Migrazione completata: ${updated} aggiornate, ${skipped} già ok, ${errors} errori.`;
+  msg.className = errors ? 'hint err' : 'hint';
+  draw();
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   if (!(await requireAdmin())) return;
   $('lo').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
@@ -705,6 +746,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('f').addEventListener('submit', save);
   $('clear').addEventListener('click', () => resetForm(false));
   $('bk').addEventListener('click', backup);
+  $('migrate').addEventListener('click', () => { if (confirm('Aggiornare i trigger vecchi (opponent_hand_card → card_played_from_hand, monster_etb → creature_enters_field) su tutte le carte?')) migrateTriggers(); });
   $('gr').value = REPO; $('gb').value = BR;
   $('elist').addEventListener('click', (e) => { const el = e.target.closest('[data-eid]'); if (el) openSpec(el.dataset.eid, EF[el.dataset.eid].spec); });
   $('enew').addEventListener('click', () => openSpec('', NEWSPEC));
