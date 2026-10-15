@@ -843,6 +843,8 @@ function clearMatchUI() {
   if (medBanner) medBanner.classList.add('hidden');
   const storyProg = $('story-progress-badge');
   if (storyProg) storyProg.classList.add('hidden');
+  $('player-medallion')?.classList.add('hidden');
+  $('opponent-medallion')?.classList.add('hidden');
   // Svuota la griglia e la mano IA così non resta la partita vecchia a video
   const board = $('shared-board');
   if (board) board.innerHTML = '';
@@ -1202,61 +1204,90 @@ async function render() {
   await drawBoard(); await drawHand(); await drawMostrissimi(); controls(); await renderReaction(); await renderDeathChoice(); await markPlayerTarget();
 }
 
-/** Mostra in alto il Medaglione attivo (solo in Storia, se ne hai scelto uno). */
+/** Aggiorna i chip Medaglione sotto i nomi (tuo + boss) e nasconde il vecchio banner flottante. */
 function updateStoryMedallionBanner() {
-  let banner = $('story-medallion-banner');
+  // Nascondi il vecchio banner fisso in alto (non serve più)
+  const old = $('story-medallion-banner');
+  if (old) old.classList.add('hidden');
+
   const progress = currentMode === 'story' ? getStoryProgress() : null;
-  const power = progress?.chosenPower;
   const hasMatch = !!(state && matchId);
+  const playerChip = $('player-medallion');
+  const bossChip = $('opponent-medallion');
 
-  if (!hasMatch || !power || !BOSS_DATA[power]) {
-    if (banner) banner.classList.add('hidden');
-    return;
+  // --- Medaglione del giocatore (dopo la 3ª scelta) ---
+  if (playerChip) {
+    const power = progress?.chosenPower;
+    if (hasMatch && power && BOSS_DATA[power]?.medaglioneName) {
+      const med = BOSS_DATA[power];
+      const short = (deckFactionNames[power] || power);
+      playerChip.textContent = `✦ ${short}`;
+      playerChip.title = `${med.medaglioneName}: ${med.powerDesc}`;
+      playerChip.setAttribute('aria-label', `${med.medaglioneName}: ${med.powerDesc}`);
+      playerChip.onclick = e => {
+        e.stopPropagation();
+        notice(`${med.medaglioneName}\n${med.powerDesc}`, 'success');
+      };
+      playerChip.classList.remove('hidden');
+    } else {
+      playerChip.classList.add('hidden');
+      playerChip.onclick = null;
+    }
   }
 
-  if (!banner) {
-    banner = document.createElement('div');
-    banner.id = 'story-medallion-banner';
-    banner.className = 'story-medallion-banner';
-    document.body.append(banner);
+  // --- Medaglione del boss (dalla 3ª partita in poi, non Indrazzico) ---
+  if (bossChip) {
+    const bossCode = progress?.currentBoss;
+    const fightIndex = getStoryFightIndex(progress);
+    // Boss «bara» dalla 3ª sfida (fightIndex >= 2) e ha un Medaglione
+    const bossActive = hasMatch && bossCode && bossCode !== 'IND' && fightIndex >= 2 && BOSS_DATA[bossCode]?.medaglioneName;
+    if (bossActive) {
+      const med = BOSS_DATA[bossCode];
+      const short = (deckFactionNames[bossCode] || bossCode);
+      bossChip.textContent = `✦ ${short}`;
+      bossChip.title = `${med.medaglioneName}: ${med.powerDesc}`;
+      bossChip.setAttribute('aria-label', `Boss — ${med.medaglioneName}: ${med.powerDesc}`);
+      bossChip.onclick = e => {
+        e.stopPropagation();
+        notice(`Boss — ${med.medaglioneName}\n${med.powerDesc}`, 'success');
+      };
+      bossChip.classList.remove('hidden');
+    } else {
+      bossChip.classList.add('hidden');
+      bossChip.onclick = null;
+    }
   }
-  const med = BOSS_DATA[power];
-  banner.textContent = `✦ ${med.medaglioneName}: ${med.powerDesc}`;
-  banner.classList.remove('hidden');
 }
 
-/** Contatore Storia: «Storia 2/4» in alto a destra. Clic → elenco boss sconfitti. */
+/** Contatore Storia sotto il nome Mummy. Clic → elenco boss sconfitti. */
 function updateStoryProgressBadge() {
-  let badge = $('story-progress-badge');
+  const badge = $('story-progress-badge');
+  if (!badge) return;
+
   const inStory = currentMode === 'story' && !!(state && matchId);
   const progress = inStory ? getStoryProgress() : null;
 
   if (!inStory || !progress) {
-    if (badge) badge.classList.add('hidden');
+    badge.classList.add('hidden');
     return;
   }
 
-  // Partite totali: 3 boss intermedi + Indrazzico = 4
   const beaten = progress.beaten || [];
-  const currentNum = Math.min(beaten.length + 1, 4); // 1..4
+  const currentNum = Math.min(beaten.length + 1, 4);
   const total = 4;
   const label = progress.currentBoss === 'IND'
-    ? `Storia ${total}/${total} · Finale`
+    ? `Storia ${total}/${total}`
     : `Storia ${currentNum}/${total}`;
 
-  if (!badge) {
-    badge = document.createElement('button');
-    badge.id = 'story-progress-badge';
-    badge.type = 'button';
-    badge.className = 'story-progress-badge';
-    badge.setAttribute('aria-label', 'Progresso Storia: tocca per vedere i boss sconfitti');
+  badge.textContent = label;
+  badge.setAttribute('aria-label', `Progresso Storia ${label}: tocca per i boss sconfitti`);
+  if (!badge.dataset.wired) {
+    badge.dataset.wired = '1';
     badge.onclick = e => {
       e.stopPropagation();
       showStoryProgressDetail();
     };
-    document.body.append(badge);
   }
-  badge.textContent = label;
   badge.classList.remove('hidden');
 }
 
