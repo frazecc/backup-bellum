@@ -741,6 +741,13 @@ function queuePresentation(onlyLast = false) {
           if (i < list.length - 1) await waitPresentation(180); // breve stacco: i balloon restano distinti
         }
         if (generation !== presentationGeneration || matchId !== id) break;
+
+        // Partita finita durante il turno IA (es. sconfitta) → gestisci subito
+        if (state.status === 'finished') {
+          await handleMatchFinished();
+          break;
+        }
+
         if (state.status !== 'running' || state.pending_reaction || obligatory() || !state.work_queue?.length) break;
         busy = true; controls();
         try {
@@ -748,15 +755,65 @@ function queuePresentation(onlyLast = false) {
             {method:'POST',body:{expectedAnnouncementId:a.id}})).state;
           await render(); await logs();
           await ensurePhaseBanner().catch(fail);
+          // Controlla di nuovo dopo advance (l’IA può averti ucciso)
+          if (state.status === 'finished') {
+            await handleMatchFinished();
+            break;
+          }
         } catch(e) {
           fail(e);
           try { state = (await api(`/match/${encodeURIComponent(id)}`)).state; await render(); } catch(refreshError) { console.warn(refreshError); }
+          if (state?.status === 'finished') {
+            await handleMatchFinished();
+          }
           break;
         } finally { busy = false; await render().catch(fail); }
-        if (state.public_announcement?.id === a.id) break;
+        if (state?.public_announcement?.id === a.id) break;
       }
     } finally { presentationRunning = false; }
   })();
+}
+
+/** Gestisce fine partita (vittoria o sconfitta) da qualsiasi punto del flusso. */
+async function handleMatchFinished() {
+  if (!state || state.status !== 'finished') return;
+  const won = state.winner_index === 1;
+
+  try { dismissNotice(); } catch (_) { /* ignore */ }
+  await notice(won ? 'HAI VINTO!' : 'HAI PERSO!', won ? 'success' : 'error');
+
+  if (won && currentMode === 'story') {
+    await handleStoryVictory();
+    return;
+  }
+
+  if (!won) {
+    const wasStory = currentMode === 'story';
+    localStorage.removeItem('bellum:last-match');
+    matchId = null;
+    state = null;
+    flow = null;
+    priorMatch = null;
+    deathDraft = { choiceId: null, instanceIds: [] };
+    presentationGeneration++;
+    presentationLayer().style.display = 'none';
+    close();
+    closeGraveyard();
+    closeColorDialog();
+    hideStoryStart();
+    hideHome();
+    reactionDialog().classList.add('hidden');
+    choiceDialog().classList.add('hidden');
+    const medBanner = $('story-medallion-banner');
+    if (medBanner) medBanner.classList.add('hidden');
+
+    if (wasStory) {
+      clearStoryProgress();
+    }
+
+    try { dismissNotice(); } catch (_) { /* ignore */ }
+    showAuthScreen({ forceLoginForm: false });
+  }
 }
 async function renderReaction() {
   const el = reactionDialog(), r = reaction();
@@ -1121,43 +1178,7 @@ async function request(path, body, message) {
     try { await logs(); } catch (e) { console.warn(e); }
 
     if (state.status === 'finished') {
-      const won = state.winner_index === 1;
-      await notice(won ? 'HAI VINTO!' : 'HAI PERSO!', won ? 'success' : 'error');
-
-      if (won && currentMode === 'story') {
-        // ---------- VITTORIA IN STORIA ----------
-        await handleStoryVictory();
-      } else if (!won) {
-        // Sconfitta: anima persa → torna alla mummia (sempre, Storia o no)
-        const wasStory = currentMode === 'story';
-        localStorage.removeItem('bellum:last-match');
-        matchId = null;
-        state = null;
-        flow = null;
-        priorMatch = null;
-        deathDraft = { choiceId: null, instanceIds: [] };
-        presentationGeneration++;
-        presentationLayer().style.display = 'none';
-        close();
-        closeGraveyard();
-        closeColorDialog();
-        hideStoryStart();
-        hideHome();
-        reactionDialog().classList.add('hidden');
-        choiceDialog().classList.add('hidden');
-        // Nascondi subito anche il banner Medaglione
-        const medBanner = $('story-medallion-banner');
-        if (medBanner) medBanner.classList.add('hidden');
-
-        if (wasStory) {
-          clearStoryProgress();
-          currentMode = 'story'; // resta story solo come info; i progressi sono già azzerati
-        }
-
-        // Forza il ritorno al login (niente attese lunghe che possono lasciare la schermata bloccata)
-        try { dismissNotice(); } catch (_) { /* ignore */ }
-        showAuthScreen({ forceLoginForm: false });
-      }
+      await handleMatchFinished();
     } else {
       // Un solo canale: phase-banner. Evita messaggi generici fuori tempo
       // (es. «È di nuovo il tuo turno» mentre è ancora il turno IA).
@@ -1184,8 +1205,12 @@ async function request(path, body, message) {
   } finally {
     busy = false;
     await render().catch(fail);
+    // Se la partita è già finita (o azzerata dalla sconfitta), non proseguire con fasi/presentazioni
+    if (!state || !matchId || state.status === 'finished') {
+      return;
+    }
     // Fine turno umano: sempre popup CHIUSURA (anche se il motore è già passato all'IA).
-    if (path === 'end-turn' && state) {
+    if (path === 'end-turn') {
       // Se l'IA ha già avviato il suo turno, current_turn è avanzato → chiusura = turno precedente.
       const endedTurn = state.active_player_index === 0
         ? Math.max(1, (state.current_turn ?? 1) - 1)
