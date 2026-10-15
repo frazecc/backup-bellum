@@ -11,8 +11,8 @@ import type {
 } from './types.js';
 import {
   adjacent, allowed, around, at, blank, cells, effects, eligible, enemyNeighbours, enemyTerraformas,
-  find, findAura, findCreature, home, instance, keyword, label, other,
-  phaseNumber, playerTargetId, prepend, put, reactionTrigger, shuffle, supported, target, targetChoices, targeted, units, valid, validTarget,
+  find, findAura, findCreature, findPermanent, home, instance, keyword, label, other,
+  permanentsOnBoard, phaseNumber, playerTargetId, prepend, put, reactionTrigger, shuffle, supported, target, targetChoices, targeted, units, valid, validTarget,
 } from './engine-board.js';
 import { commit, db, getCardData, load, logMatchAction } from './engine-storage.js';
 import { availableFactions, bossFactions, chosenColors, deck, deckPool, offer, playableEffects, player, randomColors } from './engine-deck.js';
@@ -56,14 +56,14 @@ function cleanupLoop(c: Context) {
   c.deaths = []; c.s.anti_loop_counter = 0;
 
   // Messaggio speciale richiesto
-  const announcement: PublicAnnouncement = {
+  const announcement = {
     id: randomUUID(),
-    kind: 'result',
+    kind: 'result' as const,
     actor: null,
     text: 'Le bestie divine sono soddisfatte di ciò che hanno visto. Complimenti.',
     turn: c.s.current_turn,
     phase: c.s.phase,
-    duration_ms: 1000,
+    duration_ms: 3000,
   };
   c.s.public_announcement = announcement;
 
@@ -199,8 +199,9 @@ async function applyEffect(c: Context, task: ResolveEffectWork) {
   if (!Number.isInteger(n) || n < 0 || n > 20) throw new Error('Quantità effetto non valida');
   const isDamage = e.type === 'damage' || e.type === 'damage_creature';
   const playerHit = isDamage && e.target === 'any_target' && task.target_instance_id === playerTargetId(foe);
-  const selected = targeted(e) && !playerHit ? target(s, p, e, task.target_instance_id) : null;
-  if (targeted(e) && !playerHit && !selected) {
+  const isPermanentEffect = e.type === 'return_hand' || e.type === 'destroy';
+  const selected = targeted(e) && !playerHit && !isPermanentEffect ? target(s, p, e, task.target_instance_id) : null;
+  if (targeted(e) && !playerHit && !isPermanentEffect && !selected) {
     log(c, p, 'effect_no_target', `${d.name}: bersaglio non più valido, effetto annullato.`, { card_id: d.id }); return;
   }
   if (e.type === 'draw') {
@@ -240,15 +241,52 @@ async function applyEffect(c: Context, task: ResolveEffectWork) {
       if (selected.cell.hp <= 0) await destroyCell(c, selected.position, p);
     } else throw new Error('Effetto danno senza bersaglio supportato');
   } else if (e.type === 'return_hand') {
-    const x = selected!;
-    put(s, x.position, null);
-    s.players[x.cell.owner_index].hand.push(instance(x.cell));
-    for (const aura of x.cell.auras) s.players[aura.owner_index].graveyard.push(instance(aura));
-    log(c, p, 'effect_return_hand', `${d.name}: una creatura torna in mano.`, { target_instance_id: x.cell.instance_id });
+    // Fase 3: funziona su qualsiasi permanente tranne Mostrissimi.
+    // Se Aura → stacca e torna in mano. Se creatura → torna in mano, Aure al cimitero.
+    // Se Terraforma → torna in mano.
+    const perm = task.target_instance_id ? findPermanent(s, task.target_instance_id) : null;
+    if (!perm) {
+      log(c, p, 'effect_no_target', `${d.name}: bersaglio non più valido, effetto annullato.`, { card_id: d.id });
+      return;
+    }
+    // Blocca Mostrissimi
+    if (perm.kind === 'creature') {
+      const cardData = await getCardData(perm.card_id);
+      if (cardData.card_type === 'mostrissimo') {
+        log(c, p, 'effect_no_target', `${d.name}: non si può far tornare in mano un Mostrissimo.`, { card_id: d.id });
+        return;
+      }
+    }
+    if (perm.kind === 'aura') {
+      const host = perm.host;
+      host.auras = host.auras.filter(a => a.instance_id !== perm.instance_id);
+      s.players[perm.owner_index].hand.push(instance(perm.aura));
+      log(c, p, 'effect_return_hand', `${d.name}: un'Aura torna in mano.`, { target_instance_id: perm.instance_id });
+    } else if (perm.kind === 'creature') {
+      put(s, perm.position, null);
+      s.players[perm.owner_index].hand.push(instance(perm.cell));
+      for (const aura of perm.cell.auras) s.players[aura.owner_index].graveyard.push(instance(aura));
+      log(c, p, 'effect_return_hand', `${d.name}: una creatura torna in mano.`, { target_instance_id: perm.instance_id });
+    } else if (perm.kind === 'terraforma') {
+      put(s, perm.position, null);
+      s.players[perm.owner_index].hand.push({ instance_id: perm.instance_id, card_id: perm.card_id });
+      log(c, p, 'effect_return_hand', `${d.name}: una Terraforma torna in mano.`, { target_instance_id: perm.instance_id });
+    }
     await reconcilePassives(c);
   } else if (e.type === 'destroy') {
-    if (selected) await destroyCell(c, selected.position, p);
-    else throw new Error('Distruzione senza bersaglio valido');
+    // Fase 3: funziona su qualsiasi permanente (Mostri, Mostrissimi, Terraforme, Aure).
+    const perm = task.target_instance_id ? findPermanent(s, task.target_instance_id) : (selected ? { kind: 'creature' as const, position: selected.position, cell: selected.cell, instance_id: selected.cell.instance_id, card_id: selected.cell.card_id, owner_index: selected.cell.owner_index } : null);
+    if (!perm) {
+      log(c, p, 'effect_no_target', `${d.name}: bersaglio non più valido, effetto annullato.`, { card_id: d.id });
+      return;
+    }
+    if (perm.kind === 'aura') {
+      await removeAura(c, perm.instance_id);
+      log(c, p, 'effect_destroy', `${d.name}: un'Aura viene distrutta.`, { target_instance_id: perm.instance_id });
+    } else {
+      await destroyCell(c, perm.position, p);
+      log(c, p, 'effect_destroy', `${d.name}: un permanente viene distrutto.`, { target_instance_id: perm.instance_id });
+    }
   } else if (e.type === 'buff') {
     const summoned = e.target === 'triggering_creature' && task.target_instance_id ? findCreature(s, task.target_instance_id) : null;
     if (e.target === 'triggering_creature' && !summoned) {

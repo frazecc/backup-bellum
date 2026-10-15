@@ -1,21 +1,54 @@
 // backend/card-rules.ts — regole di validità delle carte: unica fonte per mazzi, Mostrissimi
 // e controllo di salvataggio dell'editor (POST /cards/validate). I messaggi sono quelli
 // mostrati nell'editor. Regole di bilanciamento e nomi duplicati restano solo nell'editor.
+//
+// Fase 3: return_hand e destroy accettano bersagli permanenti; trigger aggiornati.
 type Json = Record<string, unknown>;
 
 const TYPES = ['monster', 'mostrissimo', 'maledizione', 'instant', 'aura', 'terraforma'];
 const CREATURES = ['monster', 'mostrissimo'];
-const TRIGGERS = ['opponent_upkeep_start', 'opponent_upkeep_end', 'opponent_hand_card', 'monster_etb', 'mostrissimo_before_entry'];
-const COUNTER_TRIGGERS = ['opponent_hand_card', 'monster_etb', 'mostrissimo_before_entry'];
+// Trigger di reazione ammessi (nuovi + deprecated per migrazione)
+const TRIGGERS = [
+  'opponent_upkeep_start',
+  'opponent_upkeep_end',
+  'card_played_from_hand',
+  'creature_enters_field',
+  'card_enters_field',
+  'own_creature_enters_field',
+  'opponent_creature_enters_field',
+  'mostrissimo_before_entry',
+  // DEPRECATED
+  'opponent_hand_card',
+  'monster_etb',
+];
+const COUNTER_TRIGGERS = [
+  'card_played_from_hand',
+  'creature_enters_field',
+  'card_enters_field',
+  'own_creature_enters_field',
+  'opponent_creature_enters_field',
+  'mostrissimo_before_entry',
+  // DEPRECATED
+  'opponent_hand_card',
+  'monster_etb',
+];
 const CREATURE_TARGETS = ['any_creature', 'all_creatures', 'all_creatures_self', 'all_creatures_opponent'];
+const PERMANENT_TARGETS = [
+  'any_creature',
+  'any_permanent',
+  'any_permanent_except_mostrissimo',
+  'any_target',
+];
 const TARGETS = new Map<string, string[]>([
   ['draw', ['self', 'opponent']],
   ['discard', ['self', 'opponent']],
   ['heal', ['self', 'opponent', ...CREATURE_TARGETS]],
   // any_target: a scelta del proprietario, il giocatore avversario o una creatura (alleata o nemica).
   ['damage', [...CREATURE_TARGETS, 'any_target', 'opponent']],
-  ['return_hand', ['any_creature']],
-  ['destroy', ['any_creature']],
+  // Fase 3: return_hand su qualsiasi permanente tranne Mostrissimi
+  ['return_hand', PERMANENT_TARGETS],
+  // Fase 3: destroy su qualsiasi permanente (Mostri, Mostrissimi, Terraforme, Aure)
+  ['destroy', ['any_creature', 'any_permanent', 'any_target']],
   // all_creatures escluso: il motore applica i bonus solo alle creature di chi gioca la carta.
   ['buff', ['any_creature', 'all_creatures_self', 'enchanted_creature', 'source_creature']],
 ]);
@@ -57,7 +90,7 @@ function effectErrors(e: Json, type: string, trigger: unknown, death = false): s
     out.push('Scarto "tutta la mano tranne N": solo per lo scarto, con N tra 0 e 20 e senza trigger.');
   if (t === 'counter') {
     if (type !== 'instant' || !COUNTER_TRIGGERS.includes(String(trigger)))
-      out.push('NOPE: serve una Trappola con evento "carta dalla mano", "ingresso mostro" o "prima del Mostrissimo".');
+      out.push('NOPE: serve una Trappola con evento di reazione valido.');
     return out;
   }
   if (t === 'movement_cost') {
@@ -83,12 +116,13 @@ function effectErrors(e: Json, type: string, trigger: unknown, death = false): s
     return out;
   }
   if (e.target === 'triggering_creature') out.push('Il bersaglio "creatura che ha attivato il trigger" richiede un trigger.');
-  if (e.target === 'any_target' && t !== 'damage') out.push('Il bersaglio a scelta tra giocatore e creature vale solo per i danni.');
+  if (e.target === 'any_target' && t !== 'damage' && t !== 'return_hand' && t !== 'destroy')
+    out.push('Il bersaglio a scelta vale solo per danni, return_hand e destroy.');
   if (e.target === 'source_creature' && (t !== 'buff' || !CREATURES.includes(type) || death))
     out.push('"Questa creatura" vale solo per i bonus all\'ingresso di Mostri e Mostrissimi.');
   const allowed = TARGETS.get(t);
   if (!allowed) { out.push(`Effetto "${String(e.type)}" non supportato dal motore.`); return out; }
-  if (type === 'aura' && t !== 'buff') out.push('Le Aure ammettono solo bonus o movimento a costo 0.');
+  if (type === 'aura' && t !== 'buff' && t !== 'movement_cost') out.push('Le Aure ammettono solo bonus o movimento a costo 0.');
   if (type === 'terraforma' && t !== 'buff') out.push('Le Terraforme ammettono solo bonus.');
   const target = (e.target as string | undefined) ?? (t === 'draw' ? 'self' : t === 'discard' ? 'opponent' : null);
   if (target && !allowed.includes(target)) out.push(`${t}: il bersaglio "${target}" blocca la partita.`);
