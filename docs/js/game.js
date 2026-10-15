@@ -1346,8 +1346,8 @@ function isStoryCompleted() {
 function getRemainingBosses(progress) {
   if (!progress) return [];
   const allSix = ['CHI', 'INF', 'PES', 'BUL', 'GRO', 'CLO'];
-  const protected = [progress.primary, progress.secondary, progress.tertiary];
-  return allSix.filter(c => !protected.includes(c) && !(progress.beaten || []).includes(c));
+  const playerColors = [progress.primary, progress.secondary, progress.tertiary];
+  return allSix.filter(c => !playerColors.includes(c) && !(progress.beaten || []).includes(c));
 }
 
 /** True se i 3 boss intermedi sono tutti battuti e manca solo Indrazzico. */
