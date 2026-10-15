@@ -1059,13 +1059,37 @@ function showDeckColors() {
 }
 async function render() {
   const set = (id,x) => { if ($(id)) $(id).textContent = String(x); };
-  if (state) { hideStart(); hideHome(); }
+  if (state) { hideStart(); hideHome(); hideStoryStart(); }
   set('player-life',me()?.life ?? 20); set('player-current-mana',me()?.current_mana ?? 0); set('player-max-mana',me()?.max_mana ?? 0);
   set('player-hand-count',me()?.hand?.length ?? 0); set('player-deck-count',me()?.deck?.length ?? 0); set('player-graveyard-count',me()?.graveyard?.length ?? 0);
   set('opponent-life',them()?.life ?? 20); set('opponent-current-mana',them()?.current_mana ?? 0); set('opponent-max-mana',them()?.max_mana ?? 0);
   set('opponent-hand-count',them()?.hand?.length ?? 0); set('opponent-deck-count',them()?.deck?.length ?? 0); set('opponent-graveyard-count',them()?.graveyard?.length ?? 0);
   showDeckColors(); drawOpponentHand();
+  updateStoryMedallionBanner();
   await drawBoard(); await drawHand(); await drawMostrissimi(); controls(); await renderReaction(); await renderDeathChoice(); await markPlayerTarget();
+}
+
+/** Mostra in alto il Medaglione attivo (solo in Storia, se ne hai scelto uno). */
+function updateStoryMedallionBanner() {
+  let banner = $('story-medallion-banner');
+  const progress = currentMode === 'story' ? getStoryProgress() : null;
+  const power = progress?.chosenPower;
+  const hasMatch = !!(state && matchId);
+
+  if (!hasMatch || !power || !BOSS_DATA[power]) {
+    if (banner) banner.classList.add('hidden');
+    return;
+  }
+
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'story-medallion-banner';
+    banner.className = 'story-medallion-banner';
+    document.body.append(banner);
+  }
+  const med = BOSS_DATA[power];
+  banner.textContent = `✦ ${med.medaglioneName}: ${med.powerDesc}`;
+  banner.classList.remove('hidden');
 }
 async function logs() {
   if (!$('match-logs') || !matchId) return;
@@ -1553,6 +1577,24 @@ function showHome() {
       endlessBtn.classList.add('is-locked');
       endlessBtn.disabled = true;
     }
+  }
+
+  // Trofeo «Abitante della Piramide»
+  let trophy = el.querySelector('.home-trophy');
+  if (storyDone) {
+    if (!trophy) {
+      trophy = document.createElement('div');
+      trophy.className = 'home-trophy';
+      trophy.innerHTML = `
+        <img src="img/trofei/abitante.png" alt="Abitante della Piramide" width="96" height="96" decoding="async" />
+        <span>Abitante della Piramide</span>
+      `;
+      const content = el.querySelector('.home-content');
+      if (content) content.append(trophy);
+    }
+    trophy.classList.remove('hidden');
+  } else if (trophy) {
+    trophy.classList.add('hidden');
   }
 
   el.classList.remove('hidden');
