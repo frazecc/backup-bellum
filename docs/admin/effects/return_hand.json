@@ -1,15 +1,25 @@
 {
- "order": 8,
- "label": "🔄 Ritorna in mano (anche tua)",
- "for": [
-  "monster",
-  "mostrissimo",
-  "maledizione",
-  "instant"
- ],
- "json": {
-  "type": "return_hand",
-  "target": "any_creature"
- },
- "text": "Una creatura torna in mano al proprietario"
+  "order": 8,
+  "label": "🔄 Torna in mano (permanente, non Mostrissimo)",
+  "for": [
+    "monster",
+    "mostrissimo",
+    "maledizione",
+    "instant"
+  ],
+  "targets": [
+    ["any_creature", "Una creatura (non Mostrissimo)"],
+    ["any_permanent_except_mostrissimo", "Un permanente (non Mostrissimo)"],
+    ["any_target", "A scelta del giocatore in partita"]
+  ],
+  "json": {
+    "type": "return_hand",
+    "target": "{t}"
+  },
+  "text": {
+    "any_creature": "Una creatura torna in mano al proprietario",
+    "any_permanent_except_mostrissimo": "Un permanente (non Mostrissimo) torna in mano al proprietario",
+    "any_target": "Un permanente a scelta (non Mostrissimo) torna in mano al proprietario",
+    "default": "Un permanente torna in mano al proprietario"
+  }
 }

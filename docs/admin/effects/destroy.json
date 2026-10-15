@@ -1,15 +1,25 @@
 {
- "order": 7,
- "label": "💀 Distruggi creatura",
- "for": [
-  "monster",
-  "mostrissimo",
-  "maledizione",
-  "instant"
- ],
- "json": {
-  "type": "destroy",
-  "target": "any_creature"
- },
- "text": "Distruggi una creatura"
+  "order": 7,
+  "label": "💀 Distruggi permanente",
+  "for": [
+    "monster",
+    "mostrissimo",
+    "maledizione",
+    "instant"
+  ],
+  "targets": [
+    ["any_creature", "Una creatura"],
+    ["any_permanent", "Un permanente qualsiasi"],
+    ["any_target", "A scelta del giocatore in partita"]
+  ],
+  "json": {
+    "type": "destroy",
+    "target": "{t}"
+  },
+  "text": {
+    "any_creature": "Distruggi una creatura",
+    "any_permanent": "Distruggi un permanente",
+    "any_target": "Distruggi un permanente a scelta",
+    "default": "Distruggi un permanente"
+  }
 }
