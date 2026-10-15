@@ -1059,7 +1059,7 @@ function showDeckColors() {
 }
 async function render() {
   const set = (id,x) => { if ($(id)) $(id).textContent = String(x); };
-  if (state) hideStart();
+  if (state) { hideStart(); hideHome(); }
   set('player-life',me()?.life ?? 20); set('player-current-mana',me()?.current_mana ?? 0); set('player-max-mana',me()?.max_mana ?? 0);
   set('player-hand-count',me()?.hand?.length ?? 0); set('player-deck-count',me()?.deck?.length ?? 0); set('player-graveyard-count',me()?.graveyard?.length ?? 0);
   set('opponent-life',them()?.life ?? 20); set('opponent-current-mana',them()?.current_mana ?? 0); set('opponent-max-mana',them()?.max_mana ?? 0);
@@ -1283,6 +1283,136 @@ function closeColorDialog() {
   // Solo se non c’è partita in corso e non stiamo creando: evita «Le spoglie…» dopo moneta/maledizione.
   if (!state && !busy && !matchId && !$('game-screen')?.classList.contains('hidden')) showStart();
 }
+
+// ---------- HOME PAGE: deserto + tre piramidi (Storia / Endless / Coming Soon) ----------
+let currentMode = 'story'; // 'story' | 'endless'
+
+function isStoryCompleted() {
+  try { return localStorage.getItem('bellum:story-completed') === '1'; } catch { return false; }
+}
+
+function homeDialog() {
+  let el = $('home-dialog');
+  if (el) return el;
+
+  el = document.createElement('div');
+  el.id = 'home-dialog';
+  el.className = 'home-dialog hidden';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-modal', 'true');
+  el.setAttribute('aria-labelledby', 'home-title');
+
+  // Sfondo deserto
+  const bg = document.createElement('div');
+  bg.className = 'home-desert';
+
+  // Contenuto centrale
+  const content = document.createElement('div');
+  content.className = 'home-content';
+
+  const title = document.createElement('h1');
+  title.id = 'home-title';
+  title.className = 'home-title';
+  title.textContent = 'Scegli il tuo destino';
+
+  const subtitle = document.createElement('p');
+  subtitle.className = 'home-subtitle';
+  subtitle.textContent = 'Tre piramidi sorgono all’orizzonte…';
+
+  // Contenitore delle tre piramidi
+  const pyramids = document.createElement('div');
+  pyramids.className = 'home-pyramids';
+
+  // --- Piramides SVG (temporanee, sostituibili con PNG) ---
+  function makePyramid(id, label, locked, onClick) {
+    const wrap = document.createElement('button');
+    wrap.type = 'button';
+    wrap.id = id;
+    wrap.className = 'home-pyramid' + (locked ? ' is-locked' : '');
+    wrap.setAttribute('aria-label', label);
+    if (locked) wrap.disabled = true;
+
+    // SVG piramide stilizzata
+    wrap.innerHTML = `
+      <svg class="pyramid-svg" viewBox="0 0 120 110" width="140" height="128" aria-hidden="true">
+        <defs>
+          <linearGradient id="pg-${id}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#e8c565"/>
+            <stop offset="55%" stop-color="#c9a043"/>
+            <stop offset="100%" stop-color="#8a5a14"/>
+          </linearGradient>
+          <linearGradient id="ps-${id}" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#00000055"/>
+            <stop offset="100%" stop-color="#00000000"/>
+          </linearGradient>
+        </defs>
+        <!-- corpo principale -->
+        <polygon points="60,8 112,100 8,100" fill="url(#pg-${id})" stroke="#5a3410" stroke-width="2.5"/>
+        <!-- lato in ombra -->
+        <polygon points="60,8 112,100 60,100" fill="url(#ps-${id})"/>
+        <!-- ingresso -->
+        <rect x="52" y="72" width="16" height="28" fill="#2a1a0a" opacity="0.85"/>
+        <!-- base -->
+        <rect x="4" y="98" width="112" height="6" rx="1" fill="#6b4420"/>
+      </svg>
+      <span class="pyramid-label">${label}</span>
+    `;
+
+    if (!locked && onClick) {
+      wrap.onclick = onClick;
+    }
+    return wrap;
+  }
+
+  // Storia
+  const storyBtn = makePyramid('home-story', 'Modalità Storia', false, () => {
+    currentMode = 'story';
+    hideHome();
+    startScreen().catch(fail);
+  });
+
+  // Endless (fotocopia di Storia per ora)
+  const endlessLabel = isStoryCompleted() ? 'Modalità Endless' : '???';
+  const endlessLocked = false; // per ora sempre cliccabile (è una copia)
+  const endlessBtn = makePyramid('home-endless', endlessLabel, endlessLocked, () => {
+    currentMode = 'endless';
+    hideHome();
+    startScreen().catch(fail); // stessa logica di Storia
+  });
+
+  // Coming Soon
+  const soonBtn = makePyramid('home-soon', 'Coming Soon', true, null);
+
+  pyramids.append(storyBtn, endlessBtn, soonBtn);
+  content.append(title, subtitle, pyramids);
+  el.append(bg, content);
+
+  // Aggiungi al body (fuori dallo stage per coprire tutto)
+  document.body.append(el);
+  return el;
+}
+
+function showHome() {
+  if (state || busy) return;
+  const el = homeDialog();
+
+  // Aggiorna etichetta Endless se la storia è stata completata
+  const endlessBtn = $('home-endless');
+  if (endlessBtn) {
+    const label = endlessBtn.querySelector('.pyramid-label');
+    if (label) label.textContent = isStoryCompleted() ? 'Modalità Endless' : '???';
+  }
+
+  el.classList.remove('hidden');
+  // Nascondi gli altri overlay di avvio
+  hideStart();
+  closeColorDialog();
+}
+
+function hideHome() {
+  $('home-dialog')?.classList.add('hidden');
+}
+
 // ---------- Schermata iniziale: recupera partita precedente / nuova partita ----------
 let priorMatch = null, probing = false;
 async function probePrior() {
@@ -1332,7 +1462,7 @@ async function recoverPrior() {
     const result = await api(`/match/${encodeURIComponent(id)}`);
     if (result.state?.state_version !== 4) throw new Error('Partita non più compatibile: avvia una nuova partita.');
     matchId = id; state = result.state; flow = null; priorMatch = null; deathDraft = {choiceId:null,instanceIds:[]};
-    localStorage.setItem('bellum:last-match',matchId); hideStart(); close(); closeGraveyard(); closeColorDialog();
+    localStorage.setItem('bellum:last-match',matchId); hideStart(); hideHome(); close(); closeGraveyard(); closeColorDialog();
   } catch(e) { fail(e); }
   finally {
     busy = false; await render().catch(fail);
@@ -1343,7 +1473,7 @@ async function recoverPrior() {
 function openColorDialog() {
   if (busy || reaction() || pending() || obligatory()) return;
   close(); closeGraveyard();
-  hideStart(); // non deve restare sotto e riapparire dopo moneta/maledizione
+  hideStart(); hideHome(); // non deve restare sotto e riapparire dopo moneta/maledizione
   const el = colorDialog();
   $('deck-color-validation').textContent = '';
   if ($('deck-primary-color').value === $('deck-secondary-color').value) $('deck-secondary-color').value = 'INF';
@@ -1517,11 +1647,12 @@ async function init() {
   });
   $('end-turn-button')?.addEventListener('click',() => { if (active()) request('end-turn',{},''); });
   $('refresh-button')?.addEventListener('click',() => refreshMatch().catch(fail));
-  $('logout-button')?.addEventListener('click',() => signOut().then(() => { presentationGeneration++; presentationLayer().style.display = 'none'; matchId = null; state = null; flow = null; priorMatch = null; deathDraft = {choiceId:null,instanceIds:[]}; close(); closeGraveyard(); closeColorDialog(); reactionDialog().classList.add('hidden'); choiceDialog().classList.add('hidden'); }).catch(fail));
+  $('logout-button')?.addEventListener('click',() => signOut().then(() => { presentationGeneration++; presentationLayer().style.display = 'none'; matchId = null; state = null; flow = null; priorMatch = null; deathDraft = {choiceId:null,instanceIds:[]}; close(); closeGraveyard(); closeColorDialog(); hideHome(); hideStart(); reactionDialog().classList.add('hidden'); choiceDialog().classList.add('hidden'); }).catch(fail));
   document.addEventListener('keydown',e => { if (e.key === 'Escape' && !obligatory()) { if (!$('deck-color-dialog')?.classList.contains('hidden') && !busy) closeColorDialog(); else if (!$('graveyard-dialog')?.classList.contains('hidden')) closeGraveyard(); else if (view) close(); } });
   await render();
-  await startScreen();
+  // Dopo il login mostriamo la Home (deserto + piramidi)
+  showHome();
 }
-window.addEventListener('bellum:auth-ready',() => init().then(() => startScreen()).catch(fail));
+window.addEventListener('bellum:auth-ready',() => init().then(() => showHome()).catch(fail));
 getCurrentUser().then(user => { if (user) return init(); }).catch(fail);
 wireStage();

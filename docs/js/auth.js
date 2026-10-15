@@ -116,6 +116,8 @@ function paintLoginEyes() {
 export function showAuthScreen(options = {}) {
   authScreen?.classList.remove('hidden');
   gameScreen?.classList.add('hidden');
+  // Nascondi anche la Home se era aperta
+  document.getElementById('home-dialog')?.classList.add('hidden');
   setAuthMessage();
   paintLoginEyes();
 
