@@ -1845,6 +1845,7 @@ body.notice-open #stage .action-panel button {
   color: var(--tomb-gold-light, #e8c565);
 }
 
+
 /* ========== HOME PAGE (deserto + piramidi) ========== */
 .home-dialog {
   position: fixed;
@@ -1854,6 +1855,7 @@ body.notice-open #stage .action-panel button {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  background: #0d0a08;
 }
 .home-dialog.hidden {
   display: none !important;
@@ -1863,44 +1865,32 @@ body.notice-open #stage .action-panel button {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 120% 60% at 50% 100%, #c9a04355 0%, transparent 55%),
-    radial-gradient(ellipse 80% 40% at 20% 80%, #8a5a1444 0%, transparent 50%),
-    radial-gradient(ellipse 80% 40% at 80% 85%, #6b3f0c33 0%, transparent 50%),
+    radial-gradient(ellipse 100% 70% at 50% 100%, #c9a04333 0%, transparent 60%),
+    radial-gradient(ellipse 80% 50% at 30% 90%, #8a5a1422 0%, transparent 55%),
+    radial-gradient(ellipse 80% 50% at 70% 95%, #6b3f0c22 0%, transparent 55%),
     linear-gradient(180deg,
-      #1a120a 0%,
-      #2e2214 18%,
-      #4a3520 42%,
-      #6b4a28 62%,
-      #8a6a3a 78%,
-      #c9a05a 100%
+      #0a0806 0%,
+      #14100c 25%,
+      #1e1810 50%,
+      #2a2014 75%,
+      #3a2c18 100%
     );
   pointer-events: none;
 }
 
-/* dune stilizzate */
+/* leggera foschia in basso */
 .home-desert::before {
   content: '';
   position: absolute;
   bottom: 0;
-  left: -10%;
-  right: -10%;
-  height: 38%;
-  background:
-    radial-gradient(ellipse 50% 100% at 15% 100%, #a07840 0%, transparent 70%),
-    radial-gradient(ellipse 55% 100% at 50% 100%, #b88a4a 0%, transparent 70%),
-    radial-gradient(ellipse 50% 100% at 85% 100%, #9a7040 0%, transparent 70%);
-  opacity: 0.85;
-}
-
-/* cielo / foschia */
-.home-desert::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  left: -5%;
+  right: -5%;
   height: 45%;
-  background: linear-gradient(180deg, #0d0a08 0%, #1a120a88 40%, transparent 100%);
+  background:
+    radial-gradient(ellipse 60% 80% at 20% 100%, #a0784033 0%, transparent 70%),
+    radial-gradient(ellipse 70% 90% at 50% 100%, #b88a4a28 0%, transparent 70%),
+    radial-gradient(ellipse 60% 80% at 80% 100%, #9a704028 0%, transparent 70%);
+  opacity: 0.9;
   pointer-events: none;
 }
 
@@ -1910,27 +1900,28 @@ body.notice-open #stage .action-panel button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.6rem;
-  padding: 1.2rem;
+  gap: 0.5rem;
+  padding: 1rem;
   text-align: center;
   max-width: 96vw;
+  width: 100%;
 }
 
 .home-title {
   margin: 0;
   font-family: 'Lilita One', Georgia, serif;
-  font-size: clamp(1.6rem, 5vw, 2.4rem);
+  font-size: clamp(1.5rem, 5vw, 2.3rem);
   color: #e8c565;
   letter-spacing: 0.03em;
-  text-shadow: 0 2px 12px #000a, 0 0 30px #c9a04355;
+  text-shadow: 0 2px 12px #000a, 0 0 28px #c9a04344;
 }
 
 .home-subtitle {
-  margin: 0 0 1.2rem;
+  margin: 0 0 1rem;
   font-family: 'Nunito', system-ui, sans-serif;
   font-weight: 700;
-  font-size: clamp(0.9rem, 2.8vw, 1.1rem);
-  color: #efe2c0cc;
+  font-size: clamp(0.85rem, 2.6vw, 1.05rem);
+  color: #efe2c0bb;
   text-shadow: 0 1px 6px #0008;
 }
 
@@ -1939,42 +1930,55 @@ body.notice-open #stage .action-panel button {
   flex-wrap: wrap;
   justify-content: center;
   align-items: flex-end;
-  gap: clamp(1rem, 4vw, 2.5rem);
-  margin-top: 0.5rem;
+  gap: clamp(0.8rem, 3.5vw, 2.2rem);
+  margin-top: 0.3rem;
+  width: 100%;
 }
 
 .home-pyramid {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.5rem;
   background: transparent;
   border: none;
-  padding: 0.4rem;
+  padding: 0.3rem;
   cursor: pointer;
-  transition: transform 0.2s ease, filter 0.2s ease;
+  transition: transform 0.22s ease, filter 0.22s ease;
   color: #efe2c0;
   font-family: 'Nunito', system-ui, sans-serif;
   font-weight: 800;
-  font-size: clamp(0.85rem, 2.5vw, 1.05rem);
+  font-size: clamp(0.8rem, 2.4vw, 1rem);
   text-shadow: 0 1px 4px #000a;
 }
 
 .home-pyramid:not(.is-locked):hover {
-  transform: translateY(-10px) scale(1.06);
-  filter: drop-shadow(0 8px 18px #e8c56566);
+  transform: translateY(-8px) scale(1.05);
+  filter: drop-shadow(0 10px 20px #e8c56555);
 }
 
 .home-pyramid:not(.is-locked):active {
-  transform: translateY(-4px) scale(1.02);
+  transform: translateY(-3px) scale(1.02);
 }
 
 .home-pyramid.is-locked {
   cursor: not-allowed;
-  opacity: 0.45;
-  filter: grayscale(0.35);
+  opacity: 0.42;
+  filter: grayscale(0.4);
 }
 
+/* Immagine piramide (es. piramide1.png) */
+.home-pyramid .pyramid-img {
+  display: block;
+  width: clamp(140px, 28vw, 240px);
+  height: auto;
+  max-height: 160px;
+  object-fit: contain;
+  border-radius: 8px;
+  filter: drop-shadow(0 6px 14px #0009);
+}
+
+/* SVG di fallback */
 .home-pyramid .pyramid-svg {
   display: block;
   width: clamp(100px, 22vw, 150px);
@@ -1983,18 +1987,33 @@ body.notice-open #stage .action-panel button {
 }
 
 .home-pyramid .pyramid-label {
-  max-width: 9rem;
+  max-width: 10rem;
   line-height: 1.25;
 }
 
-/* su schermi molto stretti metti le piramidi una sotto l'altra */
-@media (max-width: 480px) {
+/* Cellulare: piramidi una sotto l’altra per più spazio */
+@media (max-width: 560px) {
   .home-pyramids {
     flex-direction: column;
     align-items: center;
-    gap: 1.4rem;
+    gap: 1.3rem;
+  }
+  .home-pyramid .pyramid-img {
+    width: min(260px, 78vw);
+    max-height: 150px;
   }
   .home-pyramid .pyramid-svg {
-    width: 120px;
+    width: 130px;
+  }
+}
+
+/* Schermi molto larghi (PC con colonne laterali): tieni le piramidi in una fascia centrale */
+@media (min-width: 1100px) {
+  .home-content {
+    max-width: 720px;
+  }
+  .home-pyramid .pyramid-img {
+    width: 220px;
+    max-height: 140px;
   }
 }
