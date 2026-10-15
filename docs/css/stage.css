@@ -1579,7 +1579,7 @@ body.notice-open #stage .action-panel button {
   box-sizing: border-box;
   border-radius: 10% / 6%;
   background: transparent;
-  border: 3px solid red !important; /* DEBUG: togliere a fine taratura */
+  /* bordo debug rimosso — allineamento ok */
 }
 .auth-phone-screen .auth-card {
   width: 100%;
