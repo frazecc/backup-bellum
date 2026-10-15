@@ -6,8 +6,8 @@ const FAC = { 1: ['CHI', 'Chiericanza'], 2: ['INF', 'Infamia'], 3: ['PES', 'Pest
 const TYPES = { monster: 'Mostro', mostrissimo: 'Mostrissimo', maledizione: 'Maledizione', instant: 'Trappola', aura: 'Aura', terraforma: 'Terraforma' };
 const RAR = { common: 'Comune', uncommon: 'Non comune', rare: 'Rara', ultra_rare: 'Ultra rara', legendary: 'Leggendaria' };
 const CREA = ['monster', 'mostrissimo'];
-const TRG = ['opponent_upkeep_start', 'opponent_upkeep_end', 'opponent_hand_card', 'monster_etb', 'mostrissimo_before_entry'];
-const CTRG = ['opponent_hand_card', 'monster_etb', 'mostrissimo_before_entry'];
+const TRG = ['opponent_upkeep_start', 'opponent_upkeep_end', 'card_played_from_hand', 'creature_enters_field', 'card_enters_field', 'own_creature_enters_field', 'opponent_creature_enters_field', 'mostrissimo_before_entry', 'opponent_hand_card', 'monster_etb'];
+const CTRG = ['card_played_from_hand', 'creature_enters_field', 'card_enters_field', 'own_creature_enters_field', 'opponent_creature_enters_field', 'mostrissimo_before_entry', 'opponent_hand_card', 'monster_etb'];
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -51,7 +51,9 @@ function parseEff(j, ty) {
 const TG = {
   draw: ['self', 'opponent'], discard: ['self', 'opponent'],
   heal: ['self', 'opponent', ...CT.map((x) => x[0])], damage: [...CT.map((x) => x[0]), 'any_target', 'opponent'],
-  return_hand: ['any_creature'], destroy: ['any_creature'],
+  // Fase 3: return_hand su permanenti (no Mostrissimi), destroy su tutti i permanenti
+  return_hand: ['any_creature', 'any_permanent', 'any_permanent_except_mostrissimo', 'any_target'],
+  destroy: ['any_creature', 'any_permanent', 'any_target'],
   // all_creatures escluso: il motore applica i bonus solo alle creature di chi gioca la carta.
   buff: ['any_creature', 'all_creatures_self', 'enchanted_creature', 'triggering_creature', 'source_creature']
 };
@@ -118,7 +120,7 @@ function effErr(e, ty, trg, death = false) {
   if (amount !== undefined && !(Number.isInteger(amount) && amount >= 0 && amount <= 20)) E.push(`${t}: la quantità deve essere tra 0 e 20.`);
   if (e.keep !== undefined && (t !== 'discard' || !Number.isInteger(e.keep) || e.keep < 0 || e.keep > 20 || e.trigger !== undefined)) E.push('Scarto \"tutta la mano tranne N\": solo per lo scarto, con N tra 0 e 20 e senza trigger.');
   if (t === 'counter') {
-    if (ty !== 'instant' || !CTRG.includes(trg)) E.push('NOPE: serve una Trappola con evento \"carta dalla mano\", \"ingresso mostro\" o \"prima del Mostrissimo\".');
+    if (ty !== 'instant' || !CTRG.includes(trg)) E.push('NOPE: serve una Trappola con evento di reazione valido.');
     return E;
   }
   if (t === 'movement_cost') {
@@ -141,7 +143,7 @@ function effErr(e, ty, trg, death = false) {
     return E;
   }
   if (e.target === 'triggering_creature') E.push('Il bersaglio \"creatura che ha attivato il trigger\" richiede un trigger.');
-  if (e.target === 'any_target' && t !== 'damage') E.push('Il bersaglio a scelta tra giocatore e creature vale solo per i danni.');
+  if (e.target === 'any_target' && t !== 'damage' && t !== 'return_hand' && t !== 'destroy') E.push('Il bersaglio a scelta vale solo per danni, return_hand e destroy.');
   if (e.target === 'source_creature' && (t !== 'buff' || !CREA.includes(ty) || death)) E.push('\"Questa creatura\" vale solo per i bonus all\'ingresso di Mostri e Mostrissimi.');
   if (!TG[t]) { E.push(`Effetto \"${e.type}\" non supportato dal motore.`); return E; }
   if (ty === 'aura' && t !== 'buff') E.push('Le Aure ammettono solo bonus o movimento a costo 0.');
