@@ -1709,17 +1709,27 @@ body.notice-open #stage .action-panel button {
   overflow-wrap: normal;
   word-break: normal;
 }
-/* Utility: nasconde qualsiasi elemento con class="hidden" */
-.hidden {
+/* Utility: nasconde elementi con class="hidden" (specificità alta per battere .form-stack) */
+.hidden,
+.auth-phone-screen .hidden,
+.auth-phone-screen .form-stack.hidden,
+.auth-phone-screen #auth-known.hidden,
+.auth-phone-screen #login-form.hidden {
   display: none !important;
 }
 
-/* Utente conosciuto: solo messaggio + 2 bottoni */
+/* Utente conosciuto: solo messaggio + 2 bottoni (niente titolo/quote/form) */
 .auth-screen.auth-known-mode .mummy-quote,
 .auth-screen.auth-known-mode .eyebrow,
-.auth-screen.auth-known-mode .auth-card h1 { display: none; }
-.auth-screen.auth-known-mode #login-form { display: none !important; }
-.auth-screen.auth-known-mode #auth-known { display: flex !important; }
+.auth-screen.auth-known-mode .auth-card h1 {
+  display: none !important;
+}
+.auth-screen.auth-known-mode #login-form {
+  display: none !important;
+}
+.auth-screen.auth-known-mode #auth-known {
+  display: flex !important;
+}
 
 @media (min-width: 900px) {
   .auth-scene {
