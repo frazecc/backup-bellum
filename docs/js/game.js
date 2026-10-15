@@ -48,7 +48,16 @@ const faction = d => {
 };
 // ---------- Passo 1: helper di presentazione (stage) ----------
 const stageRoot = () => $('stage') ?? document.body; // tutti i dialoghi vivono dentro la colonna centrale
-const costText = d => d.card_type === 'mostrissimo' ? `✦${Number(d.sacrifice_cost ?? 0)}` : `⚡${Number(d.mana_cost ?? 0)}`;
+/** Costo mana effettivo (Medaglione CLO in Storia: creature −1, min 1). */
+function effectiveManaCost(d) {
+  let cost = Number(d?.mana_cost ?? 0);
+  if (currentMode === 'story' && d?.card_type === 'monster') {
+    const med = getStoryProgress()?.chosenPower;
+    if (med === 'CLO') cost = Math.max(1, cost - 1);
+  }
+  return cost;
+}
+const costText = d => d.card_type === 'mostrissimo' ? `✦${Number(d.sacrifice_cost ?? 0)}` : `⚡${effectiveManaCost(d)}`;
 const plainText = d => String(d?.effect_text ?? '').replace(/\*\*/g,'').replace(/\s+/g,' ').trim();
 const hasText = d => plainText(d).length > 0;
 /** Anteprima effetto: intero se corto, altrimenti taglio + puntini. */
@@ -1042,7 +1051,7 @@ async function beginCard(instanceId,d) {
   await render(); notice(flow.step === 'cell' ? 'Scegli una cella libera della tua riga.' : 'Scegli una creatura bersaglio.','success');
 }
 function playable(d) {
-  if (!active() || d.card_type === 'mostrissimo' || d.card_type === 'instant' || Number(d.mana_cost) > me().current_mana) return false;
+  if (!active() || d.card_type === 'mostrissimo' || d.card_type === 'instant' || effectiveManaCost(d) > me().current_mana) return false;
   if ((d.card_type === 'monster' || d.card_type === 'terraforma') && !board()[2].some(c => !c)) return false;
   if (d.card_type === 'aura' && !targets(d).length) return false;
   if (!creature(d) && d.card_type !== 'aura' && targetEffect(d) && !hasTargets(d)) return false;
@@ -1051,7 +1060,7 @@ function playable(d) {
 /** Troppo cara rispetto al mana massimo del turno (bende mummia). Vale anche per trappole/instant. */
 function tooExpensive(d) {
   if (!d || d.card_type === 'mostrissimo') return false;
-  return Number(d.mana_cost ?? 0) > Number(me()?.max_mana ?? 0);
+  return effectiveManaCost(d) > Number(me()?.max_mana ?? 0);
 }
 async function drawBoard() {
   const root = $('shared-board'); if (!root) return;
@@ -2313,7 +2322,39 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
   // Niente popup «Creazione partita / Ho capito»: solo feedback sul form.
   if ($('deck-color-validation')) $('deck-color-validation').textContent = 'Il patto si sta sigillando…';
   try {
-    const result = await api('/match/create', { method: 'POST', body: { primaryColor, secondaryColor } });
+    // Body base +, in Storia, vita boss e Medaglione
+    const createBody = { primaryColor, secondaryColor };
+    if (currentMode === 'story') {
+      let progress = getStoryProgress();
+      // 3ª partita: scegli il Medaglione PRIMA di creare la partita, così vale subito
+      if (progress && getStoryFightIndex(progress) === 2 && !progress.chosenPower) {
+        const previewBoss = pickNextBoss(progress);
+        const bossPreview = BOSS_DATA[previewBoss] || { name: previewBoss };
+        await showMummyDialog(
+          `Oh no! ${bossPreview.name} sta barando!\nSta usando il suo Medaglione!\n\nTieni, prendi… usa uno di questi cheat code, presto!`
+        );
+        const chosen = await showCheatCodeChoice(progress);
+        if (chosen) {
+          progress = getStoryProgress() || progress;
+          progress.chosenPower = chosen;
+          saveStoryProgress(progress);
+          const med = BOSS_DATA[chosen];
+          await showMummyDialog(
+            `Hai attivato il ${med.medaglioneName}!\n«${med.powerDesc}»\n\nQuesto potere resterà attivo anche contro Indrazzico.`
+          );
+        }
+        progress = getStoryProgress() || progress;
+      }
+      const fightIndex = getStoryFightIndex(progress);
+      // Se non restano boss intermedi → Indrazzico a 20 vita (dopo la Mummia)
+      const remaining = progress ? getRemainingBosses(progress) : ['x', 'y', 'z'];
+      const aiLife = remaining.length === 0 ? 20 : getBossLifeForFight(fightIndex);
+      createBody.story = {
+        aiStartingLife: aiLife,
+        humanMedallion: progress?.chosenPower || null,
+      };
+    }
+    const result = await api('/match/create', { method: 'POST', body: createBody });
     presentationGeneration++;
     presentationLayer().style.display = 'none';
     matchId = result.match_id;
