@@ -1709,11 +1709,17 @@ body.notice-open #stage .action-panel button {
   overflow-wrap: normal;
   word-break: normal;
 }
+/* Utility: nasconde qualsiasi elemento con class="hidden" */
+.hidden {
+  display: none !important;
+}
+
 /* Utente conosciuto: solo messaggio + 2 bottoni */
 .auth-screen.auth-known-mode .mummy-quote,
 .auth-screen.auth-known-mode .eyebrow,
 .auth-screen.auth-known-mode .auth-card h1 { display: none; }
 .auth-screen.auth-known-mode #login-form { display: none !important; }
+.auth-screen.auth-known-mode #auth-known { display: flex !important; }
 
 @media (min-width: 900px) {
   .auth-scene {
