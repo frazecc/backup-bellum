@@ -154,6 +154,29 @@ function wireReduceMotion() {
     applyReduceMotion(next);
   });
 }
+
+/** Preferenza: conferma automatica dei popup «Ho capito» (solo phase-banner, non dialoghi Mummia). */
+function isAutoNotice() {
+  try { return localStorage.getItem('bellum:auto-ho-capito') === '1'; } catch (_) { return false; }
+}
+function applyAutoNotice(on) {
+  const toggle = $('auto-notice-toggle');
+  if (toggle) toggle.setAttribute('aria-checked', on ? 'true' : 'false');
+  try { localStorage.setItem('bellum:auto-ho-capito', on ? '1' : '0'); } catch (_) { /* ignore */ }
+}
+function wireAutoNotice() {
+  const toggle = $('auto-notice-toggle');
+  if (!toggle || toggle.dataset.ready) return;
+  toggle.dataset.ready = 'true';
+  let stored = null;
+  try { stored = localStorage.getItem('bellum:auto-ho-capito'); } catch (_) { /* ignore */ }
+  applyAutoNotice(stored === '1');
+  toggle.addEventListener('click', e => {
+    e.stopPropagation();
+    const next = toggle.getAttribute('aria-checked') !== 'true';
+    applyAutoNotice(next);
+  });
+}
 let narratorResolver = null;
 function setNarratorImage(src) {
   const url = src || 'img/mummy/mummy-base.png';
@@ -208,11 +231,13 @@ function wireMenu() {
   button.addEventListener('click',e => { e.stopPropagation(); setOpen(panel.classList.contains('hidden')); });
   panel.addEventListener('click',e => {
     const t = e.target.closest?.('button');
-    if (t && t.id !== 'reduce-motion-toggle') setOpen(false);
+    // I toggle restano aperti (non chiudono il menu)
+    if (t && t.id !== 'reduce-motion-toggle' && t.id !== 'auto-notice-toggle') setOpen(false);
   });
   document.addEventListener('click',e => { if (!panel.classList.contains('hidden') && !panel.contains(e.target)) setOpen(false); });
   document.addEventListener('keydown',e => { if (e.key === 'Escape' && !panel.classList.contains('hidden')) setOpen(false); });
   wireReduceMotion();
+  wireAutoNotice();
 }
 function drawOpponentHand() {
   const root = $('opponent-hand'); if (!root) return;
@@ -372,6 +397,11 @@ function notice(text, type = '') {
       // click sul banner (anche fuori dal bottone) chiude
       if (e.target === el || e.target.classList?.contains('phase-banner-text')) dismissNotice();
     };
+
+    // Auto «Ho capito»: chiude da solo dopo una breve pausa (solo questi banner, non i dialoghi Mummia)
+    if (isAutoNotice()) {
+      noticeTimer = setTimeout(() => { dismissNotice(); }, 900);
+    }
   });
 }
 
@@ -774,6 +804,38 @@ function queuePresentation(onlyLast = false) {
   })();
 }
 
+/** Pulisce completamente la UI della partita (griglia, mani, overlay) senza toccare i progressi Storia. */
+function clearMatchUI() {
+  try { localStorage.removeItem('bellum:last-match'); } catch (_) { /* ignore */ }
+  matchId = null;
+  state = null;
+  flow = null;
+  priorMatch = null;
+  deathDraft = { choiceId: null, instanceIds: [] };
+  presentationGeneration++;
+  try { presentationLayer().style.display = 'none'; } catch (_) { /* ignore */ }
+  close();
+  closeGraveyard();
+  closeColorDialog();
+  hideStoryStart();
+  try { reactionDialog()?.classList.add('hidden'); } catch (_) { /* ignore */ }
+  try { choiceDialog()?.classList.add('hidden'); } catch (_) { /* ignore */ }
+  const medBanner = $('story-medallion-banner');
+  if (medBanner) medBanner.classList.add('hidden');
+  // Svuota la griglia e la mano IA così non resta la partita vecchia a video
+  const board = $('shared-board');
+  if (board) board.innerHTML = '';
+  const oppHand = $('opponent-hand');
+  if (oppHand) oppHand.replaceChildren();
+  const offer = $('offer-slot');
+  if (offer) offer.innerHTML = '';
+  // Reset HUD vita/mazzo (verranno aggiornati alla prossima partita)
+  for (const id of ['opponent-life', 'player-life', 'opponent-deck-count', 'player-deck-count', 'opponent-graveyard-count', 'player-graveyard-count']) {
+    const n = $(id);
+    if (n) n.textContent = '–';
+  }
+}
+
 /** Gestisce fine partita (vittoria o sconfitta) da qualsiasi punto del flusso. */
 async function handleMatchFinished() {
   if (!state || state.status !== 'finished') return;
@@ -789,23 +851,8 @@ async function handleMatchFinished() {
 
   if (!won) {
     const wasStory = currentMode === 'story';
-    localStorage.removeItem('bellum:last-match');
-    matchId = null;
-    state = null;
-    flow = null;
-    priorMatch = null;
-    deathDraft = { choiceId: null, instanceIds: [] };
-    presentationGeneration++;
-    presentationLayer().style.display = 'none';
-    close();
-    closeGraveyard();
-    closeColorDialog();
-    hideStoryStart();
+    clearMatchUI();
     hideHome();
-    reactionDialog().classList.add('hidden');
-    choiceDialog().classList.add('hidden');
-    const medBanner = $('story-medallion-banner');
-    if (medBanner) medBanner.classList.add('hidden');
 
     if (wasStory) {
       clearStoryProgress();
@@ -1107,7 +1154,7 @@ async function drawMostrissimi() {
 }
 function controls() {
   const disable = (id,v) => { if ($(id)) $(id).disabled = !!v; };
-  disable('new-match-button',busy || obligatory()); disable('end-turn-button',!active()); disable('refresh-button',busy || !matchId);
+  disable('end-turn-button',!active());
   disable('cancel-selection-button',busy || obligatory() || !flow || (!!pending() && flow?.kind !== 'trap-target'));
   // Riga sotto la griglia disabilitata: non fa «saltare» il layout.
   // Le indicazioni restano nei notice/popup (Ho capito).
@@ -1901,7 +1948,8 @@ function showMummyDialog(text) {
   });
 }
 
-/** Dopo una vittoria in Storia: aggiorna progressi e propone il prossimo passo. */
+/** Dopo una vittoria in Storia: aggiorna progressi e propone il prossimo passo.
+ *  Prima pulisce la griglia, poi mostra la schermata di complimenti della Mummia. */
 async function handleStoryVictory() {
   let progress = getStoryProgress();
   if (!progress) return;
@@ -1918,21 +1966,9 @@ async function handleStoryVictory() {
     // Marca anche la vecchia chiave per compatibilità
     try { localStorage.setItem('bellum:story-completed', '1'); } catch { /* ignore */ }
 
+    // Schermata ad hoc: griglia via, solo complimenti della Mummia
+    clearMatchUI();
     await showMummyDialog(BOSS_DATA.IND.mummyAfter + '\n\nHai ottenuto il trofeo «Abitante della Piramide»!\nLa Modalità Endless è ora sbloccata.');
-    
-    // Pulisci la partita e torna alla Home
-    localStorage.removeItem('bellum:last-match');
-    matchId = null;
-    state = null;
-    flow = null;
-    priorMatch = null;
-    deathDraft = { choiceId: null, instanceIds: [] };
-    presentationGeneration++;
-    presentationLayer().style.display = 'none';
-    close();
-    closeGraveyard();
-    closeColorDialog();
-    hideStoryStart();
     showHome();
     return;
   }
@@ -1944,6 +1980,9 @@ async function handleStoryVictory() {
   }
   progress.currentBoss = null;
   saveStoryProgress(progress);
+
+  // Schermata ad hoc: togli la griglia vecchia, poi i complimenti della Mummia
+  clearMatchUI();
 
   const boss = BOSS_DATA[justBeaten] || { mummyAfter: 'Hai vinto.' };
   await showMummyDialog(boss.mummyAfter);
@@ -1957,21 +1996,9 @@ async function handleStoryVictory() {
   // Chiedi se continuare subito o tornare alla Home
   const continueNow = await showStoryContinueChoice(remaining.length === 0);
   if (continueNow) {
+    // La griglia è già pulita: newMatch la ricostruirà da zero
     await startNextStoryFight(progress);
   } else {
-    // Torna alla Home
-    localStorage.removeItem('bellum:last-match');
-    matchId = null;
-    state = null;
-    flow = null;
-    priorMatch = null;
-    deathDraft = { choiceId: null, instanceIds: [] };
-    presentationGeneration++;
-    presentationLayer().style.display = 'none';
-    close();
-    closeGraveyard();
-    closeColorDialog();
-    hideStoryStart();
     showHome();
   }
 }
@@ -2304,14 +2331,12 @@ async function init() {
   if ($('signed-in-user')) $('signed-in-user').textContent = `@${usernameFromEmail(user.email)}`;
   if ($('player-title')) $('player-title').textContent = usernameFromEmail(user.email) || 'Tu';
   overlay(); reactionDialog(); choiceDialog(); graveyardDialog(); colorDialog(); wireGraveyards(); wireMenu(); wireNoticeDismiss(); fitStage();
-  $('new-match-button')?.addEventListener('click',openColorDialog);
   $('cancel-selection-button')?.addEventListener('click',() => {
     if (obligatory()) return;
     if (flow?.kind === 'trap-target') { flow = null; render().catch(fail); notice('Scegli un’altra Trappola o passa.'); return; }
     if (!pending() && !reaction()) { flow = null; close(); render().catch(fail); notice('Selezione annullata.'); }
   });
   $('end-turn-button')?.addEventListener('click',() => { if (active()) request('end-turn',{},''); });
-  $('refresh-button')?.addEventListener('click',() => refreshMatch().catch(fail));
   $('logout-button')?.addEventListener('click',() => signOut().then(() => { presentationGeneration++; presentationLayer().style.display = 'none'; matchId = null; state = null; flow = null; priorMatch = null; deathDraft = {choiceId:null,instanceIds:[]}; close(); closeGraveyard(); closeColorDialog(); hideHome(); hideStart(); hideStoryStart(); reactionDialog().classList.add('hidden'); choiceDialog().classList.add('hidden'); }).catch(fail));
   document.addEventListener('keydown',e => { if (e.key === 'Escape' && !obligatory()) { if (!$('deck-color-dialog')?.classList.contains('hidden') && !busy) closeColorDialog(); else if (!$('graveyard-dialog')?.classList.contains('hidden')) closeGraveyard(); else if (view) close(); } });
   await render();
