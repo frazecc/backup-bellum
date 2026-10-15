@@ -56,14 +56,14 @@ function cleanupLoop(c: Context) {
   c.deaths = []; c.s.anti_loop_counter = 0;
 
   // Messaggio speciale richiesto
-  const announcement = {
+  const announcement: PublicAnnouncement = {
     id: randomUUID(),
-    kind: 'result' as const,
+    kind: 'result',
     actor: null,
     text: 'Le bestie divine sono soddisfatte di ciò che hanno visto. Complimenti.',
     turn: c.s.current_turn,
     phase: c.s.phase,
-    duration_ms: 3000,
+    duration_ms: 1000,
   };
   c.s.public_announcement = announcement;
 
