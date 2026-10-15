@@ -54,7 +54,20 @@ function cleanupLoop(c: Context) {
   c.s.work_queue = c.s.work_queue.filter(x => x.kind !== 'resolve_effect');
   delete c.s.pending_death_order; delete c.s.pending_target_choice;
   c.deaths = []; c.s.anti_loop_counter = 0;
-  log(c, -1, 'anti_loop_cleanup', 'La Penombra divora ogni cosa: venti trigger consecutivi, plancia svuotata.');
+
+  // Messaggio speciale richiesto
+  const announcement = {
+    id: randomUUID(),
+    kind: 'result' as const,
+    actor: null,
+    text: 'Le bestie divine sono soddisfatte di ciò che hanno visto. Complimenti.',
+    turn: c.s.current_turn,
+    phase: c.s.phase,
+    duration_ms: 3000,
+  };
+  c.s.public_announcement = announcement;
+
+  log(c, -1, 'anti_loop_cleanup', 'La Penombra divora ogni cosa: venti trigger consecutivi, plancia svuotata. Le bestie divine sono soddisfatte di ciò che hanno visto. Complimenti.');
 }
 function deathTasks(sources: DeathTriggerSource[]): ResolveEffectWork[] {
   return sources.flatMap(x => x.effect_indices.map(effect_index => ({
@@ -297,20 +310,30 @@ async function resolveEffectOrChoose(c: Context, task: ResolveEffectWork) {
 function eventTrigger(e: PendingEvent): ReactionTriggerEvent | null {
   if (e.kind === 'upkeep_start') return 'opponent_upkeep_start';
   if (e.kind === 'upkeep_end') return 'opponent_upkeep_end';
-  if (e.kind === 'hand_card') return 'opponent_hand_card';
+  if (e.kind === 'hand_card') return 'card_played_from_hand';          // CAMBIATO
   if (e.kind === 'mostrissimo_before_entry') return 'mostrissimo_before_entry';
-  if (e.kind === 'monster_etb') return 'monster_etb';
+  if (e.kind === 'monster_etb') return 'creature_enters_field';         // CAMBIATO
   return null;
 }
-async function noPeAllowed(d: CardData, e: PendingEvent) {
+async function noPeAllowed(d: CardData, e: PendingEvent): Promise<boolean> {
   const tr = reactionTrigger(d);
-  if (tr === 'opponent_hand_card') {
-    if (e.kind !== 'hand_card') return false;
-    const declared = await getCardData(e.card_id);
-    return declared.card_type === 'maledizione';
+  if (!tr) return false;
+
+  // Compatibilità temporanea con i vecchi nomi di trigger
+  if (tr === 'opponent_hand_card') return e.kind === 'hand_card';
+  if (tr === 'monster_etb') return e.kind === 'monster_etb';
+
+  // Nuovi trigger
+  if (tr === 'card_played_from_hand') return e.kind === 'hand_card';
+  if (tr === 'creature_enters_field' || tr === 'card_enters_field' ||
+      tr === 'own_creature_enters_field' || tr === 'opponent_creature_enters_field') {
+    return e.kind === 'monster_etb';
   }
-  return (tr === 'mostrissimo_before_entry' && e.kind === 'mostrissimo_before_entry')
-    || (tr === 'monster_etb' && e.kind === 'monster_etb');
+  if (tr === 'mostrissimo_before_entry') return e.kind === 'mostrissimo_before_entry';
+  if (tr === 'opponent_upkeep_start') return e.kind === 'upkeep_start';
+  if (tr === 'opponent_upkeep_end') return e.kind === 'upkeep_end';
+
+  return false;
 }
 function legalPositions(s: GameState, p: PlayerIndex, freed: Position[]) {
   const out: Position[] = [];
