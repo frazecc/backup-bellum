@@ -30,6 +30,7 @@ export type ReactionTriggerEvent =
   // DEPRECATED – mantenuti solo per retrocompatibilità durante la migrazione
   | 'opponent_hand_card'
   | 'monster_etb';
+export type ReactionTrigger = { event: ReactionTriggerEvent };
 
 export type EffectDefinition = {
   type: EffectType;
