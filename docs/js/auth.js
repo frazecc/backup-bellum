@@ -76,7 +76,7 @@ function showLoginForm() {
 function showKnownUser(user) {
   const name = usernameFromEmail(user?.email) || 'viaggiatore';
   if (authKnownName) {
-    authKnownName.innerHTML = `Riconosco<br>quest’ombra<br><strong>@${name}</strong>`;
+    authKnownName.innerHTML = `Riconosco quest'ombra<br>${name}, sei tu?`;
   }
   loginForm?.classList.add('hidden');
   authKnown?.classList.remove('hidden');
