@@ -739,8 +739,13 @@ async function presentPublic(a, generation) {
   layer.append(panel); layer.style.display = 'flex';
   document.body.classList.add('notice-open');
   // Pausa finché l’utente non conferma (bottone o click sullo sfondo del layer).
+  // Se «Auto Ho capito» è attivo, chiude da solo dopo una breve pausa.
   await new Promise(resolve => {
+    let settled = false;
     const done = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(autoTimer);
       if (generation !== presentationGeneration) { resolve(); return; }
       layer.style.display = 'none';
       layer.replaceChildren();
@@ -748,8 +753,12 @@ async function presentPublic(a, generation) {
       layer.onclick = null;
       resolve();
     };
+    let autoTimer = null;
     ok.onclick = e => { e.stopPropagation(); done(); };
     layer.onclick = e => { if (e.target === layer) done(); };
+    if (isAutoNotice()) {
+      autoTimer = setTimeout(done, 900);
+    }
   });
 }
 // Passo 3: ogni risultato pubblico ha il suo balloon (state.public_announcements, in ordine); /advance usa
@@ -812,6 +821,7 @@ function clearMatchUI() {
   flow = null;
   priorMatch = null;
   deathDraft = { choiceId: null, instanceIds: [] };
+  busy = false; // importante: sblocca newMatch dopo una vittoria
   presentationGeneration++;
   try { presentationLayer().style.display = 'none'; } catch (_) { /* ignore */ }
   close();
@@ -822,6 +832,8 @@ function clearMatchUI() {
   try { choiceDialog()?.classList.add('hidden'); } catch (_) { /* ignore */ }
   const medBanner = $('story-medallion-banner');
   if (medBanner) medBanner.classList.add('hidden');
+  const storyProg = $('story-progress-badge');
+  if (storyProg) storyProg.classList.add('hidden');
   // Svuota la griglia e la mano IA così non resta la partita vecchia a video
   const board = $('shared-board');
   if (board) board.innerHTML = '';
@@ -1177,6 +1189,7 @@ async function render() {
   set('opponent-hand-count',them()?.hand?.length ?? 0); set('opponent-deck-count',them()?.deck?.length ?? 0); set('opponent-graveyard-count',them()?.graveyard?.length ?? 0);
   showDeckColors(); drawOpponentHand();
   updateStoryMedallionBanner();
+  updateStoryProgressBadge();
   await drawBoard(); await drawHand(); await drawMostrissimi(); controls(); await renderReaction(); await renderDeathChoice(); await markPlayerTarget();
 }
 
@@ -1201,6 +1214,106 @@ function updateStoryMedallionBanner() {
   const med = BOSS_DATA[power];
   banner.textContent = `✦ ${med.medaglioneName}: ${med.powerDesc}`;
   banner.classList.remove('hidden');
+}
+
+/** Contatore Storia: «Storia 2/4» in alto a destra. Clic → elenco boss sconfitti. */
+function updateStoryProgressBadge() {
+  let badge = $('story-progress-badge');
+  const inStory = currentMode === 'story' && !!(state && matchId);
+  const progress = inStory ? getStoryProgress() : null;
+
+  if (!inStory || !progress) {
+    if (badge) badge.classList.add('hidden');
+    return;
+  }
+
+  // Partite totali: 3 boss intermedi + Indrazzico = 4
+  const beaten = progress.beaten || [];
+  const currentNum = Math.min(beaten.length + 1, 4); // 1..4
+  const total = 4;
+  const label = progress.currentBoss === 'IND'
+    ? `Storia ${total}/${total} · Finale`
+    : `Storia ${currentNum}/${total}`;
+
+  if (!badge) {
+    badge = document.createElement('button');
+    badge.id = 'story-progress-badge';
+    badge.type = 'button';
+    badge.className = 'story-progress-badge';
+    badge.setAttribute('aria-label', 'Progresso Storia: tocca per vedere i boss sconfitti');
+    badge.onclick = e => {
+      e.stopPropagation();
+      showStoryProgressDetail();
+    };
+    document.body.append(badge);
+  }
+  badge.textContent = label;
+  badge.classList.remove('hidden');
+}
+
+/** Popup con i boss già sconfitti (nome + fazione/colore). */
+function showStoryProgressDetail() {
+  const progress = getStoryProgress();
+  if (!progress) return;
+
+  let el = $('story-progress-dialog');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'story-progress-dialog';
+    el.className = 'card-detail-overlay';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.style.zIndex = '160';
+    stageRoot().append(el);
+  }
+  el.innerHTML = '';
+  const panel = document.createElement('div');
+  panel.className = 'panel';
+  panel.style.cssText = 'width:min(92vw,400px);margin:auto;padding:1.2rem;text-align:center;border:1px solid #d5a758;box-shadow:0 12px 48px #000';
+
+  const title = document.createElement('h3');
+  title.style.cssText = 'margin:0 0 0.8rem;font-size:1.15rem;color:#e8c565';
+  title.textContent = 'I tuoi trofei di guerra';
+
+  const list = document.createElement('ul');
+  list.style.cssText = 'list-style:none;margin:0 0 1rem;padding:0;text-align:left';
+
+  const beaten = progress.beaten || [];
+  if (beaten.length === 0) {
+    const empty = document.createElement('p');
+    empty.style.cssText = 'margin:0 0 1rem;opacity:.85';
+    empty.textContent = 'Nessun boss sconfitto ancora. Questa è la tua prima sfida!';
+    panel.append(title, empty);
+  } else {
+    for (const code of beaten) {
+      const data = BOSS_DATA[code] || { name: code };
+      const faction = deckFactionNames[code] || code;
+      const li = document.createElement('li');
+      li.style.cssText = 'padding:0.55rem 0.4rem;border-bottom:1px solid #5a341044;line-height:1.35';
+      li.innerHTML = `<strong>${escape(data.name)}</strong><br><span style="opacity:.85">Fazione: ${escape(faction)} (${escape(code)})</span>`;
+      list.append(li);
+    }
+    panel.append(title, list);
+  }
+
+  if (progress.currentBoss) {
+    const cur = document.createElement('p');
+    cur.style.cssText = 'margin:0 0 1rem;font-size:0.95rem;color:#e8c565';
+    const curData = BOSS_DATA[progress.currentBoss];
+    const curName = curData?.name || progress.currentBoss;
+    const curFac = deckFactionNames[progress.currentBoss] || progress.currentBoss;
+    cur.textContent = `In corso: ${curName} · ${curFac}`;
+    panel.append(cur);
+  }
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'primary-button';
+  btn.textContent = 'Chiudi';
+  btn.onclick = () => el.classList.add('hidden');
+  panel.append(btn);
+  el.append(panel);
+  el.classList.remove('hidden');
 }
 async function logs() {
   if (!$('match-logs') || !matchId) return;
@@ -1859,6 +1972,9 @@ async function resumeStory() {
 /** Avvia la prossima lotta della Storia (boss rimanente o Indrazzico). */
 async function startNextStoryFight(progress) {
   if (!progress) return;
+  // Sblocca sempre: dopo una vittoria busy può essere ancora true (coda presentazioni)
+  busy = false;
+  currentMode = 'story';
   // I dialoghi e la scelta del Medaglione vengono gestiti dentro newMatch
   await newMatch(progress.primary, progress.secondary);
 }
