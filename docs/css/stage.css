@@ -1545,30 +1545,26 @@ body.notice-open #stage .action-panel button {
   box-sizing: border-box;
   background: #120a06;
 }
-/* Scena = immagine intera (come mummy-phone.html di riferimento) */
 .auth-scene {
   position: relative;
   max-width: 420px;
   width: min(100vw, calc(100dvh * 768 / 1376));
   margin: 0 auto;
-  border-radius: 0;
   overflow: hidden;
 }
 .auth-art {
   display: block;
   width: 100%;
   height: auto;
-  vertical-align: middle;
   pointer-events: none;
   user-select: none;
 }
 /*
-  Coordinate calibrate sul riferimento mummy-phone.html:
-  top 26% · left 34% · width 33% · height 33.5%
+  Coordinate mummy-phone.html: top 26% · left 34% · width 33% · height 33.5%
+  Bordo rosso = questo box (DEBUG).
 */
 .auth-phone-screen {
   position: absolute;
-  /* mummy-phone.html di riferimento — bordo rosso = questo box */
   top: 26%;
   left: 34%;
   width: 33%;
@@ -1577,226 +1573,153 @@ body.notice-open #stage .action-panel button {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  align-items: stretch;
-  overflow: hidden; /* niente sbordi */
-  padding: 5% 6%;
+  align-items: center;
+  overflow: hidden;
+  padding: 3.5% 4.5%;
   box-sizing: border-box;
   border-radius: 10% / 6%;
   background: transparent;
-  /* DEBUG */
-  border: 3px solid red !important;
-}
-/* Tutto il contenuto DEVE stare nel box: niente overflow orizzontale */
-.auth-phone-screen,
-.auth-phone-screen * {
-  box-sizing: border-box;
-  max-width: 100%;
-  min-width: 0;
+  border: 3px solid red !important; /* DEBUG: togliere a fine taratura */
 }
 .auth-phone-screen .auth-card {
-  width: 100% !important;
-  max-width: 100% !important;
-  overflow: hidden;
-}
-.auth-phone-screen .form-stack {
   width: 100%;
-  gap: 0.28rem !important;
-}
-.auth-phone-screen label,
-.auth-phone-screen input,
-.auth-phone-screen button,
-.auth-phone-screen .muted,
-.auth-phone-screen h1,
-.auth-phone-screen p {
   max-width: 100%;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-.auth-phone-screen input,
-.auth-phone-screen .primary-button,
-.auth-phone-screen .secondary-button {
-  width: 100% !important;
-  max-width: 100% !important;
-  min-height: 1.55rem !important;
-  padding: 0.22rem 0.35rem !important;
-  font-size: 0.68rem !important;
-  line-height: 1.15 !important;
-}
-.auth-phone-screen h1 {
-  font-size: 0.72rem !important;
-  margin: 0 0 0.12rem !important;
-  line-height: 1.1 !important;
-}
-.auth-phone-screen .eyebrow {
-  font-size: 0.5rem !important;
-  margin: 0 0 0.08rem !important;
-}
-.auth-phone-screen .mummy-quote {
-  font-size: 0.58rem !important;
-  margin: 0 0 0.2rem !important;
-  line-height: 1.2 !important;
-}
-.auth-phone-screen .muted {
-  font-size: 0.62rem !important;
-  line-height: 1.25 !important;
-  margin: 0 0 0.2rem !important;
-}
-.auth-phone-screen .form-message {
-  font-size: 0.55rem !important;
-}
-
-
-
-.auth-screen .auth-card {
-  background: transparent !important;
+  margin: 0 !important;
+  padding: 0 !important;
   border: 0 !important;
   box-shadow: none !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  max-width: none !important;
-  width: 100%;
-  color: #2a1808;
+  background: transparent !important;
+  color: #2a1205;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  gap: 0.18rem;
+  min-width: 0;
+  overflow: hidden;
 }
-.auth-screen .auth-card .eyebrow {
-  margin: 0 0 0.12rem;
-  font-size: clamp(0.52rem, 2vw, 0.65rem);
-  letter-spacing: 0.12em;
+.auth-phone-screen .eyebrow {
+  margin: 0;
+  font-size: 0.45rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #6a4a18;
   font-weight: 800;
-  text-shadow: none;
+  line-height: 1.15;
+  white-space: nowrap;
 }
-.auth-screen .auth-card h1 {
-  margin: 0 0 0.15rem;
-  font-size: clamp(0.7rem, 2.4vw, 0.88rem);
-  line-height: 1.12;
+.auth-phone-screen #auth-title,
+.auth-phone-screen h1 {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.15;
   color: #2a1205;
   font-family: 'Lilita One', Georgia, serif;
   font-weight: 400;
-  text-shadow: none;
+  white-space: nowrap;
 }
-.auth-screen .mummy-quote {
-  margin: 0 0 0.3rem;
+.auth-phone-screen .mummy-quote {
+  margin: 0 0 0.12rem;
+  font-size: 0.52rem;
+  line-height: 1.2;
   color: #4a3210;
   font-weight: 700;
-  font-size: clamp(0.55rem, 1.7vw, 0.68rem);
-  line-height: 1.25;
-  text-shadow: none;
 }
+.auth-phone-screen .form-stack {
+  display: flex !important;
+  flex-direction: column;
+  gap: 0.2rem !important;
+  width: 100%;
+  margin: 0;
+  min-width: 0;
+}
+.auth-phone-screen .form-stack label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  width: 100%;
+  text-align: left;
+  font-size: 0.5rem;
+  font-weight: 700;
+  color: #3a1c08;
+  min-width: 0;
+}
+.auth-phone-screen .form-stack label span {
+  line-height: 1.1;
+}
+.auth-phone-screen .form-stack input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 1.45rem;
+  height: 1.45rem;
+  padding: 0.15rem 0.3rem;
+  border: 1.5px solid #8a5a14;
+  border-radius: 6px;
+  background: #fffef8;
+  color: #1a0a05;
+  font-size: 11px; /* iOS: >=16 evita zoom; qui lo schermo è piccolo: 11px + max-scale viewport se serve */
+  line-height: 1.2;
+  box-sizing: border-box;
+}
+.auth-phone-screen .form-stack input:focus {
+  outline: 1.5px solid #c9a043;
+  border-color: #c9a043;
+}
+.auth-phone-screen .primary-button,
+.auth-phone-screen .secondary-button {
+  width: 100%;
+  max-width: 100%;
+  min-height: 1.5rem;
+  height: auto;
+  padding: 0.22rem 0.3rem;
+  font-size: 0.62rem;
+  line-height: 1.15;
+  border-radius: 7px;
+  border: 1.5px solid #8a5a14;
+  font-weight: 800;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+.auth-phone-screen .primary-button {
+  background: linear-gradient(180deg, #e8c565, #c98a20);
+  color: #2a1205;
+}
+.auth-phone-screen .secondary-button {
+  background: #f7efd8;
+  color: #3a1c08;
+  font-weight: 700;
+}
+.auth-phone-screen .form-message {
+  margin: 0;
+  font-size: 0.48rem;
+  color: #8a2010;
+  font-weight: 700;
+  min-height: 0.7em;
+  line-height: 1.2;
+}
+.auth-phone-screen .muted,
+.auth-phone-screen #auth-known-name {
+  margin: 0 0 0.12rem;
+  font-size: 0.58rem;
+  line-height: 1.25;
+  color: #3a2810;
+  font-weight: 700;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+/* Utente conosciuto: solo messaggio + 2 bottoni */
 .auth-screen.auth-known-mode .mummy-quote,
 .auth-screen.auth-known-mode .eyebrow,
 .auth-screen.auth-known-mode .auth-card h1 { display: none; }
-.auth-screen.auth-known-mode #auth-known {
-  justify-items: center; /* grid: asse orizzontale */
-  align-items: center;
-  text-align: center;
-}
-.auth-screen.auth-known-mode #auth-known-name {
-  line-height: 1.35;
-  margin-bottom: 0.35rem;
-  width: 100%;
-  text-align: center;
-}
-.auth-screen.auth-known-mode #auth-sono-io,
-.auth-screen.auth-known-mode #auth-altro-utente {
-  width: 100%;
-  max-width: 100%;
-  justify-self: stretch;
-  margin-left: 0;
-  margin-right: 0;
-  white-space: nowrap;
-}
-.auth-screen .form-stack {
-  gap: 0.38rem !important;
-}
-.auth-screen .form-stack label {
-  display: grid;
-  gap: 0.1rem;
-  text-align: left;
-  font-size: clamp(0.62rem, 2.1vw, 0.75rem);
-  font-weight: 700;
-  color: #3a1c08;
-  text-shadow: none;
-}
-.auth-screen #login-form {
-  justify-items: stretch;
-  text-align: center;
-  width: 100%;
-}
-.auth-screen #login-form label {
-  width: 100%;
-  max-width: 100%;
-  justify-self: stretch;
-  text-align: left;
-}
-.auth-screen .form-stack input {
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 1.7rem;
-  padding: 0.28rem 0.5rem;
-  border: 2px solid #8a5a14;
-  border-radius: 9px;
-  background: #fffef8;
-  color: #1a0a05;
-  font-size: 16px;
-}
-.auth-screen .form-stack input:focus {
-  outline: 2px solid #c9a043;
-  outline-offset: 1px;
-  border-color: #c9a043;
-}
-.auth-screen .primary-button,
-.auth-screen .secondary-button {
-  min-height: 1.75rem;
-  font-size: clamp(0.68rem, 2vw, 0.8rem);
-  border-radius: 11px;
-  width: 100%;
-  padding: 0.32rem 0.55rem;
-}
-.auth-screen .primary-button {
-  background: linear-gradient(180deg, #e8c565, #c98a20);
-  color: #2a1205;
-  border: 2px solid #8a5a14;
-  font-weight: 800;
-}
-.auth-screen .secondary-button {
-  background: #f7efd8;
-  color: #3a1c08;
-  border: 2px solid #8a5a14;
-  font-weight: 700;
-}
-.auth-screen .form-message {
-  margin: 0.2rem 0 0;
-  font-size: clamp(0.6rem, 2vw, 0.72rem);
-  color: #8a2010;
-  min-height: 1em;
-  text-shadow: none;
-  font-weight: 700;
-}
-.auth-screen .muted {
-  color: #3a2810;
-  font-weight: 700;
-  font-size: clamp(0.62rem, 1.9vw, 0.75rem);
-  margin: 0 0 0.25rem;
-  overflow-wrap: normal;
-  word-break: normal;
-  hyphens: none;
-  text-shadow: none;
-}
+.auth-screen.auth-known-mode #login-form { display: none !important; }
 
 @media (min-width: 900px) {
   .auth-scene {
     max-width: 420px;
     width: min(100vw, 420px, calc(100dvh * 768 / 1376));
   }
-}
-@media (max-height: 700px) {
-  .auth-screen .mummy-quote { display: none; }
-  .auth-phone-screen { padding: 3% 4%; }
-  .auth-screen .form-stack input { min-height: 1.95rem; }
-  .auth-screen .primary-button,
-  .auth-screen .secondary-button { min-height: 2rem; }
 }
 
 /* Riduci animazioni: spegne torcia, fiamma, prism, glow, transition carte */
