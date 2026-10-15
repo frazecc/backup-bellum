@@ -1092,8 +1092,12 @@ async function request(path, body, message) {
     if (state.status === 'finished') {
       const won = state.winner_index === 1;
       await notice(won ? 'HAI VINTO!' : 'HAI PERSO!', won ? 'success' : 'error');
-      if (!won) {
-        // Sconfitta: anima persa → torna alla mummia (sessione resta attiva → "Sono io")
+
+      if (won && currentMode === 'story') {
+        // ---------- VITTORIA IN STORIA ----------
+        await handleStoryVictory();
+      } else if (!won) {
+        // Sconfitta: anima persa → torna alla mummia
         localStorage.removeItem('bellum:last-match');
         matchId = null;
         state = null;
@@ -1105,8 +1109,17 @@ async function request(path, body, message) {
         close();
         closeGraveyard();
         closeColorDialog();
+        hideStoryStart();
+        hideHome();
         reactionDialog().classList.add('hidden');
         choiceDialog().classList.add('hidden');
+
+        // Se eravamo in Modalità Storia → azzera i progressi (morte del personaggio)
+        if (currentMode === 'story') {
+          clearStoryProgress();
+          notice('Sei caduto nella piramide. Le tue spoglie sono state perdute.', 'error');
+        }
+
         setTimeout(() => showAuthScreen(), 1200);
       }
     } else {
@@ -1287,8 +1300,132 @@ function closeColorDialog() {
 // ---------- HOME PAGE: deserto + tre piramidi (Storia / Endless / Coming Soon) ----------
 let currentMode = 'story'; // 'story' | 'endless'
 
+// ---------- PROGRESSI STORIA (Fase 1) ----------
+// Struttura salvata in localStorage:
+// {
+//   primary: 'CHI', secondary: 'INF', tertiary: 'PES',
+//   beaten: ['BUL', 'GRO'],          // boss già sconfitti (i 3 intermedi)
+//   indrazzicoBeaten: false,
+//   chosenPower: null,               // potere scelto alla 3ª partita (es. 'CHI')
+//   completed: false                 // true solo dopo aver battuto Indrazzico
+// }
+
+const STORY_KEY = 'bellum:story-progress';
+
+function getStoryProgress() {
+  try {
+    const raw = localStorage.getItem(STORY_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function saveStoryProgress(progress) {
+  try {
+    localStorage.setItem(STORY_KEY, JSON.stringify(progress));
+  } catch (e) {
+    console.warn('Impossibile salvare i progressi Storia', e);
+  }
+}
+
+function clearStoryProgress() {
+  try {
+    localStorage.removeItem(STORY_KEY);
+    localStorage.removeItem('bellum:story-completed'); // vecchia chiave
+  } catch { /* ignore */ }
+}
+
 function isStoryCompleted() {
-  try { return localStorage.getItem('bellum:story-completed') === '1'; } catch { return false; }
+  const p = getStoryProgress();
+  return !!(p && p.completed);
+}
+
+/** Restituisce i colori ancora da battere (i 3 intermedi rimanenti). */
+function getRemainingBosses(progress) {
+  if (!progress) return [];
+  const allSix = ['CHI', 'INF', 'PES', 'BUL', 'GRO', 'CLO'];
+  const protected = [progress.primary, progress.secondary, progress.tertiary];
+  return allSix.filter(c => !protected.includes(c) && !(progress.beaten || []).includes(c));
+}
+
+/** True se i 3 boss intermedi sono tutti battuti e manca solo Indrazzico. */
+function isReadyForIndrazzico(progress) {
+  if (!progress || progress.indrazzicoBeaten) return false;
+  return getRemainingBosses(progress).length === 0;
+}
+
+// Dati placeholder dei boss (nomi, poteri/Medaglioni, frasi)
+// Il Medaglione è un potere passivo fuori dal campo (non bersagliabile).
+const BOSS_DATA = {
+  CHI: {
+    name: 'Sacerdote Ankh-Hotep',
+    powerDesc: 'Le tue creature hanno +0/+1',
+    threat: '«La luce della guarigione non ti salverà…»',
+    mummyAfter: 'Hai sconfitto il Sacerdote. La piramide trema, ma il cammino continua.',
+    medaglioneName: 'Medaglione della Chiericanza',
+  },
+  INF: {
+    name: 'Ladra Neferet',
+    powerDesc: 'All’inizio del tuo turno peschi 1 carta in più',
+    threat: '«Rubo tutto… anche le tue speranze.»',
+    mummyAfter: 'Neferet è caduta. Attenzione: le ombre diventano più dense.',
+    medaglioneName: 'Medaglione dell’Infamia',
+  },
+  PES: {
+    name: 'Verme del Nilo',
+    powerDesc: 'All’inizio del tuo turno l’avversario scarta 1 carta',
+    threat: '«La malattia avanza… e tu sei già infetto.»',
+    mummyAfter: 'Il Verme è stato spezzato. L’aria è un po’ meno pesante.',
+    medaglioneName: 'Medaglione della Pestilenza',
+  },
+  BUL: {
+    name: 'Colosso di Khem',
+    powerDesc: 'Le tue creature hanno +1/+0',
+    threat: '«Schiaccerò le tue ossa sotto i miei piedi.»',
+    mummyAfter: 'Il Colosso è a terra. La forza bruta non basta contro di te.',
+    medaglioneName: 'Medaglione del Bullismo',
+  },
+  GRO: {
+    name: 'Grande Ptah',
+    powerDesc: 'All’inizio del tuo turno guadagni 1 vita',
+    threat: '«Divento sempre più grande… tu sempre più piccolo.»',
+    mummyAfter: 'Ptah è stato ridimensionato. La piramide osserva con interesse.',
+    medaglioneName: 'Medaglione della Grossanza',
+  },
+  CLO: {
+    name: 'Jester Ra',
+    powerDesc: 'Le tue creature costano 1 mana in meno (minimo 1)',
+    threat: '«Questa lotta sarà… ridicola.»',
+    mummyAfter: 'Il Jester non ride più. Forse non era solo uno scherzo.',
+    medaglioneName: 'Medaglione della Clownerie',
+  },
+  IND: {
+    name: 'Indrazzico, l’Ombra Eterna',
+    powerDesc: '(poteri speciali in arrivo)',
+    threat: '«Io sono ciò che resta quando tutto è finito.»',
+    mummyAfter: 'Hai sconfitto Indrazzico. Sei diventato un Abitante della Piramide.',
+    medaglioneName: null,
+  },
+};
+
+/** Quanti boss intermedi hai già battuto (0, 1 o 2 → vita 20/25/30). */
+function getStoryFightIndex(progress) {
+  return (progress?.beaten || []).length; // 0 = primo, 1 = secondo, 2 = terzo
+}
+
+function getBossLifeForFight(index) {
+  if (index <= 0) return 20;
+  if (index === 1) return 25;
+  return 30; // terzo boss
+}
+
+/** Sceglie a caso uno dei boss ancora da battere. */
+function pickNextBoss(progress) {
+  const remaining = getRemainingBosses(progress);
+  if (remaining.length === 0) return 'IND';
+  return remaining[Math.floor(Math.random() * remaining.length)];
 }
 
 function homeDialog() {
@@ -1372,7 +1509,7 @@ function homeDialog() {
   const storyBtn = makePyramid('home-story', 'Modalità Storia', false, () => {
     currentMode = 'story';
     hideHome();
-    startScreen().catch(fail);
+    storyStartScreen().catch(fail);
   }, 'img/piramide1.png');
 
   // Endless – piramide2.png
@@ -1470,6 +1607,330 @@ async function startScreen() {
   try { await probePrior(); } finally { probing = false; }
   showStart();
 }
+
+// ---------- STORIA: schermata di avvio (RIPRENDI / NUOVO INIZIO) ----------
+function storyStartDialog() {
+  let el = $('story-start-dialog');
+  if (el) return el;
+
+  el = document.createElement('div');
+  el.id = 'story-start-dialog';
+  el.className = 'card-detail-overlay start-dialog hidden';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-modal', 'true');
+  el.setAttribute('aria-labelledby', 'story-start-title');
+  el.style.zIndex = '120';
+
+  const panel = document.createElement('div');
+  panel.className = 'panel';
+
+  const title = document.createElement('h2');
+  title.id = 'story-start-title';
+  title.textContent = 'Il Cammino nella Piramide';
+
+  const text = document.createElement('p');
+  text.id = 'story-start-text';
+
+  const actions = document.createElement('div');
+  actions.className = 'start-actions';
+
+  const recover = document.createElement('button');
+  recover.type = 'button';
+  recover.id = 'story-recover-button';
+  recover.className = 'primary-button';
+  recover.textContent = 'RIPRENDI le tue spoglie';
+  recover.onclick = () => resumeStory().catch(fail);
+
+  const fresh = document.createElement('button');
+  fresh.type = 'button';
+  fresh.id = 'story-new-button';
+  fresh.className = 'secondary-button';
+  fresh.textContent = 'Abbraccia un nuovo destino';
+  fresh.onclick = () => {
+    clearStoryProgress();
+    hideStoryStart();
+    // Inizia una nuova Storia → scelta colori
+    openColorDialogForStory();
+  };
+
+  actions.append(recover, fresh);
+  panel.append(title, text, actions);
+  el.append(panel);
+  stageRoot().append(el);
+  return el;
+}
+
+function showStoryStart() {
+  if (state || busy) return;
+  const el = storyStartDialog();
+  const progress = getStoryProgress();
+  const hasProgress = !!(progress && !progress.completed && (
+    (progress.beaten && progress.beaten.length > 0) || progress.primary
+  ));
+
+  $('story-recover-button').classList.toggle('hidden', !hasProgress);
+  $('story-new-button').className = hasProgress ? 'secondary-button' : 'primary-button';
+
+  if (hasProgress) {
+    const remaining = getRemainingBosses(progress);
+    const beatenCount = (progress.beaten || []).length;
+    let msg = `Hai già sconfitto ${beatenCount} boss.`;
+    if (remaining.length > 0) {
+      msg += ` Ti restano ${remaining.length} boss + Indrazzico.`;
+    } else if (!progress.indrazzicoBeaten) {
+      msg += ` Ti resta solo Indrazzico, l’Ombra Eterna.`;
+    }
+    msg += ' Vuoi riprendere le tue spoglie o abbracciare un nuovo destino?';
+    $('story-start-text').textContent = msg;
+  } else {
+    $('story-start-text').textContent = 'Nessuna spoglia da recuperare. Puoi solo abbracciare un nuovo destino e iniziare il Cammino.';
+  }
+
+  el.classList.remove('hidden');
+}
+
+function hideStoryStart() {
+  $('story-start-dialog')?.classList.add('hidden');
+}
+
+async function storyStartScreen() {
+  if (state || busy) return;
+  showStoryStart();
+}
+
+/** Continua una Storia già iniziata (progressi salvati). */
+async function resumeStory() {
+  const progress = getStoryProgress();
+  if (!progress) {
+    notice('Nessun progresso trovato. Inizia un nuovo destino.', 'error');
+    return;
+  }
+  hideStoryStart();
+  // Avvia direttamente il prossimo boss (stessi colori già scelti)
+  currentMode = 'story';
+  await startNextStoryFight(progress);
+}
+
+/** Avvia la prossima lotta della Storia (boss rimanente o Indrazzico). */
+async function startNextStoryFight(progress) {
+  if (!progress) return;
+  // I dialoghi e la scelta del Medaglione vengono gestiti dentro newMatch
+  await newMatch(progress.primary, progress.secondary);
+}
+
+/** Scelta del cheat code (1 potere tra i 3 colori del mazzo del giocatore). */
+function showCheatCodeChoice(progress) {
+  return new Promise(resolve => {
+    const colors = [progress.primary, progress.secondary, progress.tertiary].filter(Boolean);
+    let el = $('cheat-code-dialog');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'cheat-code-dialog';
+      el.className = 'card-detail-overlay';
+      el.setAttribute('role', 'dialog');
+      el.setAttribute('aria-modal', 'true');
+      el.style.zIndex = '155';
+      stageRoot().append(el);
+    }
+    el.innerHTML = '';
+    const panel = document.createElement('div');
+    panel.className = 'panel';
+    panel.style.cssText = 'width:min(94vw,480px);margin:auto;padding:1.3rem;text-align:center;border:1px solid #d5a758;box-shadow:0 12px 48px #000';
+
+    const title = document.createElement('h2');
+    title.style.cssText = 'margin:0 0 .8rem;font-family:"Lilita One",Georgia,serif;color:#e8c565';
+    title.textContent = 'Scegli un Cheat Code';
+
+    const subtitle = document.createElement('p');
+    subtitle.style.cssText = 'margin:0 0 1.1rem;font-size:.98rem;line-height:1.4';
+    subtitle.textContent = 'Attiva il Medaglione di uno dei tuoi colori. Resterà con te fino alla fine della Storia.';
+
+    const list = document.createElement('div');
+    list.style.cssText = 'display:flex;flex-direction:column;gap:.65rem;margin-bottom:1rem';
+
+    colors.forEach(code => {
+      const data = BOSS_DATA[code];
+      if (!data) return;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'primary-button';
+      btn.style.cssText = 'text-align:left;padding:.75rem 1rem;line-height:1.35';
+      btn.innerHTML = `<strong>${data.medaglioneName}</strong><br><span style="font-size:.9em;opacity:.9">${data.powerDesc}</span>`;
+      btn.onclick = () => {
+        el.classList.add('hidden');
+        resolve(code);
+      };
+      list.append(btn);
+    });
+
+    panel.append(title, subtitle, list);
+    el.append(panel);
+    el.classList.remove('hidden');
+  });
+}
+
+/** Dialogo semplice della Mummia (testo + bottone Continua). */
+function showMummyDialog(text) {
+  return new Promise(resolve => {
+    let el = $('mummy-story-dialog');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'mummy-story-dialog';
+      el.className = 'card-detail-overlay';
+      el.setAttribute('role', 'dialog');
+      el.setAttribute('aria-modal', 'true');
+      el.style.zIndex = '150';
+      stageRoot().append(el);
+    }
+    el.innerHTML = '';
+    const panel = document.createElement('div');
+    panel.className = 'panel';
+    panel.style.cssText = 'width:min(92vw,440px);margin:auto;padding:1.3rem 1.2rem;text-align:center;border:1px solid #d5a758;box-shadow:0 12px 48px #000';
+
+    const body = document.createElement('p');
+    body.style.cssText = 'margin:0 0 1.2rem;line-height:1.5;font-size:1.08rem;white-space:pre-line';
+    body.textContent = text;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'primary-button';
+    btn.textContent = 'Continua';
+    btn.onclick = () => { el.classList.add('hidden'); resolve(); };
+
+    panel.append(body, btn);
+    el.append(panel);
+    el.classList.remove('hidden');
+  });
+}
+
+/** Dopo una vittoria in Storia: aggiorna progressi e propone il prossimo passo. */
+async function handleStoryVictory() {
+  let progress = getStoryProgress();
+  if (!progress) return;
+
+  const justBeaten = progress.currentBoss;
+  if (!justBeaten) return;
+
+  // Segna il boss come battuto
+  if (justBeaten === 'IND') {
+    progress.indrazzicoBeaten = true;
+    progress.completed = true;
+    progress.currentBoss = null;
+    saveStoryProgress(progress);
+    // Marca anche la vecchia chiave per compatibilità
+    try { localStorage.setItem('bellum:story-completed', '1'); } catch { /* ignore */ }
+
+    await showMummyDialog(BOSS_DATA.IND.mummyAfter + '\n\nHai ottenuto il trofeo «Abitante della Piramide»!\nLa Modalità Endless è ora sbloccata.');
+    
+    // Pulisci la partita e torna alla Home
+    localStorage.removeItem('bellum:last-match');
+    matchId = null;
+    state = null;
+    flow = null;
+    priorMatch = null;
+    deathDraft = { choiceId: null, instanceIds: [] };
+    presentationGeneration++;
+    presentationLayer().style.display = 'none';
+    close();
+    closeGraveyard();
+    closeColorDialog();
+    hideStoryStart();
+    showHome();
+    return;
+  }
+
+  // Boss intermedio
+  if (!progress.beaten) progress.beaten = [];
+  if (!progress.beaten.includes(justBeaten)) {
+    progress.beaten.push(justBeaten);
+  }
+  progress.currentBoss = null;
+  saveStoryProgress(progress);
+
+  const boss = BOSS_DATA[justBeaten] || { mummyAfter: 'Hai vinto.' };
+  await showMummyDialog(boss.mummyAfter);
+
+  const remaining = getRemainingBosses(progress);
+  if (remaining.length === 0) {
+    // Prossimo è Indrazzico
+    await showMummyDialog('Hai sconfitto tutti i guardiani dei colori.\nOra ti attende Indrazzico, l’Ombra Eterna.');
+  }
+
+  // Chiedi se continuare subito o tornare alla Home
+  const continueNow = await showStoryContinueChoice(remaining.length === 0);
+  if (continueNow) {
+    await startNextStoryFight(progress);
+  } else {
+    // Torna alla Home
+    localStorage.removeItem('bellum:last-match');
+    matchId = null;
+    state = null;
+    flow = null;
+    priorMatch = null;
+    deathDraft = { choiceId: null, instanceIds: [] };
+    presentationGeneration++;
+    presentationLayer().style.display = 'none';
+    close();
+    closeGraveyard();
+    closeColorDialog();
+    hideStoryStart();
+    showHome();
+  }
+}
+
+/** Chiede se continuare subito il prossimo boss. */
+function showStoryContinueChoice(isIndrazzicoNext) {
+  return new Promise(resolve => {
+    let el = $('story-continue-dialog');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'story-continue-dialog';
+      el.className = 'card-detail-overlay';
+      el.setAttribute('role', 'dialog');
+      el.setAttribute('aria-modal', 'true');
+      el.style.zIndex = '150';
+      stageRoot().append(el);
+    }
+    el.innerHTML = '';
+    const panel = document.createElement('div');
+    panel.className = 'panel';
+    panel.style.cssText = 'width:min(92vw,420px);margin:auto;padding:1.3rem;text-align:center;border:1px solid #d5a758;box-shadow:0 12px 48px #000';
+
+    const text = document.createElement('p');
+    text.style.cssText = 'margin:0 0 1.2rem;line-height:1.45;font-size:1.05rem';
+    text.textContent = isIndrazzicoNext
+      ? 'Vuoi affrontare subito Indrazzico?'
+      : 'Vuoi affrontare subito il prossimo boss?';
+
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap';
+
+    const yes = document.createElement('button');
+    yes.type = 'button';
+    yes.className = 'primary-button';
+    yes.textContent = 'Sì, continuo';
+    yes.onclick = () => { el.classList.add('hidden'); resolve(true); };
+
+    const no = document.createElement('button');
+    no.type = 'button';
+    no.className = 'secondary-button';
+    no.textContent = 'Torna alla Home';
+    no.onclick = () => { el.classList.add('hidden'); resolve(false); };
+
+    actions.append(yes, no);
+    panel.append(text, actions);
+    el.append(panel);
+    el.classList.remove('hidden');
+  });
+}
+
+/** Apre la scelta colori specificamente per una nuova Storia. */
+function openColorDialogForStory() {
+  // Per ora riusiamo la scelta colori normale.
+  // In Fase 2 collegheremo la creazione partita alla Storia.
+  openColorDialog();
+}
+
 async function recoverPrior() {
   if (!priorMatch || busy) return;
   const id = priorMatch.id; busy = true; controls();
@@ -1501,7 +1962,18 @@ async function submitColors() {
     $('deck-color-validation').textContent = 'Scegli due colori diversi.'; return;
   }
   $('deck-color-validation').textContent = '';
-  await newMatch(primaryColor,secondaryColor);
+
+  // Se siamo in Modalità Storia e non c’è ancora un progresso, creiamo la nuova Storia
+  if (currentMode === 'story') {
+    const existing = getStoryProgress();
+    if (!existing || existing.completed) {
+      // Nuova Storia: salveremo primary/secondary dopo la creazione partita (serve il tertiary)
+      await newMatch(primaryColor, secondaryColor, { isNewStory: true });
+      return;
+    }
+  }
+
+  await newMatch(primaryColor, secondaryColor);
 }
 function showCurseDialog(humanColors, aiColors) {
   return new Promise(resolve => {
@@ -1591,7 +2063,7 @@ function showCoinFlip(firstIsHuman) {
     el.classList.remove('hidden');
   });
 }
-async function newMatch(primaryColor, secondaryColor) {
+async function newMatch(primaryColor, secondaryColor, options = {}) {
   cardLoaded.clear();
   lastPhaseKey = null;
   if (busy || obligatory()) return;
@@ -1610,11 +2082,79 @@ async function newMatch(primaryColor, secondaryColor) {
     close();
     closeGraveyard();
     hideStart();
+    hideStoryStart();
     closeColorDialog();
     localStorage.setItem('bellum:last-match', matchId);
-    // Griglia ancora nascosta: prima maledizione → moneta → benedizione.
+
     const humanColors = state?.deck_colors?.[1];
     const aiColors = state?.deck_colors?.[0];
+
+    // --- Modalità Storia: inizializza o continua i progressi ---
+    if (currentMode === 'story') {
+      let progress = getStoryProgress();
+
+      if (options.isNewStory || !progress) {
+        // Nuova Storia
+        progress = {
+          primary: humanColors?.primary || primaryColor,
+          secondary: humanColors?.secondary || secondaryColor,
+          tertiary: humanColors?.tertiary,
+          beaten: [],
+          indrazzicoBeaten: false,
+          chosenPower: null,
+          completed: false,
+          currentBoss: null,
+        };
+        saveStoryProgress(progress);
+      }
+
+      // Scegli il prossimo boss e prepara dialoghi (Medaglioni / cheat code)
+      const nextBoss = pickNextBoss(progress);
+      progress.currentBoss = nextBoss;
+      saveStoryProgress(progress);
+
+      const fightIndex = getStoryFightIndex(progress);
+      const boss = BOSS_DATA[nextBoss] || { name: nextBoss, threat: '…' };
+
+      if (nextBoss === 'IND') {
+        await showMummyDialog(`È arrivato il momento. Affronterai ${boss.name}.\n${boss.threat}`);
+        await showMummyDialog(
+          'Indrazzico appare con una forza spaventosa…\n\n«Ora stanno esagerando… ci penso io.»\n\nLa Mummia riduce i suoi punti vita a 20.\nLa lotta sarà comunque durissima.'
+        );
+        if (progress.chosenPower && BOSS_DATA[progress.chosenPower]) {
+          const med = BOSS_DATA[progress.chosenPower];
+          await showMummyDialog(`Il tuo ${med.medaglioneName} è ancora attivo:\n«${med.powerDesc}»`);
+        }
+      } else {
+        await showMummyDialog(`Il prossimo avversario è ${boss.name}.\n${boss.threat}`);
+
+        if (fightIndex < 2) {
+          await showMummyDialog(
+            `Per ora ${boss.name} combatte senza il suo Medaglione.\nSfrutta questo vantaggio!`
+          );
+        }
+
+        if (fightIndex === 2 && !progress.chosenPower) {
+          await showMummyDialog(
+            `Oh no! ${boss.name} sta barando!\nSta usando il suo Medaglione!\n\nTieni, prendi… usa uno di questi cheat code, presto!`
+          );
+          const chosen = await showCheatCodeChoice(progress);
+          if (chosen) {
+            progress.chosenPower = chosen;
+            saveStoryProgress(progress);
+            const med = BOSS_DATA[chosen];
+            await showMummyDialog(
+              `Hai attivato il ${med.medaglioneName}!\n«${med.powerDesc}»\n\nQuesto potere resterà attivo anche contro Indrazzico.`
+            );
+          }
+        } else if (progress.chosenPower && BOSS_DATA[progress.chosenPower]) {
+          const med = BOSS_DATA[progress.chosenPower];
+          await showMummyDialog(`Il tuo ${med.medaglioneName} è attivo:\n«${med.powerDesc}»`);
+        }
+      }
+    }
+
+    // Griglia ancora nascosta: prima maledizione → moneta → benedizione.
     await showCurseDialog(humanColors, aiColors);
     await showCoinFlip(state?.active_player_index === 1);
     const uname = usernameFromEmail((await getCurrentUser())?.email) || 'coraggioso';
@@ -1662,7 +2202,7 @@ async function init() {
   });
   $('end-turn-button')?.addEventListener('click',() => { if (active()) request('end-turn',{},''); });
   $('refresh-button')?.addEventListener('click',() => refreshMatch().catch(fail));
-  $('logout-button')?.addEventListener('click',() => signOut().then(() => { presentationGeneration++; presentationLayer().style.display = 'none'; matchId = null; state = null; flow = null; priorMatch = null; deathDraft = {choiceId:null,instanceIds:[]}; close(); closeGraveyard(); closeColorDialog(); hideHome(); hideStart(); reactionDialog().classList.add('hidden'); choiceDialog().classList.add('hidden'); }).catch(fail));
+  $('logout-button')?.addEventListener('click',() => signOut().then(() => { presentationGeneration++; presentationLayer().style.display = 'none'; matchId = null; state = null; flow = null; priorMatch = null; deathDraft = {choiceId:null,instanceIds:[]}; close(); closeGraveyard(); closeColorDialog(); hideHome(); hideStart(); hideStoryStart(); reactionDialog().classList.add('hidden'); choiceDialog().classList.add('hidden'); }).catch(fail));
   document.addEventListener('keydown',e => { if (e.key === 'Escape' && !obligatory()) { if (!$('deck-color-dialog')?.classList.contains('hidden') && !busy) closeColorDialog(); else if (!$('graveyard-dialog')?.classList.contains('hidden')) closeGraveyard(); else if (view) close(); } });
   await render();
   // NON mostriamo la Home qui: solo dopo che l’utente ha confermato «Sono io» o ha fatto login
