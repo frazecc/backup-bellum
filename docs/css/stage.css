@@ -2070,3 +2070,31 @@ body.notice-open #stage .action-panel button {
 .story-medallion-banner.hidden {
   display: none !important;
 }
+
+/* Contatore progresso Storia (cliccabile → elenco boss sconfitti) */
+.story-progress-badge {
+  position: fixed;
+  top: 0.5rem;
+  right: 0.6rem;
+  z-index: 55;
+  padding: 0.4rem 0.75rem;
+  border: 2px solid #c9a043;
+  border-radius: 999px;
+  background: #1a140ef0;
+  color: #e8c565;
+  font-family: 'Nunito', system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 4px 14px #000a;
+  min-height: 36px;
+}
+.story-progress-badge:hover,
+.story-progress-badge:focus-visible {
+  background: #2a1c10f5;
+  outline: none;
+}
+.story-progress-badge.hidden {
+  display: none !important;
+}
