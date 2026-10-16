@@ -1415,8 +1415,19 @@ function controls() {
 }
 function showDeckColors() {
   const human = state?.deck_colors?.[1], ai = state?.deck_colors?.[0];
-  if ($('player-deck-colors')) $('player-deck-colors').textContent = human ? `Mazzo: ${human.primary} · ${human.secondary} · ${human.tertiary}` : '';
-  if ($('opponent-deck-colors')) $('opponent-deck-colors').textContent = ai ? `Mazzo: ${ai.primary} · ${ai.secondary} · ${ai.tertiary}` : '';
+  const fmt = (colors) => {
+    if (!colors) return '';
+    const codes = [colors.primary, colors.secondary, colors.tertiary].filter(Boolean);
+    return codes.map(c => {
+      const iris = (typeof FACTION_EYE !== 'undefined' && FACTION_EYE[c]) || '#e8c565';
+      const name = deckFactionNames[c] || c;
+      return `<span class="hud-color-chip" title="${name}" style="--chip:${iris}"><i></i>${c}</span>`;
+    }).join('');
+  };
+  const pEl = $('player-deck-colors');
+  const oEl = $('opponent-deck-colors');
+  if (pEl) pEl.innerHTML = fmt(human);
+  if (oEl) oEl.innerHTML = fmt(ai);
 }
 /** Evita render sovrapposti: se ne parte uno mentre un altro è in corso, ne schedula uno solo alla fine. */
 let renderRunning = false;
