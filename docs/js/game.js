@@ -1517,31 +1517,63 @@ async function logs() {
   const latest = $('log-latest');
   if (latest) { latest.replaceChildren(); for (const text of texts.slice(-3)) { const li = document.createElement('li'); li.textContent = text; latest.append(li); } }
 }
+/** Mostra gli annunci pubblici già presenti nello stato (senza /advance). */
+async function presentPendingAnnouncements() {
+  if (!state?.public_announcement) return;
+  const a = state.public_announcement;
+  const list = Array.isArray(state.public_announcements) && state.public_announcements.length > 1
+    ? state.public_announcements
+    : [a];
+  const generation = presentationGeneration;
+  for (let i = 0; i < list.length; i++) {
+    await presentPublic(list[i], generation);
+    if (generation !== presentationGeneration) return;
+    if (i < list.length - 1) await waitPresentation(180);
+  }
+}
+
 async function request(path, body, message) {
   if (busy || !matchId) return;
   close(); busy = true; controls(); reactionDialog().classList.add('hidden'); choiceDialog().classList.add('hidden');
   try {
     state = (await api(`/match/${encodeURIComponent(matchId)}/${path}`, { method: 'POST', body })).state;
     flow = null;
-    await render();
     try { await logs(); } catch (e) { console.warn(e); }
 
     if (state.status === 'finished') {
+      await render();
       await handleMatchFinished();
     } else {
-      // Un solo canale: phase-banner. Evita messaggi generici fuori tempo
-      // (es. «È di nuovo il tuo turno» mentre è ancora il turno IA).
-      let text = null;
-      let kind = 'success';
-      if (state.mostrissimo_result?.outcome === 'failed') {
-        text = state.mostrissimo_result.message; kind = 'error';
-      } else if (deathOrder()) text = 'Scegli l’ordine delle creature morte.';
-      else if (deathTarget()) text = 'Scegli il bersaglio dell’effetto alla morte.';
-      else if (state.pending_reaction) text = reactionDescription(state.pending_reaction.event);
-      // Niente «Carta/Creatura dichiarata»: resta solo l'anteprima pubblica della carta.
-      else if (message && !(path === 'end-turn' && state.active_player_index !== 1)
-        && !/dichiarat/i.test(message)) text = message;
-      if (text) await notice(text, kind);
+      // ETB (on_play): prima creatura in campo + annunci, POI scelta bersaglio
+      const etbSrc = deathTarget()?.task?.source;
+      const isEtbPick = etbSrc === 'on_play' || etbSrc === 'terraforma_trigger' || etbSrc === 'aura_attack';
+
+      if (isEtbPick) {
+        // 1) Griglia con la creatura già piazzata (senza modalità bersaglio)
+        await drawBoard();
+        await drawHand();
+        controls();
+        updateOpponentName();
+        updateStoryProgressBadge();
+        // Lascia dipingere il browser
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        // 2) Annunci pubblici (carta giocata / ingresso)
+        try { await presentPendingAnnouncements(); } catch (e) { console.warn(e); }
+        // 3) Ora abilita la scelta bersaglio sulla griglia
+        await render();
+      } else {
+        await render();
+        let text = null;
+        let kind = 'success';
+        if (state.mostrissimo_result?.outcome === 'failed') {
+          text = state.mostrissimo_result.message; kind = 'error';
+        } else if (deathOrder()) text = 'Scegli l’ordine delle creature morte.';
+        else if (deathTarget()?.task?.source === 'on_death') text = 'Scegli il bersaglio dell’effetto alla morte.';
+        else if (state.pending_reaction) text = reactionDescription(state.pending_reaction.event);
+        else if (message && !(path === 'end-turn' && state.active_player_index !== 1)
+          && !/dichiarat/i.test(message)) text = message;
+        if (text) await notice(text, kind);
+      }
     }
   } catch (e) {
     fail(e);
@@ -1554,13 +1586,10 @@ async function request(path, body, message) {
   } finally {
     busy = false;
     await render().catch(fail);
-    // Se la partita è già finita (o azzerata dalla sconfitta), non proseguire con fasi/presentazioni
     if (!state || !matchId || state.status === 'finished') {
       return;
     }
-    // Fine turno umano: sempre popup CHIUSURA (anche se il motore è già passato all'IA).
     if (path === 'end-turn') {
-      // Se l'IA ha già avviato il suo turno, current_turn è avanzato → chiusura = turno precedente.
       const endedTurn = state.active_player_index === 0
         ? Math.max(1, (state.current_turn ?? 1) - 1)
         : (state.current_turn ?? 1);
@@ -1568,7 +1597,10 @@ async function request(path, body, message) {
     } else {
       await ensurePhaseBanner().catch(fail);
     }
-    queuePresentation();
+    // Se stiamo già scegliendo un bersaglio ETB, non ri-presentare gli stessi annunci
+    const etbSrc = deathTarget()?.task?.source;
+    const skipPres = etbSrc === 'on_play' || etbSrc === 'terraforma_trigger' || etbSrc === 'aura_attack';
+    if (!skipPres) queuePresentation();
   }
 }
 // Il giocatore avversario come bersaglio (danni a scelta): si tocca il riquadro dei suoi PV.
