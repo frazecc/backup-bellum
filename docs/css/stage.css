@@ -612,22 +612,23 @@ body:has(#stage.calm) .narrator-medallion.bob { animation: none !important; }
 #stage .board-cell:disabled { opacity: 1; }
 #stage .board-cell.tired .cell-card { filter: grayscale(.45); opacity: .7; }
 
-/* Caselle selezionabili: alone oro (disattivabile con .calm) */
+/* Caselle selezionabili: stesso segnale delle carte giocabili (bordo rosso/bianco) */
 #stage .board-cell.valid-summon,
 #stage .board-cell.valid-move,
 #stage .board-cell.valid-target {
-  border-color: var(--tomb-gold-light, #e8c565);
-  animation: tomb-slot-glow 1.6s ease-in-out infinite;
-}
-@keyframes tomb-slot-glow {
-  0%, 100% { box-shadow: 0 2px 0 var(--tomb-chunky-shadow, #1a0a05), 0 0 10px #e8c56588; }
-  50%      { box-shadow: 0 2px 0 var(--tomb-chunky-shadow, #1a0a05), 0 0 22px #e8c565ee; }
+  border: 3px solid #ffffff !important;
+  animation: playable-frame 1.1s ease-in-out infinite;
+  z-index: 2;
 }
 #stage.calm .board-cell.valid-summon,
 #stage.calm .board-cell.valid-move,
 #stage.calm .board-cell.valid-target {
   animation: none !important;
-  box-shadow: 0 2px 0 var(--tomb-chunky-shadow, #1a0a05), 0 0 14px #e8c565aa;
+  border-color: #e0453d !important;
+  box-shadow:
+    0 0 0 3px #e0453d,
+    0 2px 0 var(--tomb-chunky-shadow, #1a0a05),
+    0 0 18px #e0453d88;
 }
 
 /* ----- Carta sulla griglia — Stile B papiro + badge rotondi ----- */
@@ -853,7 +854,21 @@ body:has(#stage.calm) .narrator-medallion.bob { animation: none !important; }
 
 /* ---------- Eventi, messaggi, istruzioni ---------- */
 #stage .info-zone { position: relative; flex: none; display: flex; flex-direction: column; gap: calc(2 * var(--p)); }
-#stage .selection-instructions { display: none !important; } /* niente riga sotto la griglia: evita il «saltello» */
+#stage .selection-instructions {
+  display: block;
+  margin: 0;
+  padding: calc(4 * var(--p)) calc(8 * var(--p));
+  border: 1px solid #c9a04388;
+  border-radius: calc(8 * var(--p));
+  background: #17111bcc;
+  color: var(--tomb-text, #efe2c0);
+  font-size: calc(13 * var(--p));
+  line-height: 1.35;
+  text-align: center;
+}
+#stage .selection-instructions[hidden] {
+  display: none !important;
+}
 #stage .game-message,
 #stage .game-message:empty {
   position: static !important; display: block; transform: none; width: auto; min-height: calc(16 * var(--p)); margin: 0; padding: 0;
