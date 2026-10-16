@@ -2415,3 +2415,49 @@ body.notice-open #stage .action-panel button {
 .home-trophy-endless span {
   letter-spacing: 0.03em;
 }
+
+
+/* PvP Lobby — Camera del Re Lobbi II */
+.pvp-lobby {
+  position: fixed;
+  inset: 0;
+  z-index: 270;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 6, 4, 0.82);
+  padding: 1rem;
+}
+.pvp-lobby.hidden { display: none !important; }
+.pvp-lobby-panel {
+  width: min(94vw, 440px);
+  max-height: 90dvh;
+  overflow: auto;
+  padding: 1.25rem;
+  text-align: center;
+  border: 2px solid #d5a758;
+}
+.pvp-lobby-panel h2 {
+  margin: 0 0 0.35rem;
+  font-family: 'Lilita One', Georgia, serif;
+  color: #e8c565;
+}
+.pvp-lobby-sub { margin: 0 0 1rem; opacity: 0.85; }
+.pvp-lobby-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 1rem;
+  text-align: left;
+}
+.pvp-lobby-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid #8a5a14;
+  border-radius: 10px;
+  background: #1a1410;
+}
+.pvp-lobby-status { font-size: 0.85rem; margin-bottom: 0.75rem; }
