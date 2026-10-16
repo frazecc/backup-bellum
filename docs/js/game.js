@@ -546,6 +546,24 @@ function button(text,fn,disabled=false) {
   return b;
 }
 
+/** Testo guida sotto la griglia durante la scelta bersaglio / attacco. */
+function targetReminderText(cardDef) {
+  const fx = cardDef ? (plainText(cardDef) || cardDef.name || 'effetto') : 'effetto';
+  return `Stai attivando: «${fx}». Seleziona un bersaglio tra quelli evidenziati (bordo rosso/bianco).`;
+}
+function showTargetReminder(text) {
+  const el = $('selection-instructions');
+  if (!el) return;
+  el.hidden = false;
+  el.textContent = text || '';
+}
+function hideTargetReminder() {
+  const el = $('selection-instructions');
+  if (!el) return;
+  el.hidden = true;
+  el.textContent = '';
+}
+
 /**
  * Anteprima del permanente scelto come bersaglio → Conferma / Annulla.
  * Risolve true se confermato, false se annullato.
@@ -709,6 +727,7 @@ async function renderDeathChoice() {
           }
         }
       }
+      showTargetReminder(targetReminderText(d));
       return;
     } else {
       // Solo effetti davvero «alla morte»
@@ -1160,9 +1179,13 @@ async function inspect(kind,id,extra={}) {
     const foeName = opponentDisplayName();
     add(direct ? `Attacca ${foeName}` : 'Attacca',() => {
       if (direct) return request('attack',{attackerPosition:current.position,target:{type:'player',playerIndex:0}},'Attacco dichiarato.');
-      flow = {kind:'attack',from:current.position}; close(); render().catch(fail); notice('Tocca il nemico evidenziato.','success');
+      flow = {kind:'attack',from:current.position}; close(); render().catch(fail);
+      showTargetReminder('Seleziona un nemico evidenziato (bordo rosso/bianco) per attaccare.');
     });
-    if (direct && attackable(current.position).length) add('Attacca Terraforma',() => { flow = {kind:'attack',from:current.position}; close(); render().catch(fail); notice('Tocca la Terraforma nemica evidenziata.','success'); });
+    if (direct && attackable(current.position).length) add('Attacca Terraforma',() => {
+      flow = {kind:'attack',from:current.position}; close(); render().catch(fail);
+      showTargetReminder('Seleziona la Terraforma nemica evidenziata (bordo rosso/bianco).');
+    });
     const cost = await moveCost(current.cell);
     if (current !== view) return;
     add(`Muovi · ${cost} mana`,() => { flow = {kind:'move',from:current.position}; close(); render().catch(fail); notice('Tocca una cella libera adiacente.','success'); },Number(me()?.current_mana ?? 0) < cost || !steps(current.position).length);
@@ -1311,12 +1334,10 @@ function controls() {
   const disable = (id,v) => { if ($(id)) $(id).disabled = !!v; };
   disable('end-turn-button',!active());
   disable('cancel-selection-button',busy || obligatory() || !flow || (!!pending() && flow?.kind !== 'trap-target'));
-  // Riga sotto la griglia disabilitata: non fa «saltare» il layout.
-  // Le indicazioni restano nei notice/popup (Ho capito).
-  if ($('selection-instructions')) {
-    $('selection-instructions').textContent = '';
-    $('selection-instructions').hidden = true;
-  }
+  // Reminder bersaglio/attacco: non svuotare se siamo in modalità scelta
+  const keepReminder = flow && ['etb-target', 'mostrissimo-target', 'trap-target', 'attack', 'hand'].includes(flow.kind)
+    && (flow.kind !== 'hand' || flow.step === 'target');
+  if (!keepReminder) hideTargetReminder();
 }
 function showDeckColors() {
   const human = state?.deck_colors?.[1], ai = state?.deck_colors?.[0];
@@ -1535,6 +1556,7 @@ async function presentPendingAnnouncements() {
 async function request(path, body, message) {
   if (busy || !matchId) return;
   close(); busy = true; controls(); reactionDialog().classList.add('hidden'); choiceDialog().classList.add('hidden');
+  hideTargetReminder();
   try {
     state = (await api(`/match/${encodeURIComponent(matchId)}/${path}`, { method: 'POST', body })).state;
     flow = null;
@@ -1686,11 +1708,19 @@ async function boardClick(pos) {
     }
     if (c || !summonCells(p).some(x => eq(x,pos))) return notice('Cella non valida.','error');
     const d = await card(p.card_id);
-    // Sempre chiedere il bersaglio ETB se la carta è mirata (anche solo se stessa).
-    if (targetEffect(d)) {
-      flow = {kind:'mostrissimo-target',position:pos,id:d.id}; await render(); notice('ora scegli il bersaglio','success'); return;
+    // Buff/cura: completa SENZA bersaglio → creatura in campo → poi scelta (come i mostri normali).
+    // Danno/altro mirato: il server esige ancora il bersaglio prima dell’ingresso.
+    const etbAimed = effects(d).filter(e =>
+      !e?.trigger && (e?.target === 'any_creature' || e?.target === 'any_target' || e?.type === 'return_hand')
+    );
+    const onlyBuffHeal = etbAimed.length > 0 && etbAimed.every(e => e.type === 'buff' || e.type === 'heal');
+    if (etbAimed.length && !onlyBuffHeal) {
+      flow = { kind: 'mostrissimo-target', position: pos, id: d.id };
+      await render();
+      showTargetReminder(targetReminderText(d));
+      return;
     }
-    return request('mostrissimo/complete',{position:pos},'Mostrissimo dichiarato.');
+    return request('mostrissimo/complete', { position: pos }, 'Mostrissimo dichiarato.');
   }
   if (flow?.kind === 'hand') {
     const d = await card(flow.id);
@@ -1708,7 +1738,7 @@ async function boardClick(pos) {
       if (needsTargetNow && hasTargets(d)) {
         flow.step = 'target';
         await render();
-        notice('Scegli il bersaglio dell’effetto.','success');
+        showTargetReminder(targetReminderText(d));
         return;
       }
       return request('play-card',{cardInstanceId:flow.instanceId,options:{position:pos}},'Carta dichiarata.');
@@ -1724,10 +1754,12 @@ async function boardClick(pos) {
   }
   if (flow?.kind === 'move') {
     if (!steps(flow.from).some(x => eq(x,pos))) return notice('Scegli una cella libera adiacente.','error');
+    hideTargetReminder();
     return request('move',{from:flow.from,to:pos},'Movimento dichiarato.');
   }
   if (flow?.kind === 'attack') {
     if (!attackable(flow.from).some(x => eq(x,pos))) return notice('Scegli un nemico adiacente evidenziato.','error');
+    hideTargetReminder();
     return request('attack',{attackerPosition:flow.from,target:{type:'creature',position:pos}},'Attacco dichiarato.');
   }
   if (c) return inspect('unit',c.card_id,{position:pos,cell:c});
