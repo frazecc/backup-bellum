@@ -10,12 +10,14 @@ export type DeckColors = {
   tertiary: DeckFaction;
 };
 
-/** Modificatori Modalità Storia (vita boss + Medaglione del giocatore). */
+/** Modificatori Modalità Storia (vita boss + Medaglioni). */
 export type StoryModifiers = {
   /** Vita iniziale dell’IA/boss (20 / 25 / 30; Indrazzico ridotto a 20). */
   ai_starting_life: number;
   /** Cheat code scelto dal giocatore (colore del Medaglione), o null. */
   human_medallion: DeckFaction | null;
+  /** Medaglione del boss (IA), attivo dalla 3ª lotta. Null per Indrazzico / prime lotte. */
+  ai_medallion?: DeckFaction | null;
 };
 export type EffectType =
   | 'draw' | 'damage' | 'damage_creature' | 'heal' | 'discard'

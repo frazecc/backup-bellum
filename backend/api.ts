@@ -163,8 +163,14 @@ apiRouter.post('/match/create', async (req: Request, res: Response) => {
     const secondary = deckFactionValue(body.secondaryColor, 'Colore secondario');
     if (primary === secondary) throw new Error('Scegli due colori diversi');
 
-    // Opzioni Modalità Storia (opzionali): vita boss + Medaglione del giocatore
-    let createOpts: { aiStartingLife?: number; humanMedallion?: DeckFaction | null } = {};
+    // Opzioni Modalità Storia (opzionali): vita boss, Medaglioni, terziario stabile, colore boss IA
+    let createOpts: {
+      aiStartingLife?: number;
+      humanMedallion?: DeckFaction | null;
+      aiMedallion?: DeckFaction | null;
+      tertiaryColor?: DeckFaction | null;
+      aiPrimary?: DeckFaction | 'IND' | null;
+    } = {};
     const story = body.story;
     if (story && typeof story === 'object' && !Array.isArray(story)) {
       const st = story as Record<string, unknown>;
@@ -177,6 +183,22 @@ apiRouter.post('/match/create', async (req: Request, res: Response) => {
         createOpts.humanMedallion = deckFactionValue(st.humanMedallion, 'Medaglione');
       } else if (st.humanMedallion === null) {
         createOpts.humanMedallion = null;
+      }
+      if (st.aiMedallion != null && st.aiMedallion !== '') {
+        createOpts.aiMedallion = deckFactionValue(st.aiMedallion, 'Medaglione boss');
+      } else if (st.aiMedallion === null) {
+        createOpts.aiMedallion = null;
+      }
+      if (st.tertiaryColor != null && st.tertiaryColor !== '') {
+        createOpts.tertiaryColor = deckFactionValue(st.tertiaryColor, 'Colore terziario');
+      }
+      // aiPrimary: uno dei 6 colori oppure 'IND' (Indrazzico)
+      if (typeof st.aiPrimary === 'string' && st.aiPrimary.length > 0) {
+        if (st.aiPrimary === 'IND') {
+          createOpts.aiPrimary = 'IND';
+        } else {
+          createOpts.aiPrimary = deckFactionValue(st.aiPrimary, 'Boss IA');
+        }
       }
     }
 

@@ -27,25 +27,42 @@ function log(c: Context, owner: number, action: string, description: string, ext
 export type CreateMatchOptions = {
   aiStartingLife?: number;
   humanMedallion?: DeckFaction | null;
+  /** Medaglione del boss (IA), dalla 3ª lotta. */
+  aiMedallion?: DeckFaction | null;
+  /** Terziario del giocatore (maledizione). Se omesso viene scelto a caso. */
+  tertiaryColor?: DeckFaction | null;
+  /**
+   * Colore primario forzato per l’IA (boss della Storia).
+   * 'IND' = Indrazzico: se non esistono carte IND nel catalogo, fallback sulla maledizione del giocatore.
+   */
+  aiPrimary?: DeckFaction | 'IND' | null;
 };
 
 function humanMedallion(s: GameState): DeckFaction | null {
   return s.story_modifiers?.human_medallion ?? null;
 }
 
-/** Costo mana effettivo (Medaglione CLO: creature del giocatore costano 1 in meno, min 1). */
+function aiMedallion(s: GameState): DeckFaction | null {
+  return s.story_modifiers?.ai_medallion ?? null;
+}
+
+/** Medaglione attivo per il giocatore p (1 = umano, 0 = IA). */
+function medallionOf(s: GameState, p: PlayerIndex): DeckFaction | null {
+  return p === 1 ? humanMedallion(s) : aiMedallion(s);
+}
+
+/** Costo mana effettivo (Medaglione CLO: creature costano 1 in meno, min 1). */
 function effectiveManaCost(d: CardData, s: GameState, p: PlayerIndex): number {
   let cost = Number(d.mana_cost ?? 0);
-  if (p === 1 && humanMedallion(s) === 'CLO' && d.card_type === 'monster') {
+  if (medallionOf(s, p) === 'CLO' && d.card_type === 'monster') {
     cost = Math.max(1, cost - 1);
   }
   return cost;
 }
 
-/** Bonus attacco/vita dalle creature del giocatore (Medaglioni BUL / CHI). */
+/** Bonus attacco/vita dalle creature (Medaglioni BUL / CHI) per umano o IA. */
 function medallionCreatureBonuses(s: GameState, p: PlayerIndex): { attack: number; hp: number } {
-  if (p !== 1) return { attack: 0, hp: 0 };
-  const m = humanMedallion(s);
+  const m = medallionOf(s, p);
   return {
     attack: m === 'BUL' ? 1 : 0,
     hp: m === 'CHI' ? 1 : 0,
@@ -508,24 +525,24 @@ async function applyEvent(c: Context, e: PendingEvent) {
     let count = draw(c, p, 1);
     log(c, p, 'upkeep', `${label(p)} ottiene ${player.current_mana}/${player.max_mana} mana e pesca ${count} carta/e.`);
 
-    // Medaglione del giocatore (solo Modalità Storia, solo nel turno del giocatore umano)
-    if (p === 1) {
-      const med = humanMedallion(s);
+    // Medaglioni Storia (umano e/o boss IA) nel rispettivo upkeep
+    {
+      const med = medallionOf(s, p);
       if (med === 'INF') {
-        const extra = draw(c, 1, 1);
-        if (extra > 0) log(c, 1, 'medallion', `Medaglione dell’Infamia: peschi ${extra} carta in più.`, { amount: extra });
+        const extra = draw(c, p, 1);
+        if (extra > 0) log(c, p, 'medallion', `Medaglione dell’Infamia: ${label(p)} pesca ${extra} carta in più.`, { amount: extra });
       }
       if (med === 'GRO') {
         player.life += 1;
-        log(c, 1, 'medallion', 'Medaglione della Grossanza: guadagni 1 vita.', { amount: 1 });
+        log(c, p, 'medallion', `Medaglione della Grossanza: ${label(p)} guadagna 1 vita.`, { amount: 1 });
       }
       if (med === 'PES') {
-        const foe = s.players[0];
+        const foe = s.players[other(p)];
         if (foe.hand.length > 0) {
           const i = Math.floor(Math.random() * foe.hand.length);
           const discarded = foe.hand.splice(i, 1)[0];
           foe.graveyard.push(discarded);
-          log(c, 1, 'medallion', 'Medaglione della Pestilenza: l’avversario scarta 1 carta.', { amount: 1 });
+          log(c, p, 'medallion', `Medaglione della Pestilenza: ${label(other(p))} scarta 1 carta.`, { amount: 1 });
         }
       }
     }
@@ -972,7 +989,8 @@ async function advanceAi(c: Context) {
   }
   const cards = await Promise.all(s.players[0].hand.map(async inst => ({ inst, d: await getCardData(inst.card_id) })));
   for (const { inst, d } of cards) {
-    if (d.card_type === 'instant' || d.card_type === 'mostrissimo' || d.mana_cost > s.players[0].current_mana || !playableEffects(d)) continue;
+    const manaCost = effectiveManaCost(d, s, 0);
+    if (d.card_type === 'instant' || d.card_type === 'mostrissimo' || manaCost > s.players[0].current_mana || !playableEffects(d)) continue;
     const options: PlayCardOptions = {};
     if (d.card_type === 'monster' || d.card_type === 'terraforma') {
       const free = [0, 1, 2].find(col => !s.board.rows[0][col]);
@@ -992,10 +1010,10 @@ async function advanceAi(c: Context) {
       }
     }
     s.players[0].hand = s.players[0].hand.filter(x => x.instance_id !== inst.instance_id);
-    s.players[0].graveyard.push(inst); s.players[0].current_mana -= d.mana_cost;
-    log(c, 0, 'card_declared', `L’IA dichiara ${d.name} pagando ${d.mana_cost} mana.`, { card_id: d.id, instance_id: inst.instance_id });
+    s.players[0].graveyard.push(inst); s.players[0].current_mana -= manaCost;
+    log(c, 0, 'card_declared', `L’IA dichiara ${d.name} pagando ${manaCost} mana.`, { card_id: d.id, instance_id: inst.instance_id });
     progress.actions_taken++;
-    prepend(s, { kind: 'declare_event', event: { kind: 'hand_card', actor: 0, instance_id: inst.instance_id, card_id: d.id, options, paid_mana: d.mana_cost } }, { kind: 'advance_ai' }); return;
+    prepend(s, { kind: 'declare_event', event: { kind: 'hand_card', actor: 0, instance_id: inst.instance_id, card_id: d.id, options, paid_mana: manaCost } }, { kind: 'advance_ai' }); return;
   }
   if (await attemptAiMostrissimo(c)) return;
   for (const mover of units(s, 0)) {
@@ -1020,12 +1038,49 @@ export async function createNewMatch(
 ): Promise<{ matchId: string; state: GameState }> {
   const [pool, catalogue] = await Promise.all([deckPool(), offer()]);
   const available = availableFactions(pool), bosses = bossFactions(pool);
-  const humanColors = chosenColors(primary, secondary, available, bosses);
 
-  // Maledizione del giocatore = primary dell'IA (design narrativo)
-  const aiPrimary = humanColors.tertiary;
+  // Colori umani: se Storia passa tertiaryColor, usalo (stabile tra le lotte); altrimenti a caso.
+  let humanColors: { primary: DeckFaction; secondary: DeckFaction; tertiary: DeckFaction };
+  const forcedTertiary = options.tertiaryColor;
+  if (
+    forcedTertiary &&
+    forcedTertiary !== primary &&
+    forcedTertiary !== secondary &&
+    available.includes(forcedTertiary)
+  ) {
+    if (!bosses.includes(primary)) {
+      throw new Error(`La fazione ${primary} non ha un boss da 6 mana: scegli un altro colore principale`);
+    }
+    humanColors = { primary, secondary, tertiary: forcedTertiary };
+  } else {
+    humanColors = chosenColors(primary, secondary, available, bosses);
+  }
+
+  // Colore primario IA:
+  // - Storia con boss normale → options.aiPrimary (deve avere carte + boss 6 mana)
+  // - Storia Indrazzico ('IND') → prova IND; se non ci sono carte, fallback maledizione
+  // - Modalità normale / Endless → maledizione (tertiary umano), come prima
+  let aiPrimary: DeckFaction;
+  const requested = options.aiPrimary;
+  if (requested === 'IND') {
+    // Pronto per future carte IND; oggi non esistono → fallback
+    if (available.includes('IND' as DeckFaction) && bosses.includes('IND' as DeckFaction)) {
+      aiPrimary = 'IND' as DeckFaction;
+    } else {
+      aiPrimary = humanColors.tertiary;
+    }
+  } else if (
+    requested &&
+    (['CHI', 'INF', 'PES', 'BUL', 'GRO', 'CLO'] as string[]).includes(requested) &&
+    available.includes(requested as DeckFaction) &&
+    bosses.includes(requested as DeckFaction)
+  ) {
+    aiPrimary = requested as DeckFaction;
+  } else {
+    aiPrimary = humanColors.tertiary;
+  }
   if (!bosses.includes(aiPrimary)) {
-    throw new Error(`La maledizione ${aiPrimary} non ha un boss da 6 mana: scegli altri colori`);
+    throw new Error(`La fazione IA ${aiPrimary} non ha un boss da 6 mana: scegli altri colori`);
   }
   const aiRest = shuffle(available.filter(f => f !== aiPrimary));
   const aiSecondary = aiRest[0];
@@ -1042,12 +1097,13 @@ export async function createNewMatch(
     turns_count: 0,
     duration_seconds: 0,
     player_faction_id: FACTION_IDS[primary],
-    opponent_faction_id: FACTION_IDS[aiColors.primary],
+    // IND non è ancora in FACTION_IDS: fallback sulla maledizione del giocatore
+    opponent_faction_id: FACTION_IDS[aiColors.primary] ?? FACTION_IDS[humanColors.tertiary] ?? 1,
   }).select('id').single();
   if (error || !data) throw new Error(`Creazione partita: ${error?.message ?? 'nessun ID'}`);
   const matchId = String(data.id), ai = player(0, null, aiCards), human = player(1, userId, humanCards);
 
-  // Modalità Storia: vita boss e Medaglione
+  // Modalità Storia: vita boss e Medaglioni (umano + boss IA)
   const aiLife = Number.isFinite(options.aiStartingLife) && options.aiStartingLife! > 0
     ? Math.min(200, Math.max(1, Math.floor(options.aiStartingLife!)))
     : 20;
@@ -1055,9 +1111,13 @@ export async function createNewMatch(
   const medallion = options.humanMedallion && ['CHI','INF','PES','BUL','GRO','CLO'].includes(options.humanMedallion)
     ? options.humanMedallion
     : null;
-  const storyModifiers: StoryModifiers | null = (options.aiStartingLife != null || medallion)
-    ? { ai_starting_life: aiLife, human_medallion: medallion }
+  const bossMedallion = options.aiMedallion && ['CHI','INF','PES','BUL','GRO','CLO'].includes(options.aiMedallion)
+    ? options.aiMedallion
     : null;
+  const storyModifiers: StoryModifiers | null =
+    (options.aiStartingLife != null || medallion || bossMedallion)
+      ? { ai_starting_life: aiLife, human_medallion: medallion, ai_medallion: bossMedallion }
+      : null;
 
   // Lancio di moneta: chi inizia è casuale. Il primo ha 3 carte in mano, il secondo 4.
   const firstPlayer: PlayerIndex = Math.random() < 0.5 ? 1 : 0;
