@@ -261,7 +261,7 @@ apiRouter.post('/match/create', async (req: Request, res: Response) => {
     const secondary = deckFactionValue(body.secondaryColor, 'Colore secondario');
     if (primary === secondary) throw new Error('Scegli due colori diversi');
 
-    // Opzioni Modalità Storia (opzionali): vita boss, Medaglioni, terziario stabile, colore boss IA
+    // Opzioni Storia / Endless (opzionali)
     let createOpts: {
       aiStartingLife?: number;
       humanMedallion?: DeckFaction | null;
@@ -269,7 +269,15 @@ apiRouter.post('/match/create', async (req: Request, res: Response) => {
       tertiaryColor?: DeckFaction | null;
       aiPrimary?: DeckFaction | 'IND' | null;
       aiDisplayName?: string | null;
+      firstPlayer?: 0 | 1 | null;
     } = {};
+    // tertiaryColor anche a livello root (scena anima)
+    if (body.tertiaryColor != null && body.tertiaryColor !== '') {
+      createOpts.tertiaryColor = deckFactionValue(body.tertiaryColor, 'Colore terziario');
+    }
+    if (body.firstPlayer === 0 || body.firstPlayer === 1) {
+      createOpts.firstPlayer = body.firstPlayer as 0 | 1;
+    }
     const story = body.story;
     if (story && typeof story === 'object' && !Array.isArray(story)) {
       const st = story as Record<string, unknown>;
@@ -291,7 +299,6 @@ apiRouter.post('/match/create', async (req: Request, res: Response) => {
       if (st.tertiaryColor != null && st.tertiaryColor !== '') {
         createOpts.tertiaryColor = deckFactionValue(st.tertiaryColor, 'Colore terziario');
       }
-      // aiPrimary: uno dei 6 colori oppure 'IND' (Indrazzico)
       if (typeof st.aiPrimary === 'string' && st.aiPrimary.length > 0) {
         if (st.aiPrimary === 'IND') {
           createOpts.aiPrimary = 'IND';
@@ -301,6 +308,9 @@ apiRouter.post('/match/create', async (req: Request, res: Response) => {
       }
       if (typeof st.aiDisplayName === 'string' && st.aiDisplayName.trim()) {
         createOpts.aiDisplayName = st.aiDisplayName.trim().slice(0, 80);
+      }
+      if (st.firstPlayer === 0 || st.firstPlayer === 1) {
+        createOpts.firstPlayer = st.firstPlayer as 0 | 1;
       }
     }
 

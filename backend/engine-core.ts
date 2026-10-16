@@ -38,6 +38,8 @@ export type CreateMatchOptions = {
   aiPrimary?: DeckFaction | 'IND' | null;
   /** Nome del boss da mostrare nei log al posto di “L’IA”. */
   aiDisplayName?: string | null;
+  /** Chi inizia: 1 = umano, 0 = IA. Se omesso → moneta a caso. */
+  firstPlayer?: PlayerIndex | null;
 };
 
 /** Nome giocatore nei log (in Storia usa il nome del boss). */
@@ -1132,8 +1134,12 @@ export async function createNewMatch(
       ? { ai_starting_life: aiLife, human_medallion: medallion, ai_medallion: bossMedallion, ai_display_name: aiDisplayName }
       : null;
 
-  // Lancio di moneta: chi inizia è casuale. Il primo ha 3 carte in mano, il secondo 4.
-  const firstPlayer: PlayerIndex = Math.random() < 0.5 ? 1 : 0;
+  // Chi inizia: se options.firstPlayer è 0|1 lo rispetta, altrimenti moneta a caso.
+  // Il primo ha 3 carte in mano, il secondo 4.
+  const firstPlayer: PlayerIndex =
+    options.firstPlayer === 0 || options.firstPlayer === 1
+      ? options.firstPlayer
+      : (Math.random() < 0.5 ? 1 : 0);
   const firstHand = 3, secondHand = 4;
   if (firstPlayer === 1) {
     for (let i = 0; i < secondHand; i++) ai.hand.push(ai.deck.shift()!);
