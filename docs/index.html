@@ -177,8 +177,12 @@
         </div>
       </section>
     </main>
+    <!-- Musica di sottofondo (loop). I browser richiedono un click prima di far partire l’audio. -->
+    <audio id="bg-music" src="musics/egiziana.mp3" loop preload="auto" playsinline></audio>
+    <button id="music-mute-button" type="button" class="music-mute-button" aria-label="Musica attiva" aria-pressed="false" title="Silenzia / attiva musica">🔊</button>
     <script type="module" src="js/auth.js"></script>
     <script type="module" src="js/game.js"></script>
     <script type="module" src="js/trap_preview.js"></script>
+    <script type="module" src="js/music.js"></script>
   </body>
 </html>
