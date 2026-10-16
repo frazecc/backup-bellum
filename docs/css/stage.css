@@ -612,23 +612,25 @@ body:has(#stage.calm) .narrator-medallion.bob { animation: none !important; }
 #stage .board-cell:disabled { opacity: 1; }
 #stage .board-cell.tired .cell-card { filter: grayscale(.45); opacity: .7; }
 
-/* Caselle selezionabili: stesso segnale delle carte giocabili (bordo rosso/bianco) */
+/* Caselle selezionabili: stesso bordo bianco spesso delle carte giocabili in mano */
 #stage .board-cell.valid-summon,
 #stage .board-cell.valid-move,
 #stage .board-cell.valid-target {
   border: 3px solid #ffffff !important;
-  animation: playable-frame 1.1s ease-in-out infinite;
+  box-shadow:
+    0 0 0 3px #ffffff,
+    0 2px 0 var(--tomb-chunky-shadow, #1a0a05),
+    0 0 22px #ffffffaa;
   z-index: 2;
 }
 #stage.calm .board-cell.valid-summon,
 #stage.calm .board-cell.valid-move,
 #stage.calm .board-cell.valid-target {
-  animation: none !important;
-  border-color: #e0453d !important;
+  border: 3px solid #ffffff !important;
   box-shadow:
-    0 0 0 3px #e0453d,
+    0 0 0 3px #ffffff,
     0 2px 0 var(--tomb-chunky-shadow, #1a0a05),
-    0 0 18px #e0453d88;
+    0 0 18px #ffffff88;
 }
 
 /* ----- Carta sulla griglia — Stile B papiro + badge rotondi ----- */
