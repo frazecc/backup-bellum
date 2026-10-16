@@ -2325,3 +2325,63 @@ body.notice-open #stage .action-panel button {
 .settings-panel .settings-row-desc {
   color: #c9b98a;
 }
+
+/* --- Colori mazzo accanto al nome (HUD) --- */
+#stage .hud-name-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: calc(6 * var(--p));
+  max-width: 100%;
+  min-width: 0;
+}
+#stage .hud-deck-colors {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(4 * var(--p));
+  max-width: 100%;
+}
+#stage .hud-color-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(3 * var(--p));
+  padding: calc(2 * var(--p)) calc(6 * var(--p));
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--chip, #e8c565) 55%, #000);
+  background: color-mix(in srgb, var(--chip, #e8c565) 18%, #0b0806);
+  color: var(--tomb-text, #efe2c0);
+  font-size: calc(11 * var(--p));
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+#stage .hud-color-chip i {
+  display: inline-block;
+  width: calc(8 * var(--p));
+  height: calc(8 * var(--p));
+  border-radius: 50%;
+  background: var(--chip, #e8c565);
+  box-shadow: 0 0 6px var(--chip, #e8c565);
+}
+
+/* --- Logout nel pannello Impostazioni (ingranaggio) --- */
+.settings-panel .settings-sep {
+  height: 1px;
+  margin: 0.45rem 0.2rem;
+  background: rgba(232, 197, 101, 0.25);
+}
+.settings-panel .settings-user {
+  margin: 0.15rem 0.35rem 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #e8c565cc;
+}
+.settings-panel .settings-logout {
+  margin-top: 0.15rem;
+}
+.settings-panel .settings-logout .settings-row-title {
+  color: #ffb0a8;
+}
