@@ -96,21 +96,6 @@
                       <div class="menu-line"><span>Tuo mazzo</span><p id="player-deck-colors" class="menu-colors" aria-label="Colori del tuo mazzo"></p></div>
                       <div class="menu-line"><span>Mazzo IA</span><p id="opponent-deck-colors" class="menu-colors" aria-label="Colori del mazzo IA"></p></div>
                       <div class="menu-line menu-user"><span id="signed-in-user" class="signed-in-user"></span><button id="logout-button" class="secondary-button" type="button">Esci</button></div>
-                      <div class="menu-sep" aria-hidden="true"></div>
-                      <button id="auto-notice-toggle" role="switch" aria-checked="false" class="reduce-toggle" type="button">
-                        <span class="reduce-text">
-                          <span class="reduce-title">Auto «Ho capito»</span>
-                          <span class="reduce-desc">Conferma da sola i popup brevi</span>
-                        </span>
-                        <span class="reduce-switch" aria-hidden="true"><span class="reduce-knob"></span></span>
-                      </button>
-                      <button id="reduce-motion-toggle" role="switch" aria-checked="false" class="reduce-toggle" type="button">
-                        <span class="reduce-text">
-                          <span class="reduce-title">Riduci animazioni</span>
-                          <span class="reduce-desc">Transizioni istantanee, senza effetti</span>
-                        </span>
-                        <span class="reduce-switch" aria-hidden="true"><span class="reduce-knob"></span></span>
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -179,7 +164,34 @@
     </main>
     <!-- Musica di sottofondo (loop). I browser richiedono un click prima di far partire l’audio. -->
     <audio id="bg-music" src="musics/egiziana.mp3" loop preload="auto" playsinline></audio>
-    <button id="music-mute-button" type="button" class="music-mute-button" aria-label="Musica attiva" aria-pressed="false" title="Silenzia / attiva musica">🔊</button>
+    <!-- Impostazioni sempre visibili -->
+    <div class="settings-root">
+      <button id="settings-button" type="button" class="settings-button" aria-label="Impostazioni" aria-haspopup="true" aria-expanded="false" aria-controls="settings-panel" title="Impostazioni">⚙</button>
+      <div id="settings-panel" class="settings-panel hidden" role="dialog" aria-label="Impostazioni">
+        <p class="settings-title">Impostazioni</p>
+        <button id="music-mute-button" type="button" class="settings-row" aria-pressed="false">
+          <span class="settings-row-label">
+            <span class="settings-row-title" id="music-mute-title">Musica</span>
+            <span class="settings-row-desc" id="music-mute-desc">Sottofondo egiziano in loop</span>
+          </span>
+          <span class="settings-row-value" id="music-mute-value">🔊</span>
+        </button>
+        <button id="auto-notice-toggle" type="button" role="switch" aria-checked="false" class="settings-row reduce-toggle">
+          <span class="settings-row-label">
+            <span class="settings-row-title">Auto «Ho capito»</span>
+            <span class="settings-row-desc">Chiude da sola i popup brevi</span>
+          </span>
+          <span class="reduce-switch" aria-hidden="true"><span class="reduce-knob"></span></span>
+        </button>
+        <button id="reduce-motion-toggle" type="button" role="switch" aria-checked="false" class="settings-row reduce-toggle">
+          <span class="settings-row-label">
+            <span class="settings-row-title">Riduci animazioni</span>
+            <span class="settings-row-desc">Meno effetti, più fluidità</span>
+          </span>
+          <span class="reduce-switch" aria-hidden="true"><span class="reduce-knob"></span></span>
+        </button>
+      </div>
+    </div>
     <script type="module" src="js/auth.js"></script>
     <script type="module" src="js/game.js"></script>
     <script type="module" src="js/trap_preview.js"></script>
