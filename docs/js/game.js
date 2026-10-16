@@ -562,7 +562,7 @@ async function renderDeathChoice() {
       preview.style.cssText = 'margin:.6rem auto;max-width:200px';
       preview.innerHTML = cardHTML(d, true);
       options.append(preview);
-      actions.append(button('Ho capito', async () => {
+      const confirmEtb = async () => {
         if (busy || deathTarget()?.choice_id !== selected.choice_id) return;
         flow = {
           kind: 'etb-target',
@@ -580,7 +580,12 @@ async function renderDeathChoice() {
           gm.textContent = 'Tocca il bersaglio evidenziato.';
           gm.className = 'game-message success';
         }
-      }));
+      };
+      actions.append(button('Ho capito', confirmEtb));
+      // Auto «Ho capito»: stesso toggle del menu (non i dialoghi lunghi della Mummia)
+      if (isAutoNotice()) {
+        setTimeout(() => { confirmEtb().catch(fail); }, 900);
+      }
     } else {
       title.textContent = 'Bersaglio dell’effetto';
       text.textContent = `${d.name}: scegli il bersaglio. La scelta è obbligatoria e si risolve prima dell’effetto successivo.`;
