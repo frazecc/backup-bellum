@@ -2953,6 +2953,7 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
     closeGraveyard();
     hideStart();
     hideStoryStart();
+    hideHome(); // importante: dopo anima scene la Home resta aperta e copre stage/dialoghi
     closeColorDialog();
     localStorage.setItem('bellum:last-match', matchId);
 
