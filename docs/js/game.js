@@ -13,14 +13,22 @@ let lastPhaseKey = null; // scandisce ogni cambio fase anche se vuota
 const waitPresentation = ms => new Promise(resolve => setTimeout(resolve,ms));
 const board = () => state?.board?.rows ?? [[null,null,null],[null,null,null],[null,null,null]];
 const at = p => board()[p.row]?.[p.col] ?? null;
-const me = () => state?.players?.[1];
-const them = () => state?.players?.[0];
-const reaction = () => state?.pending_reaction?.responder_index === 1 ? state.pending_reaction : null;
-const deathOrder = () => state?.pending_death_order?.chooser_index === 1 ? state.pending_death_order : null;
-const deathTarget = () => state?.pending_target_choice?.chooser_index === 1 ? state.pending_target_choice : null;
+/** In PvE sei sempre index 1; in PvP dipende da user_id. */
+let myPlayerIndex = 1;
+const me = () => state?.players?.[myPlayerIndex];
+const them = () => state?.players?.[myPlayerIndex === 1 ? 0 : 1];
+function syncMyPlayerIndex(userId) {
+  if (!state?.players || !userId) { myPlayerIndex = 1; return; }
+  if (state.players[1]?.user_id === userId) myPlayerIndex = 1;
+  else if (state.players[0]?.user_id === userId) myPlayerIndex = 0;
+  else myPlayerIndex = 1;
+}
+const reaction = () => state?.pending_reaction?.responder_index === myPlayerIndex ? state.pending_reaction : null;
+const deathOrder = () => state?.pending_death_order?.chooser_index === myPlayerIndex ? state.pending_death_order : null;
+const deathTarget = () => state?.pending_target_choice?.chooser_index === myPlayerIndex ? state.pending_target_choice : null;
 const obligatory = () => !!state?.pending_death_order || !!state?.pending_target_choice;
-const turn = () => state?.status === 'running' && state.active_player_index === 1 && state.phase === 'main';
-const pending = () => state?.pending_mostrissimo?.player_index === 1 ? state.pending_mostrissimo : null;
+const turn = () => state?.status === 'running' && state.active_player_index === myPlayerIndex && state.phase === 'main';
+const pending = () => state?.pending_mostrissimo?.player_index === myPlayerIndex ? state.pending_mostrissimo : null;
 const active = () => turn() && !busy && !pending() && !state?.pending_reaction && !obligatory() && !(state?.work_queue?.length);
 const inside = p => p.row >= 0 && p.row < 3 && p.col >= 0 && p.col < 3;
 const around = p => [{row:p.row-1,col:p.col},{row:p.row+1,col:p.col},{row:p.row,col:p.col-1},{row:p.row,col:p.col+1}].filter(inside);
@@ -1049,6 +1057,11 @@ async function handleMatchFinished() {
     return;
   }
 
+  if (currentMode === 'pvp') {
+    await handlePvpFinished();
+    return;
+  }
+
   if (!won) {
     const wasStory = currentMode === 'story';
     const wasEndless = currentMode === 'endless';
@@ -1531,6 +1544,10 @@ function updateStoryMedallionBanner() {
 
 /** Nome avversario: boss in Storia, altrimenti Mummy. Usato in HUD e popup di turno. */
 function opponentDisplayName() {
+  if (currentMode === 'pvp') {
+    const opp = them();
+    return opp?.user_id ? 'Avversario' : 'Avversario';
+  }
   if (currentMode === 'story') {
     const code = getStoryProgress()?.currentBoss;
     if (code && BOSS_DATA[code]?.name) return BOSS_DATA[code].name;
@@ -2348,10 +2365,17 @@ function homeDialog() {
     endlessStartScreen().catch(fail);
   }, 'img/piramide2.png');
 
-  // Coming Soon – piramide3.png (sempre bloccata per ora)
-  const soonBtn = makePyramid('home-soon', 'Coming Soon', true, null, 'img/piramide3.png');
+  // PvP – piramide3.png (sbloccata con trofeo Endless best ≥ 1)
+  const endlessBest = Number(getEndlessProgress()?.best) || 0;
+  const pvpUnlocked = endlessBest >= 1;
+  const pvpLabel = pvpUnlocked ? 'Modalità PvP' : '???';
+  const pvpBtn = makePyramid('home-pvp', pvpLabel, !pvpUnlocked, () => {
+    currentMode = 'pvp';
+    hideStart();
+    openPvpLobby().catch(fail);
+  }, 'img/piramide3.png');
 
-  pyramids.append(storyBtn, endlessBtn, soonBtn);
+  pyramids.append(storyBtn, endlessBtn, pvpBtn);
   content.append(title, subtitle, pyramids);
   el.append(bg, content);
 
@@ -2364,7 +2388,7 @@ function showHome() {
   if (state || busy) return;
   const el = homeDialog();
 
-  // Aggiorna etichetta e stato di blocco di Endless
+  // Aggiorna etichetta e stato di blocco Endless + PvP
   const storyDone = isStoryCompleted();
   const endlessBtn = $('home-endless');
   if (endlessBtn) {
@@ -2376,6 +2400,20 @@ function showHome() {
     } else {
       endlessBtn.classList.add('is-locked');
       endlessBtn.disabled = true;
+    }
+  }
+  const endlessBest = Number(getEndlessProgress()?.best) || 0;
+  const pvpUnlocked = endlessBest >= 1;
+  const pvpBtn = $('home-pvp');
+  if (pvpBtn) {
+    const label = pvpBtn.querySelector('.pyramid-label');
+    if (label) label.textContent = pvpUnlocked ? 'Modalità PvP' : '???';
+    if (pvpUnlocked) {
+      pvpBtn.classList.remove('is-locked');
+      pvpBtn.disabled = false;
+    } else {
+      pvpBtn.classList.add('is-locked');
+      pvpBtn.disabled = true;
     }
   }
 
@@ -3461,6 +3499,391 @@ async function init() {
 // Solo dopo conferma identità (login o «Sono io») mostriamo la Home.
 // Importante: showHome() SUBITO (sincrono) così non si vede la griglia vuota
 // mentre claimDeviceAndSync parla col server.
+
+// ========== PvP LOBBY — Camera del Re Lobbi II ==========
+let lobbyTimer = null;
+let pvpChallengeId = null;
+let pvpPollTimer = null;
+
+function stopLobbyTimers() {
+  if (lobbyTimer) { clearInterval(lobbyTimer); lobbyTimer = null; }
+  if (pvpPollTimer) { clearInterval(pvpPollTimer); pvpPollTimer = null; }
+}
+
+async function lobbyApi(path, options = {}) {
+  return api(path, options);
+}
+
+function pvpLobbyEl() {
+  let el = $('pvp-lobby');
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = 'pvp-lobby';
+  el.className = 'pvp-lobby hidden';
+  el.innerHTML = `
+    <div class="pvp-lobby-panel panel">
+      <h2>Camera del Re Lobbi II</h2>
+      <p class="pvp-lobby-sub">Chi è in attesa di una sfida</p>
+      <div id="pvp-lobby-list" class="pvp-lobby-list"></div>
+      <p id="pvp-lobby-status" class="pvp-lobby-status muted"></p>
+      <button type="button" id="pvp-lobby-leave" class="secondary-button">Torna alla Home</button>
+    </div>`;
+  document.body.append(el);
+  $('pvp-lobby-leave').onclick = () => leavePvpLobby().catch(fail);
+  return el;
+}
+
+async function openPvpLobby() {
+  hideHome();
+  hideStart();
+  currentMode = 'pvp';
+  const el = pvpLobbyEl();
+  el.classList.remove('hidden');
+  const user = await getCurrentUser();
+  const username = usernameFromEmail(user?.email) || 'viaggiatore';
+  await lobbyApi('/lobby/join', { method: 'POST', body: { username } });
+  await refreshPvpLobby();
+  stopLobbyTimers();
+  lobbyTimer = setInterval(() => refreshPvpLobby().catch(console.warn), 5000);
+}
+
+async function leavePvpLobby() {
+  stopLobbyTimers();
+  try { await lobbyApi('/lobby/leave', { method: 'POST', body: {} }); } catch (_) {}
+  $('pvp-lobby')?.classList.add('hidden');
+  pvpChallengeId = null;
+  currentMode = 'story';
+  showHome();
+}
+
+async function refreshPvpLobby() {
+  const user = await getCurrentUser();
+  const username = usernameFromEmail(user?.email) || 'viaggiatore';
+  const data = await lobbyApi('/lobby/heartbeat', { method: 'POST', body: { username } });
+  const list = $('pvp-lobby-list');
+  const status = $('pvp-lobby-status');
+  if (!list) return;
+
+  // Sfide in arrivo
+  const incoming = (data.challenges || []).filter(c => c.status === 'pending' && c.toUserId === user?.id);
+  for (const c of incoming) {
+    showChallengePopup(c);
+  }
+  // Sfida accettata → colori
+  const accepted = (data.challenges || []).find(c =>
+    c.status === 'accepted' && (c.fromUserId === user?.id || c.toUserId === user?.id)
+  );
+  if (accepted && !accepted.matchId) {
+    const already = accepted.colors && accepted.colors[user.id];
+    if (!already && pvpChallengeId !== accepted.id) {
+      pvpChallengeId = accepted.id;
+      stopLobbyTimers();
+      $('pvp-lobby')?.classList.add('hidden');
+      await startPvpColorPick(accepted.id);
+      return;
+    }
+  }
+  if (accepted?.matchId) {
+    stopLobbyTimers();
+    $('pvp-lobby')?.classList.add('hidden');
+    await enterPvpMatch(accepted.matchId);
+    return;
+  }
+
+  list.innerHTML = '';
+  const players = data.players || [];
+  if (!players.length) {
+    list.innerHTML = '<p class="muted">Nessun altro coraggioso in camera…</p>';
+  } else {
+    for (const p of players) {
+      const row = document.createElement('div');
+      row.className = 'pvp-lobby-row';
+      const name = document.createElement('span');
+      name.textContent = p.username || p.userId.slice(0, 8);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'primary-button';
+      btn.textContent = 'Sfida';
+      btn.onclick = () => challengePlayer(p.userId).catch(fail);
+      row.append(name, btn);
+      list.append(row);
+    }
+  }
+  if (status) status.textContent = `${players.length} in attesa · aggiornamento ogni 5s`;
+}
+
+async function challengePlayer(toUserId) {
+  const user = await getCurrentUser();
+  const username = usernameFromEmail(user?.email) || 'viaggiatore';
+  await lobbyApi('/lobby/challenge', { method: 'POST', body: { toUserId, username } });
+  notice('Sfida inviata. In attesa di risposta…', 'success');
+  await refreshPvpLobby();
+}
+
+function showChallengePopup(challenge) {
+  if ($('pvp-challenge-popup') && !$('pvp-challenge-popup').classList.contains('hidden')) return;
+  let el = $('pvp-challenge-popup');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'pvp-challenge-popup';
+    el.className = 'card-detail-overlay';
+    el.style.zIndex = '300';
+    document.body.append(el);
+  }
+  el.innerHTML = '';
+  const panel = document.createElement('div');
+  panel.className = 'panel';
+  panel.style.cssText = 'width:min(92vw,400px);margin:auto;padding:1.2rem;text-align:center;border:1px solid #d5a758';
+  const t = document.createElement('p');
+  t.style.cssText = 'font-family:"Lilita One",Georgia,serif;font-size:1.2rem;color:#e8c565';
+  t.textContent = 'Sfida!';
+  const b = document.createElement('p');
+  b.textContent = `${challenge.fromUsername || 'Uno sconosciuto'} ti sfida nella Camera del Re Lobbi II.`;
+  const actions = document.createElement('div');
+  actions.style.cssText = 'display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap;margin-top:1rem';
+  const yes = document.createElement('button');
+  yes.type = 'button';
+  yes.className = 'primary-button';
+  yes.textContent = 'Accetta';
+  yes.onclick = async () => {
+    el.classList.add('hidden');
+    try {
+      await lobbyApi(`/lobby/challenge/${encodeURIComponent(challenge.id)}/accept`, { method: 'POST', body: {} });
+      pvpChallengeId = challenge.id;
+      stopLobbyTimers();
+      $('pvp-lobby')?.classList.add('hidden');
+      await startPvpColorPick(challenge.id);
+    } catch (e) { fail(e); }
+  };
+  const no = document.createElement('button');
+  no.type = 'button';
+  no.className = 'secondary-button';
+  no.textContent = 'Rifiuta';
+  no.onclick = async () => {
+    el.classList.add('hidden');
+    try {
+      await lobbyApi(`/lobby/challenge/${encodeURIComponent(challenge.id)}/decline`, { method: 'POST', body: {} });
+      await refreshPvpLobby();
+    } catch (e) { fail(e); }
+  };
+  actions.append(yes, no);
+  panel.append(t, b, actions);
+  el.append(panel);
+  el.classList.remove('hidden');
+}
+
+async function startPvpColorPick(challengeId) {
+  pvpChallengeId = challengeId;
+  currentMode = 'pvp';
+  // Riusa scena anima ma alla fine invia colori alla lobby invece di newMatch
+  await showAnimaSceneForPvp(challengeId);
+}
+
+/** Variante anima che POST /lobby/challenge/:id/colors */
+async function showAnimaSceneForPvp(challengeId) {
+  // Forza flusso anima: dopo tertiary chiama lobby colors
+  if (busy) busy = false;
+  // Monkey-patch: temporaneamente sostituisci la coda di newMatch
+  const originalNewMatch = newMatch;
+  // Usa showAnimaScene ma intercept — più semplice: copia step minimal
+
+  const el = animaSceneEl();
+  el.innerHTML = '';
+  el.style.display = 'flex';
+  el.classList.remove('hidden');
+  hideHome();
+
+  const panel = document.createElement('div');
+  panel.className = 'panel anima-panel';
+  panel.style.cssText = 'width:min(94vw,460px);margin:auto;padding:1.15rem;text-align:center;border:1px solid #d5a758;background:linear-gradient(180deg,#1a1410,#0e0b09)';
+  const med = document.createElement('div');
+  med.className = 'narrator-medallion bob';
+  med.style.cssText = 'width:140px;height:140px;margin:0 auto .7rem;border-radius:50%;overflow:hidden;border:2px solid #d5a758';
+  med.innerHTML = `<img src="img/mummy/mummy-base.png" alt="" width="140" height="140" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">`;
+  const speech = document.createElement('p');
+  speech.style.cssText = 'line-height:1.5;font-size:1.08rem;max-width:36ch;margin:0 auto';
+  const choices = document.createElement('div');
+  panel.append(med, speech, choices);
+  el.append(panel);
+
+  const allCodes = Object.keys(deckFactionNames);
+  speech.textContent = 'Benvenuto, coraggioso. Dimmi, com’è fatta la tua anima?';
+  const primary = await new Promise(resolve => {
+    choices.innerHTML = '';
+    choices.append(renderColorButtons(allCodes, resolve));
+  });
+  speech.textContent = 'Interessante… ti aiuterò: quale artefatto vuoi?';
+  const secondary = await new Promise(resolve => {
+    choices.innerHTML = '';
+    choices.append(renderColorButtons(allCodes.filter(c => c !== primary), resolve));
+  });
+  const candidates = allCodes.filter(c => c !== primary && c !== secondary);
+  const tertiary = candidates[Math.floor(Math.random() * candidates.length)];
+  const tName = deckFactionNames[tertiary] || tertiary;
+  const iris = FACTION_EYE[tertiary] || '#e8c565';
+  med.style.display = 'none';
+  speech.textContent = `Un’ombra ti sfiora. Ora ${tName} fa parte di te.`;
+  choices.innerHTML = '';
+  const eyes = document.createElement('div');
+  eyes.style.cssText = 'display:flex;gap:2rem;justify-content:center;margin:.6rem 0 1rem';
+  for (let i = 0; i < 2; i++) {
+    const eye = document.createElement('div');
+    eye.style.cssText = `width:48px;height:48px;border-radius:50%;background:#0b0806;border:3px solid #3a2e1a;display:flex;align-items:center;justify-content:center;box-shadow:0 0 14px ${iris}88`;
+    eye.innerHTML = `<div style="width:20px;height:20px;border-radius:50%;background:${iris}"></div>`;
+    eyes.append(eye);
+  }
+  choices.append(eyes);
+  await new Promise(resolve => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'primary-button';
+    btn.textContent = 'Affronto il destino';
+    btn.onclick = () => resolve();
+    choices.append(btn);
+  });
+  el.classList.add('hidden');
+  el.style.display = 'none';
+
+  notice('Sigillo i colori… attendo l’avversario…', 'success');
+  const result = await lobbyApi(`/lobby/challenge/${encodeURIComponent(challengeId)}/colors`, {
+    method: 'POST',
+    body: { primaryColor: primary, secondaryColor: secondary, tertiaryColor: tertiary },
+  });
+
+  if (result.waiting || !result.match_id) {
+    // Poll until match ready
+    await waitForPvpMatch(challengeId);
+  } else {
+    await enterPvpMatch(result.match_id, result.state);
+  }
+}
+
+async function waitForPvpMatch(challengeId) {
+  notice('L’avversario sta scegliendo i colori…', 'success');
+  return new Promise((resolve, reject) => {
+    const tick = async () => {
+      try {
+        const user = await getCurrentUser();
+        const data = await lobbyApi('/lobby/heartbeat', {
+          method: 'POST',
+          body: { username: usernameFromEmail(user?.email) || 'viaggiatore' },
+        });
+        const ch = (data.challenges || []).find(c => c.id === challengeId);
+        if (ch?.matchId) {
+          if (pvpPollTimer) clearInterval(pvpPollTimer);
+          pvpPollTimer = null;
+          await enterPvpMatch(ch.matchId);
+          resolve();
+          return;
+        }
+      } catch (e) {
+        console.warn(e);
+      }
+    };
+    pvpPollTimer = setInterval(tick, 2000);
+    tick();
+  });
+}
+
+async function enterPvpMatch(matchId, preloadedState = null) {
+  stopLobbyTimers();
+  currentMode = 'pvp';
+  hideHome();
+  $('pvp-lobby')?.classList.add('hidden');
+  try {
+    const user = await getCurrentUser();
+    const mid = matchId;
+    if (preloadedState) {
+      state = preloadedState;
+    } else {
+      const result = await api(`/match/${encodeURIComponent(mid)}`);
+      state = result.state;
+    }
+    matchId = mid;
+    window.__pvp = true;
+    syncMyPlayerIndex(user?.id);
+    localStorage.setItem('bellum:last-match', matchId);
+    flow = null;
+    deathDraft = { choiceId: null, instanceIds: [] };
+    await render();
+    await logs();
+    startPvpStatePoll();
+    notice('PvP iniziato. Che vinca il migliore.', 'success');
+  } catch (e) {
+    fail(e);
+  }
+}
+
+function startPvpStatePoll() {
+  if (pvpPollTimer) clearInterval(pvpPollTimer);
+  pvpPollTimer = setInterval(async () => {
+    if (currentMode !== 'pvp' || !matchId) return;
+    if (busy) return;
+    try {
+      const result = await api(`/match/${encodeURIComponent(matchId)}`);
+      const prev = state?.state_revision;
+      state = result.state;
+      const user = await getCurrentUser();
+      syncMyPlayerIndex(user?.id);
+      if (state.status === 'finished') {
+        stopLobbyTimers();
+        await handlePvpFinished();
+        return;
+      }
+      if (state.state_revision !== prev) {
+        await render();
+      }
+    } catch (e) {
+      console.warn('pvp poll', e);
+    }
+  }, 1500);
+}
+
+async function handlePvpFinished() {
+  stopLobbyTimers();
+  const user = await getCurrentUser();
+  syncMyPlayerIndex(user?.id);
+  const won = state?.winner_index === myPlayerIndex;
+  const draw = state?.winner_index == null && state?.status === 'finished';
+  // Check both at 0 life for draw - server should set winner null
+  let title = won ? 'HAI VINTO!' : (draw ? 'PAREGGIO' : 'HAI PERSO!');
+  await showPvpResultPopup(title);
+  matchId = null;
+  state = null;
+  currentMode = 'story';
+  try { localStorage.removeItem('bellum:last-match'); } catch (_) {}
+  showAuthScreen({ forceLoginForm: false });
+}
+
+function showPvpResultPopup(title) {
+  return new Promise(resolve => {
+    let el = $('pvp-result-dialog');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'pvp-result-dialog';
+      el.className = 'card-detail-overlay';
+      el.style.zIndex = '200';
+      document.body.append(el);
+    }
+    el.innerHTML = '';
+    const panel = document.createElement('div');
+    panel.className = 'panel';
+    panel.style.cssText = 'width:min(92vw,400px);margin:auto;padding:1.3rem;text-align:center;border:1px solid #d5a758';
+    const t = document.createElement('p');
+    t.style.cssText = 'font-family:"Lilita One",Georgia,serif;font-size:1.4rem;color:#e8c565';
+    t.textContent = title;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'primary-button';
+    btn.textContent = 'Accetto il giudizio';
+    btn.onclick = () => { el.classList.add('hidden'); resolve(); };
+    panel.append(t, btn);
+    el.append(panel);
+    el.classList.remove('hidden');
+  });
+}
+
+
 window.addEventListener('bellum:auth-ready', () => {
   try { showHome(); } catch (_) { /* ignore */ }
   init()
