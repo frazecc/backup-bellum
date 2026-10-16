@@ -13,10 +13,23 @@ let lastPhaseKey = null; // scandisce ogni cambio fase anche se vuota
 const waitPresentation = ms => new Promise(resolve => setTimeout(resolve,ms));
 const board = () => state?.board?.rows ?? [[null,null,null],[null,null,null],[null,null,null]];
 const at = p => board()[p.row]?.[p.col] ?? null;
-/** In PvE sei sempre index 1; in PvP dipende da user_id. */
+/** In PvE sei sempre index 1; in PvP dipende da user_id.
+ *  Vista plancia: SEMPRE tu in basso (riga visuale 2), avversario in alto (riga 0),
+ *  come in single player. Le coordinate inviate al server restano quelle del motore. */
 let myPlayerIndex = 1;
+const foePlayerIndex = () => (myPlayerIndex === 1 ? 0 : 1);
 const me = () => state?.players?.[myPlayerIndex];
-const them = () => state?.players?.[myPlayerIndex === 1 ? 0 : 1];
+const them = () => state?.players?.[foePlayerIndex()];
+const isMine = (owner) => owner === myPlayerIndex;
+const isFoe = (owner) => owner === foePlayerIndex();
+/** Riga casa motore: P1 → 2, P0 → 0 */
+const myHomeRow = () => (myPlayerIndex === 1 ? 2 : 0);
+const foeHomeRow = () => (myPlayerIndex === 1 ? 0 : 2);
+/** Converti riga motore ↔ riga visuale (flip se sei P0). */
+const toViewRow = (engineRow) => (myPlayerIndex === 1 ? engineRow : 2 - engineRow);
+const toEngineRow = (viewRow) => (myPlayerIndex === 1 ? viewRow : 2 - viewRow);
+const toEnginePos = (viewPos) => viewPos ? { row: toEngineRow(viewPos.row), col: viewPos.col } : viewPos;
+const toViewPos = (enginePos) => enginePos ? { row: toViewRow(enginePos.row), col: enginePos.col } : enginePos;
 function syncMyPlayerIndex(userId) {
   if (!state?.players || !userId) { myPlayerIndex = 1; return; }
   if (state.players[1]?.user_id === userId) myPlayerIndex = 1;
@@ -34,7 +47,7 @@ const inside = p => p.row >= 0 && p.row < 3 && p.col >= 0 && p.col < 3;
 const around = p => [{row:p.row-1,col:p.col},{row:p.row+1,col:p.col},{row:p.row,col:p.col-1},{row:p.row,col:p.col+1}].filter(inside);
 const eq = (a,b) => !!(a && b && a.row === b.row && a.col === b.col);
 const isCreatureCell = c => c?.kind === 'creature';
-const foes = p => around(p).filter(q => isCreatureCell(at(q)) && at(q).owner_index === 0);
+const foes = p => around(p).filter(q => isCreatureCell(at(q)) && isFoe(at(q).owner_index));
 const steps = p => around(p).filter(q => q.row !== 0 && !at(q));
 const escape = x => String(x ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
 const creature = d => ['monster','mostrissimo'].includes(d.card_type);
@@ -45,7 +58,7 @@ const AI_TARGET = 'player:0';
 const playerTargetEffect = d => ['aura','terraforma'].includes(d?.card_type) ? undefined : effects(d).find(e => !e?.trigger && e?.target === 'any_target' && ['damage','damage_creature'].includes(e.type));
 const hasTargets = d => !!playerTargetEffect(d) || targets(d).length > 0;
 // Si attaccano creature nemiche e Terraforme nemiche con PV; solo le creature bloccano l'attacco diretto.
-const attackable = p => around(p).filter(q => { const c = at(q); return c?.owner_index === 0 && (isCreatureCell(c) || (c.kind === 'terraforma' && c.hp !== undefined)); });
+const attackable = p => around(p).filter(q => { const c = at(q); return c && isFoe(c.owner_index) && (isCreatureCell(c) || (c.kind === 'terraforma' && c.hp !== undefined)); });
 const factions = ['','CHI','INF','PES','BUL','GRO','CLO','IND'];
 const deckFactionNames = {CHI:'Chiericanza',INF:'Infamia',PES:'Pestilenza',BUL:'Bullismo',GRO:'Grossanza',CLO:'Clownerie'};
 const types = {monster:'MOSTRO',mostrissimo:'MOSTRISSIMO',maledizione:'MALEDIZIONE',instant:'TRAPPOLA',terraforma:'TERRAFORMA',aura:'AURA'};
@@ -339,8 +352,8 @@ function targetAllowed(d,c,event=null) {
   if (!e) return false;
   if (event?.kind === 'monster_etb' && c.instance_id !== event.source_instance_id) return false;
   if (e.target === 'any_target') return true;
-  if (['damage','damage_creature'].includes(e.type) && e.timing !== 'instant') return c.owner_index === 0;
-  if (e.type === 'heal' && e.timing !== 'instant') return c.owner_index === 1;
+  if (['damage','damage_creature'].includes(e.type) && e.timing !== 'instant') return isFoe(c.owner_index);
+  if (e.type === 'heal' && e.timing !== 'instant') return isMine(c.owner_index);
   return true;
 }
 function targets(d) {
@@ -356,17 +369,18 @@ function permanents() {
   for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
     const c = at({row,col});
     if (!c) continue;
-    if (c.owner_index === 1) found.push({id:c.instance_id,card_id:c.card_id,type:c.kind === 'terraforma' ? 'Terraforma' : 'Creatura'});
-    if (isCreatureCell(c)) for (const a of c.auras ?? []) if (a.owner_index === 1) found.push({id:a.instance_id,card_id:a.card_id,type:'Aura'});
+    if (isMine(c.owner_index)) found.push({id:c.instance_id,card_id:c.card_id,type:c.kind === 'terraforma' ? 'Terraforma' : 'Creatura'});
+    if (isCreatureCell(c)) for (const a of c.auras ?? []) if (isMine(a.owner_index)) found.push({id:a.instance_id,card_id:a.card_id,type:'Aura'});
   }
   return found;
 }
 function summonCells(p) {
   if (!p) return [];
   const found = [];
+  const home = myHomeRow();
   for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
     const pos = {row,col};
-    if (!at(pos) && (row === 2 || (row === 1 && (p.freed_positions ?? []).some(x => eq(x,pos))))) found.push(pos);
+    if (!at(pos) && (row === home || (row === 1 && (p.freed_positions ?? []).some(x => eq(x,pos))))) found.push(pos);
   }
   return found;
 }
@@ -619,7 +633,7 @@ function confirmTargetChoice(cell, cardDef, hint = '') {
     title.textContent = 'Conferma bersaglio';
     const sub = document.createElement('p');
     sub.style.cssText = 'margin:0 0 .6rem;opacity:.9;line-height:1.4';
-    const who = cell?.owner_index === 1 ? 'tua' : 'IA';
+    const who = isMine(cell?.owner_index) ? 'tua' : (currentMode === 'pvp' ? 'avversario' : 'IA');
     const stats = isCreatureCell(cell)
       ? ` · ATK ${cell.attack} · HP ${cell.hp}`
       : (cell?.hp != null ? ` · PV ${cell.hp}` : '');
@@ -704,7 +718,7 @@ async function renderDeathChoice() {
       if (chosen.includes(source.instance_id)) continue;
       const d = await card(source.card_id);
       if (deathOrder()?.choice_id !== order.choice_id) return;
-      const b = button(`${d.name} · ${source.owner_index === 1 ? 'tua' : 'IA'} · ${source.effect_indices?.length ?? 0} effetti`, async () => {
+      const b = button(`${d.name} · ${isMine(source.owner_index) ? 'tua' : (currentMode === 'pvp' ? 'avversario' : 'IA')} · ${source.effect_indices?.length ?? 0} effetti`, async () => {
         if (busy || deathOrder()?.choice_id !== order.choice_id) return;
         deathDraft.instanceIds.push(source.instance_id);
         if (deathDraft.instanceIds.length === creatures.length) {
@@ -747,7 +761,7 @@ async function renderDeathChoice() {
           const cell = at({ row, col });
           if (cell?.instance_id === sourceId) {
             const root = $('shared-board');
-            const rowEl = root?.children?.[row];
+            const rowEl = root?.children?.[toViewRow(row)];
             const btn = rowEl?.children?.[col];
             if (btn) {
               btn.classList.add('just-entered');
@@ -772,7 +786,7 @@ async function renderDeathChoice() {
         if (!found) continue;
         const targetCard = await card(found.cell.card_id);
         if (deathTarget()?.choice_id !== selected.choice_id) return;
-        const b = button(`${targetCard.name} · ${found.cell.owner_index === 1 ? 'tua' : 'IA'} · [${found.row},${found.col}] · HP ${found.cell.hp}`,() => {
+        const b = button(`${targetCard.name} · ${isMine(found.cell.owner_index) ? 'tua' : (currentMode === 'pvp' ? 'avversario' : 'IA')} · [${found.row},${found.col}] · HP ${found.cell.hp}`,() => {
           if (busy || deathTarget()?.choice_id !== selected.choice_id) return;
           return request('death/target',{choiceId:selected.choice_id,targetInstanceId:instanceId},'Effetto alla morte risolto.');
         });
@@ -1218,11 +1232,11 @@ async function inspect(kind,id,extra={}) {
   const add = (text,fn,disabled=false) => bar.append(button(text,fn,disabled));
   if (kind === 'hand' && active()) add(d.card_type === 'monster' ? 'Evoca' : d.card_type === 'terraforma' ? 'Colloca' : 'Gioca',() => beginCard(current.instanceId,d),!playable(d));
   if (kind === 'mostrissimo' && active() && state.last_mostrissimo_turn?.[1] !== state.current_turn) {
-    const cost = Number(d.sacrifice_cost), own = board().flat().filter(c => isCreatureCell(c) && c.owner_index === 1).length;
+    const cost = Number(d.sacrifice_cost), own = board().flat().filter(c => isCreatureCell(c) && isMine(c.owner_index)).length;
     const legal = Number.isInteger(cost) && cost >= 0 && cost <= 6 && permanents().length >= cost && (board()[2].some(c => !c) || (cost > 0 && own > 0));
     add(`Evoca · ${cost} sacrifici`,() => request('mostrissimo/start',{cardId:id},'Evocazione iniziata: non puoi annullare.'),!legal);
   }
-  if (kind === 'unit' && active() && isCreatureCell(current.cell) && current.cell.owner_index === 1 && !current.cell.tired) {
+  if (kind === 'unit' && active() && isCreatureCell(current.cell) && isMine(current.cell.owner_index) && !current.cell.tired) {
     const direct = foes(current.position).length === 0;
     const foeName = opponentDisplayName();
     add(direct ? `Attacca ${foeName}` : 'Attacca',() => {
@@ -1242,13 +1256,13 @@ async function inspect(kind,id,extra={}) {
     for (const aura of current.cell.auras) {
       const a = await card(aura.card_id);
       if (current !== view) return;
-      add(`Aura ${a.name}${aura.owner_index === 1 ? ' · tua' : ' · IA'}`,() => { close(); return inspect('aura',aura.card_id,{instanceId:aura.instance_id}); });
+      add(`Aura ${a.name}${isMine(aura.owner_index) ? ' · tua' : (currentMode === 'pvp' ? ' · avversario' : ' · IA')}`,() => { close(); return inspect('aura',aura.card_id,{instanceId:aura.instance_id}); });
     }
   }
   if (kind === 'tribute' && pending() && pending().stage === 'paying' && pending().paid.length < pending().required) {
     // Avviso se sacrifichi un mostro con una tua aura addosso
     const cell = current.cell || findCellByInstanceId(current.instanceId);
-    const ownAuras = (cell?.auras || []).filter(a => a.owner_index === 1);
+    const ownAuras = (cell?.auras || []).filter(a => isMine(a.owner_index));
     if (isCreatureCell(cell) && ownAuras.length > 0) {
       add('Conferma sacrificio', async () => {
         const ok = window.confirm('Attenzione: stai sacrificando un mostro che ha una tua aura addosso. Sei sicuro di voler sacrificare il mostro e non l’aura?');
@@ -1294,26 +1308,29 @@ async function drawBoard() {
   root.replaceChildren();
   const p = pending(), legal = p?.stage === 'paying' && p.paid.length === p.required ? summonCells(p) : [];
   const d = flow?.id ? cache.get(flow.id) : null;
-  for (let row = 0; row < 3; row++) {
-    const line = document.createElement('div'); line.className = `board-row ${['ai-row','center-row','human-row'][row]}`;
+  // viewRow 0 = alto (avversario), 1 = centro, 2 = basso (tu) — sempre, anche in PvP
+  for (let viewRow = 0; viewRow < 3; viewRow++) {
+    const row = toEngineRow(viewRow);
+    const line = document.createElement('div'); line.className = `board-row ${['ai-row','center-row','human-row'][viewRow]}`;
     for (let col = 0; col < 3; col++) {
       const pos = {row,col}, c = at(pos), b = document.createElement('button');
       b.type = 'button'; b.className = 'board-cell';
-      if (row === 1 && col === 1) b.classList.add('center-cell');
+      if (viewRow === 1 && col === 1) b.classList.add('center-cell');
       let definition = null;
       if (c) try { definition = await card(c.card_id); } catch(e) { console.warn(e); }
-      b.classList.add(c ? c.owner_index === 1 ? 'human-card' : 'ai-card' : 'empty');
+      b.classList.add(c ? (isMine(c.owner_index) ? 'human-card' : 'ai-card') : 'empty');
       if (c?.kind === 'terraforma') b.classList.add('terraforma-cell');
       if (isCreatureCell(c) && c.tired) b.classList.add('tired');
       if (flow?.kind === 'move' && steps(flow.from).some(x => eq(x,pos))) b.classList.add('valid-move');
       if (flow?.kind === 'attack' && attackable(flow.from).some(x => eq(x,pos))) b.classList.add('valid-target');
-      if (flow?.kind === 'hand' && flow.step === 'cell' && row === 2 && !c) b.classList.add('valid-summon');
+      if (flow?.kind === 'hand' && flow.step === 'cell' && row === myHomeRow() && !c) b.classList.add('valid-summon');
       if (flow?.kind === 'hand' && flow.step === 'target' && flow.position && eq(flow.position, pos) && !c) b.classList.add('valid-target');
       if (flow?.kind === 'mostrissimo-target' && flow.position && eq(flow.position, pos) && !c) b.classList.add('valid-target');
       if (flow?.kind === 'etb-target' && c && (flow.eligible ?? []).includes(c.instance_id)) b.classList.add('valid-target');
       if (['hand','mostrissimo-target','trap-target'].includes(flow?.kind) && (flow?.step === 'target' || flow?.kind !== 'hand') && d && targetAllowed(d,c,flow?.kind === 'trap-target' ? reaction()?.event : null)) b.classList.add('valid-target');
       if (legal.some(x => eq(x,pos))) b.classList.add('valid-summon');
-      b.setAttribute('aria-label',c ? `${definition?.name ?? 'Permanente'} ${c.owner_index === 1 ? 'Tu' : 'IA'}${isCreatureCell(c) ? ` ATK ${c.attack} HP ${c.hp}` : `, Terraforma${c.hp !== undefined ? `, PV ${c.hp}` : ' non attaccabile'}`}${isCreatureCell(c) && c.auras?.length ? `, ${c.auras.length} Aura` : ''}` : `Cella [${row},${col}]`);
+      const whoLabel = c ? (isMine(c.owner_index) ? 'Tu' : (currentMode === 'pvp' ? 'Avversario' : 'IA')) : '';
+      b.setAttribute('aria-label',c ? `${definition?.name ?? 'Permanente'} ${whoLabel}${isCreatureCell(c) ? ` ATK ${c.attack} HP ${c.hp}` : `, Terraforma${c.hp !== undefined ? `, PV ${c.hp}` : ' non attaccabile'}`}${isCreatureCell(c) && c.auras?.length ? `, ${c.auras.length} Aura` : ''}` : `Cella [${row},${col}]`);
       const altar = (row === 1 && col === 1)
         ? `<svg class="altar-svg" aria-hidden="true" width="68" height="96" viewBox="0 0 68 100"><path d="M10 20Q22 8 34 16Q46 8 58 20" fill="none" stroke="#c9a043" stroke-width="2" stroke-linecap="round"/><circle cx="34" cy="14" r="6.5" fill="#e8c565"/><path d="M21 36Q34 26 47 36Q34 46 21 36Z" fill="#0b0806" stroke="#e8c565" stroke-width="1.6"/><circle cx="34" cy="36" r="3.4" fill="#2fe0c4"/><path d="M28 43Q27 49 22 51M34 45V51" fill="none" stroke="#e8c565" stroke-width="1.6" stroke-linecap="round"/><g class="flame"><path d="M34 52Q26 60 30 68Q32 64 33 62Q34 66 37 69Q43 61 34 52Z" fill="#2fe0c4"/><path d="M34 60Q31 64 33 68Q35 66 34 60Z" fill="#e8f9f5"/></g><path d="M24 70h20l-2 6H26Z" fill="#3a2e22" stroke="#c9a043" stroke-width="1.5"/><rect x="18" y="76" width="32" height="8" fill="#3a2e22" stroke="#c9a043" stroke-width="1.5"/><rect x="12" y="84" width="44" height="9" fill="#2a2016" stroke="#c9a043" stroke-width="1.5"/></svg>`
         : '';
@@ -1383,7 +1400,7 @@ async function drawMostrissimi() {
         b.className = 'secondary-button';
         b.style.cssText = 'width:100%;text-align:left';
         const cell = findCellByInstanceId(item.id);
-        const auraCount = (cell?.auras || []).filter(a => a.owner_index === 1).length;
+        const auraCount = (cell?.auras || []).filter(a => isMine(a.owner_index)).length;
         b.textContent = `${item.type}: ${d.name}${auraCount ? ` · ${auraCount} aura` : ''}`;
         b.disabled = busy;
         b.onclick = () => {
@@ -1411,10 +1428,10 @@ async function drawMostrissimi() {
     const d = await card(inst.card_id), b = document.createElement('button');
     b.type = 'button'; b.className = 'mostrissimo-card'; b.innerHTML = handCardHTML(d);
     const cost = Number(d.sacrifice_cost ?? 0);
-    const own = board().flat().filter(c => isCreatureCell(c) && c.owner_index === 1).length;
+    const own = board().flat().filter(c => isCreatureCell(c) && isMine(c.owner_index)).length;
     const canPay = Number.isInteger(cost) && cost >= 0 && permanents().length >= cost;
-    const spaceOk = board()[2].some(c => !c) || (cost > 0 && own > 0);
-    const onceOk = state.last_mostrissimo_turn?.[1] !== state.current_turn;
+    const spaceOk = board()[myHomeRow()].some(c => !c) || (cost > 0 && own > 0);
+    const onceOk = state.last_mostrissimo_turn?.[myPlayerIndex] !== state.current_turn;
     const legal = active() && canPay && spaceOk && onceOk && cost <= 6;
     if (legal) b.classList.add('playable');
     else if (!canPay) b.classList.add('too-expensive');
@@ -1839,7 +1856,7 @@ async function boardClick(pos) {
   if (p) {
     if (p.stage !== 'paying') return;
     if (p.paid.length < p.required) {
-      if (c?.owner_index === 1) return inspect('tribute', c.card_id, { instanceId: c.instance_id, cell: c });
+      if (isMine(c?.owner_index)) return inspect('tribute', c.card_id, { instanceId: c.instance_id, cell: c });
       return notice('Scegli un tuo permanente nell’elenco dei sacrifici.','error');
     }
     if (c || !summonCells(p).some(x => eq(x,pos))) return notice('Cella non valida.','error');
