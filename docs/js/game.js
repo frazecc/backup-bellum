@@ -653,7 +653,7 @@ function humanizePublicText(a) {
   t = t.replace(/\s+/g, ' ').trim();
   // Se resta solo rumore e c'è una carta, titolo generico.
   if ((!t || t.length < 3) && a?.kind === 'card') {
-    const who = a.actor === 0 ? 'Mummy' : a.actor === 1 ? 'Tu' : 'Qualcuno';
+    const who = a.actor === 0 ? opponentDisplayName() : a.actor === 1 ? 'Tu' : 'Qualcuno';
     return `${who} gioca una carta.`;
   }
   return t;
@@ -714,7 +714,7 @@ async function presentPublic(a, generation) {
       : a.phase === 'main' ? 'SVOLGIMENTO'
       : a.phase === 'end' ? 'CHIUSURA' : 'INIZIO';
     let who = '—';
-    if (a.actor === 0) who = 'Mummy';
+    if (a.actor === 0) who = opponentDisplayName();
     else if (a.actor === 1) {
       try { who = usernameFromEmail((await getCurrentUser())?.email) || 'Tu'; }
       catch { who = 'Tu'; }
@@ -1265,20 +1265,20 @@ function updateStoryMedallionBanner() {
   }
 }
 
+/** Nome avversario: boss in Storia, altrimenti Mummy. Usato in HUD e popup di turno. */
+function opponentDisplayName() {
+  if (currentMode === 'story') {
+    const code = getStoryProgress()?.currentBoss;
+    if (code && BOSS_DATA[code]?.name) return BOSS_DATA[code].name;
+  }
+  return 'Mummy';
+}
+
 /** Nome dell'avversario sopra le carte (boss in Storia, altrimenti Mummy). */
 function updateOpponentName() {
   const el = $('opponent-name');
   if (!el) return;
-
-  let name = 'Mummy';
-  if (currentMode === 'story') {
-    const progress = getStoryProgress();
-    const code = progress?.currentBoss;
-    if (code && BOSS_DATA[code]?.name) {
-      name = BOSS_DATA[code].name;
-    }
-  }
-  el.textContent = name;
+  el.textContent = opponentDisplayName();
 }
 
 /** Contatore Storia sotto il nome Mummy. Clic → elenco boss sconfitti. */
@@ -1992,6 +1992,7 @@ function showStoryStart() {
   const hasProgress = !!(progress && !progress.completed && (
     (progress.beaten && progress.beaten.length > 0) || progress.primary
   ));
+  const hasMatch = !!priorMatch;
 
   $('story-recover-button').classList.toggle('hidden', !hasProgress);
   $('story-new-button').className = hasProgress ? 'secondary-button' : 'primary-button';
@@ -2005,7 +2006,11 @@ function showStoryStart() {
     } else if (!progress.indrazzicoBeaten) {
       msg += ` Ti resta solo Indrazzico, l’Ombra Eterna.`;
     }
-    msg += ' Vuoi riprendere le tue spoglie o abbracciare un nuovo destino?';
+    if (hasMatch) {
+      msg += ' Hai una partita interrotta: «RIPRENDI» la continua da dove l’hai lasciata.';
+    } else {
+      msg += ' Vuoi riprendere le tue spoglie o abbracciare un nuovo destino?';
+    }
     $('story-start-text').textContent = msg;
   } else {
     $('story-start-text').textContent = 'Nessuna spoglia da recuperare. Puoi solo abbracciare un nuovo destino e iniziare il Cammino.';
@@ -2020,22 +2025,68 @@ function hideStoryStart() {
 
 async function storyStartScreen() {
   if (state || busy) return;
+  try { await probePrior(); } catch (_) { /* ignore */ }
   showStoryStart();
 }
 
-/** Continua una Storia già iniziata (progressi salvati). */
+/**
+ * «RIPRENDI le tue spoglie» in Storia:
+ * 1) se c’è una partita in corso (browser chiuso a metà) → la ripristina;
+ * 2) altrimenti → avvia il prossimo boss con i colori già salvati.
+ */
 async function resumeStory() {
   const progress = getStoryProgress();
   if (!progress) {
     notice('Nessun progresso trovato. Inizia un nuovo destino.', 'error');
     return;
   }
-  // Blocca subito eventuali showStart e nascondi entrambi i dialog di avvio
   busy = true;
   hideStoryStart();
   hideStart();
-  // Avvia direttamente il prossimo boss (stessi colori già scelti)
   currentMode = 'story';
+
+  // C’è una partita non finita? Ripristinala invece di crearne una nuova.
+  try {
+    await probePrior();
+  } catch (_) { /* ignore */ }
+
+  if (priorMatch) {
+    const id = priorMatch.id;
+    try {
+      const result = await api(`/match/${encodeURIComponent(id)}`);
+      if (result.state?.state_version !== 4) throw new Error('Partita non più compatibile.');
+      if (result.state.status === 'finished') {
+        // Partita già conclusa: passa al prossimo boss
+        priorMatch = null;
+        try { localStorage.removeItem('bellum:last-match'); } catch (_) { /* ignore */ }
+        busy = false;
+        await startNextStoryFight(progress);
+        return;
+      }
+      matchId = id;
+      state = result.state;
+      flow = null;
+      priorMatch = null;
+      deathDraft = { choiceId: null, instanceIds: [] };
+      localStorage.setItem('bellum:last-match', matchId);
+      hideHome();
+      close();
+      closeGraveyard();
+      closeColorDialog();
+      busy = false;
+      await render().catch(fail);
+      try { await logs(); } catch (e) { console.warn(e); }
+      await notice('Partita precedente ripristinata.', 'success');
+      queuePresentation(true);
+      return;
+    } catch (e) {
+      console.warn('Ripristino partita fallito, avvio il prossimo boss', e);
+      priorMatch = null;
+    }
+  }
+
+  // Nessuna partita da ripristinare → prossimo boss
+  busy = false;
   await startNextStoryFight(progress);
 }
 
