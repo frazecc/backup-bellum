@@ -1327,7 +1327,17 @@ export async function resolveTargetChoice(id: string, p: PlayerIndex, choice: Ta
       throw new Error('Scelta del bersaglio scaduta o non tua');
     if (!pending.eligible_instance_ids.includes(choice.target_instance_id)) throw new Error('Bersaglio non presente nella scelta');
     delete s.pending_target_choice;
-    log(c, p, 'death_target_chosen', 'Bersaglio dell’effetto alla morte scelto.', { card_id: pending.task.card_id, target_instance_id: choice.target_instance_id, window_id: choice.choice_id });
+    const src = pending.task?.source;
+    const why = src === 'on_death' ? 'effetto alla morte'
+      : src === 'on_play' ? 'effetto in entrata'
+      : src === 'terraforma_trigger' ? 'effetto Terraforma'
+      : src === 'aura_attack' ? 'effetto Aura'
+      : 'effetto';
+    log(c, p, 'target_chosen', `Bersaglio dell’${why} scelto.`, {
+      card_id: pending.task.card_id,
+      target_instance_id: choice.target_instance_id,
+      window_id: choice.choice_id,
+    });
     // applyEffect rivalida il bersaglio corrente; se è sparito, mantiene effect_no_target.
     await applyEffect(c, { ...pending.task, target_instance_id: choice.target_instance_id });
   });
