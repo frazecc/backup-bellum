@@ -2812,11 +2812,14 @@ async function init() {
   // NON mostriamo la Home qui: solo dopo che l’utente ha confermato «Sono io» o ha fatto login
   // (evento bellum:auth-ready).
 }
-// Solo dopo conferma identità (login o «Sono io») mostriamo la Home
+// Solo dopo conferma identità (login o «Sono io») mostriamo la Home.
+// Importante: showHome() SUBITO (sincrono) così non si vede la griglia vuota
+// mentre claimDeviceAndSync parla col server.
 window.addEventListener('bellum:auth-ready', () => {
+  try { showHome(); } catch (_) { /* ignore */ }
   init()
     .then(() => claimDeviceAndSync())
-    .then(() => showHome())
+    .then(() => showHome()) // aggiorna trofeo / endless dopo sync
     .catch(fail);
 });
 // Se c’è già sessione, prepariamo i listener ma NON mostriamo ancora la Home
