@@ -2149,3 +2149,43 @@ body.notice-open #stage .action-panel button {
   padding-top: calc(4 * var(--p));
   padding-bottom: calc(4 * var(--p));
 }
+
+/* ----- Musica di sottofondo: tasto muta fisso ----- */
+.music-mute-button {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  z-index: 10000;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid #c9a043;
+  background: #1a120acc;
+  color: #efe2c0;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 0 #1a0a05, 0 0 12px #c9a04355;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.music-mute-button:hover,
+.music-mute-button:focus-visible {
+  background: #2a1c10ee;
+  outline: 2px solid #e8c565;
+  outline-offset: 2px;
+}
+.music-mute-button.is-muted {
+  opacity: 0.75;
+  border-color: #8a7650;
+}
+@media (max-width: 520px) {
+  .music-mute-button {
+    width: 40px;
+    height: 40px;
+    font-size: 1.1rem;
+  }
+}
