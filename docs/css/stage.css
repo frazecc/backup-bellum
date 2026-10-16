@@ -2150,19 +2150,21 @@ body.notice-open #stage .action-panel button {
   padding-bottom: calc(4 * var(--p));
 }
 
-/* ----- Musica di sottofondo: tasto muta fisso ----- */
-.music-mute-button {
+/* ----- Impostazioni sempre visibili (ingranaggio) ----- */
+.settings-root {
   position: fixed;
   top: max(10px, env(safe-area-inset-top));
   right: max(10px, env(safe-area-inset-right));
   z-index: 10000;
+}
+.settings-button {
   width: 44px;
   height: 44px;
   border-radius: 50%;
   border: 2px solid #c9a043;
   background: #1a120acc;
   color: #efe2c0;
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 2px 0 #1a0a05, 0 0 12px #c9a04355;
@@ -2172,20 +2174,90 @@ body.notice-open #stage .action-panel button {
   padding: 0;
   -webkit-tap-highlight-color: transparent;
 }
-.music-mute-button:hover,
-.music-mute-button:focus-visible {
+.settings-button:hover,
+.settings-button:focus-visible {
   background: #2a1c10ee;
   outline: 2px solid #e8c565;
   outline-offset: 2px;
 }
-.music-mute-button.is-muted {
-  opacity: 0.75;
-  border-color: #8a7650;
+.settings-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(280px, calc(100vw - 20px));
+  padding: 12px;
+  border: 2px solid #c9a043;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #2a2218, #17110b);
+  box-shadow: 0 8px 24px #000a;
+  color: #efe2c0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.settings-panel.hidden {
+  display: none !important;
+}
+.settings-title {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #e8c565;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #796748;
+  border-radius: 10px;
+  background: #1a120a;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.settings-row:hover {
+  border-color: #c9a043;
+  background: #241a10;
+}
+.settings-row-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.settings-row-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+.settings-row-desc {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  line-height: 1.25;
+}
+.settings-row-value {
+  font-size: 1.25rem;
+  flex: none;
+}
+.settings-row.is-muted {
+  opacity: 0.85;
+}
+/* Allinea lo switch già usato nel menu */
+.settings-panel .reduce-toggle {
+  /* eredita .settings-row */
+}
+.settings-panel .reduce-switch {
+  flex: none;
 }
 @media (max-width: 520px) {
-  .music-mute-button {
+  .settings-button {
     width: 40px;
     height: 40px;
-    font-size: 1.1rem;
+    font-size: 1.2rem;
   }
 }
