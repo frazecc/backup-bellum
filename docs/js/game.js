@@ -2378,36 +2378,70 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
   // Niente popup «Creazione partita / Ho capito»: solo feedback sul form.
   if ($('deck-color-validation')) $('deck-color-validation').textContent = 'Il patto si sta sigillando…';
   try {
-    // Body base +, in Storia, vita boss e Medaglione
+    // Body base +, in Storia: vita boss, Medaglione, terziario stabile, colore del boss IA
     const createBody = { primaryColor, secondaryColor };
+    /** Boss scelto prima della create (usato dopo per currentBoss e dialoghi). */
+    let pendingStoryBoss = null;
+
     if (currentMode === 'story') {
       let progress = getStoryProgress();
-      // 3ª partita: scegli il Medaglione PRIMA di creare la partita, così vale subito
-      if (progress && getStoryFightIndex(progress) === 2 && !progress.chosenPower) {
-        const previewBoss = pickNextBoss(progress);
-        const bossPreview = BOSS_DATA[previewBoss] || { name: previewBoss };
-        await showMummyDialog(
-          `Oh no! ${bossPreview.name} sta barando!\nSta usando il suo Medaglione!\n\nTieni, prendi… usa uno di questi cheat code, presto!`
-        );
-        const chosen = await showCheatCodeChoice(progress);
-        if (chosen) {
-          progress = getStoryProgress() || progress;
-          progress.chosenPower = chosen;
-          saveStoryProgress(progress);
-          const med = BOSS_DATA[chosen];
+      const allSix = ['CHI', 'INF', 'PES', 'BUL', 'GRO', 'CLO'];
+      let tertiaryForCreate = null;
+      let aiLife = 20;
+
+      if (progress && progress.primary && progress.tertiary) {
+        // —— Continua Storia già iniziata ——
+        // Un solo sorteggio del boss (usato sia per dialoghi che per aiPrimary)
+        pendingStoryBoss = pickNextBoss(progress);
+        tertiaryForCreate = progress.tertiary;
+        const remaining = getRemainingBosses(progress);
+        const fightIndex = getStoryFightIndex(progress);
+        aiLife = remaining.length === 0 ? 20 : getBossLifeForFight(fightIndex);
+
+        // 3ª partita: scegli il Medaglione PRIMA di creare, così vale subito (una sola volta)
+        if (fightIndex === 2 && !progress.chosenPower) {
+          const bossPreview = BOSS_DATA[pendingStoryBoss] || { name: pendingStoryBoss };
           await showMummyDialog(
-            `Hai attivato il ${med.medaglioneName}!\n«${med.powerDesc}»\n\nQuesto potere resterà attivo anche contro Indrazzico.`
+            `Oh no! ${bossPreview.name} sta barando!\nSta usando il suo Medaglione!\n\nTieni, prendi… usa uno di questi cheat code, presto!`
           );
+          const chosen = await showCheatCodeChoice(progress);
+          if (chosen) {
+            progress = getStoryProgress() || progress;
+            progress.chosenPower = chosen;
+            saveStoryProgress(progress);
+            const med = BOSS_DATA[chosen];
+            await showMummyDialog(
+              `Hai attivato il ${med.medaglioneName}!\n«${med.powerDesc}»\n\nQuesto potere resterà attivo anche contro Indrazzico.`
+            );
+          }
+          progress = getStoryProgress() || progress;
         }
-        progress = getStoryProgress() || progress;
+      } else {
+        // —— Nuova Storia: terziario + primo boss scelti lato client ——
+        const candidates = allSix.filter(c => c !== primaryColor && c !== secondaryColor);
+        tertiaryForCreate = candidates[Math.floor(Math.random() * candidates.length)];
+        const remainingForBoss = candidates.filter(c => c !== tertiaryForCreate);
+        pendingStoryBoss = remainingForBoss[Math.floor(Math.random() * remainingForBoss.length)];
+        aiLife = 20;
       }
-      const fightIndex = getStoryFightIndex(progress);
-      // Se non restano boss intermedi → Indrazzico a 20 vita (dopo la Mummia)
-      const remaining = progress ? getRemainingBosses(progress) : ['x', 'y', 'z'];
-      const aiLife = remaining.length === 0 ? 20 : getBossLifeForFight(fightIndex);
+
+      // Medaglione del boss: solo dalla 3ª lotta (fightIndex >= 2) e non su Indrazzico
+      const bossFightIndex = progress && progress.tertiary
+        ? getStoryFightIndex(progress)
+        : 0;
+      const aiMedallion =
+        pendingStoryBoss &&
+        pendingStoryBoss !== 'IND' &&
+        bossFightIndex >= 2
+          ? pendingStoryBoss
+          : null;
+
       createBody.story = {
         aiStartingLife: aiLife,
         humanMedallion: progress?.chosenPower || null,
+        aiMedallion,
+        tertiaryColor: tertiaryForCreate,
+        aiPrimary: pendingStoryBoss, // colore boss oppure 'IND'
       };
     }
     const result = await api('/match/create', { method: 'POST', body: createBody });
@@ -2431,11 +2465,13 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
     // Ordine corretto:
     //   Nuova Storia → Maledizione → Dialogo boss → Moneta → Partita
     //   Continua     → Dialogo boss → Moneta → Partita
+    // Il boss (pendingStoryBoss) è già stato scelto PRIMA della create e passato come aiPrimary.
     const isStory = currentMode === 'story';
     const isNewStoryRun = isStory && (options.isNewStory || !getStoryProgress());
 
     if (isStory) {
       let progress = getStoryProgress();
+      const nextBoss = pendingStoryBoss || (progress ? pickNextBoss(progress) : null);
 
       if (isNewStoryRun || !progress) {
         progress = {
@@ -2446,8 +2482,13 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
           indrazzicoBeaten: false,
           chosenPower: null,
           completed: false,
-          currentBoss: null,
+          currentBoss: nextBoss,
         };
+        saveStoryProgress(progress);
+      } else {
+        // Continua: aggiorna currentBoss e allinea il terziario a quello del server
+        progress.currentBoss = nextBoss;
+        if (humanColors?.tertiary) progress.tertiary = humanColors.tertiary;
         saveStoryProgress(progress);
       }
 
@@ -2456,11 +2497,7 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
         await showCurseDialog(humanColors, aiColors);
       }
 
-      // 2) Scegli e presenta il boss
-      const nextBoss = pickNextBoss(progress);
-      progress.currentBoss = nextBoss;
-      saveStoryProgress(progress);
-
+      // 2) Presenta il boss (niente seconda scelta del Medaglione: già fatta prima della create)
       const fightIndex = getStoryFightIndex(progress);
       const boss = BOSS_DATA[nextBoss] || { name: nextBoss, threat: '…' };
 
@@ -2478,22 +2515,8 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
 
         if (fightIndex < 2) {
           await showMummyDialog('Preparati, sarà una sfida impegnativa.');
-        }
-
-        if (fightIndex === 2 && !progress.chosenPower) {
-          await showMummyDialog(
-            `Oh no! ${boss.name} sta barando!\nSta usando il suo Medaglione!\n\nTieni, prendi… usa uno di questi cheat code, presto!`
-          );
-          const chosen = await showCheatCodeChoice(progress);
-          if (chosen) {
-            progress.chosenPower = chosen;
-            saveStoryProgress(progress);
-            const med = BOSS_DATA[chosen];
-            await showMummyDialog(
-              `Hai attivato il ${med.medaglioneName}!\n«${med.powerDesc}»\n\nQuesto potere resterà attivo anche contro Indrazzico.`
-            );
-          }
         } else if (progress.chosenPower && BOSS_DATA[progress.chosenPower]) {
+          // Fight 3+: ricorda solo il Medaglione già attivo (scelta fatta prima della create)
           const med = BOSS_DATA[progress.chosenPower];
           await showMummyDialog(`Il tuo ${med.medaglioneName} è attivo:\n«${med.powerDesc}»`);
         }
