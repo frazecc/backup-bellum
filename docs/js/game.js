@@ -1197,9 +1197,31 @@ async function inspect(kind,id,extra={}) {
       add(`Aura ${a.name}${aura.owner_index === 1 ? ' · tua' : ' · IA'}`,() => { close(); return inspect('aura',aura.card_id,{instanceId:aura.instance_id}); });
     }
   }
-  if (kind === 'tribute' && pending() && pending().stage === 'paying' && pending().paid.length < pending().required) add('Conferma sacrificio',() => request('mostrissimo/sacrifice',{instanceId:current.instanceId},'Sacrificio dichiarato.'));
+  if (kind === 'tribute' && pending() && pending().stage === 'paying' && pending().paid.length < pending().required) {
+    // Avviso se sacrifichi un mostro con una tua aura addosso
+    const cell = current.cell || findCellByInstanceId(current.instanceId);
+    const ownAuras = (cell?.auras || []).filter(a => a.owner_index === 1);
+    if (isCreatureCell(cell) && ownAuras.length > 0) {
+      add('Conferma sacrificio', async () => {
+        const ok = window.confirm('Attenzione: stai sacrificando un mostro che ha una tua aura addosso. Sei sicuro di voler sacrificare il mostro e non l’aura?');
+        if (!ok) return;
+        return request('mostrissimo/sacrifice',{instanceId:current.instanceId},'Sacrificio dichiarato.');
+      });
+    } else {
+      add('Conferma sacrificio',() => request('mostrissimo/sacrifice',{instanceId:current.instanceId},'Sacrificio dichiarato.'));
+    }
+  }
   add('Chiudi',close);
   $('card-detail-overlay').classList.remove('hidden'); document.body.classList.add('detail-open');
+}
+
+function findCellByInstanceId(instanceId) {
+  if (!instanceId) return null;
+  for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
+    const cell = at({ row, col });
+    if (cell?.instance_id === instanceId) return cell;
+  }
+  return null;
 }
 async function beginCard(instanceId,d) {
   if (!playable(d)) return;
@@ -1286,6 +1308,49 @@ async function drawMostrissimi() {
     if (slot) slot.append(panel); else if (before?.parentNode) before.parentNode.insertBefore(panel,before); else document.body.append(panel);
   }
   panel.replaceChildren();
+  if (!state) { panel.classList.add('hidden'); return; }
+  panel.classList.remove('hidden');
+
+  const p = pending();
+  // Durante i sacrifici: sostituisci l'offerta con un pannello chiaro di progresso
+  if (p && p.stage === 'paying') {
+    const h = document.createElement('h2');
+    h.textContent = 'Sacrifici per il Mostrissimo';
+    panel.append(h);
+    const info = document.createElement('p');
+    info.className = 'tribute-progress';
+    info.style.cssText = 'font-size:1.05rem;line-height:1.45;margin:.4rem 0 .8rem';
+    info.innerHTML = p.paid.length < p.required
+      ? `Sacrifici <strong>${p.paid.length}/${p.required}</strong>.<br>Tocca un <strong>tuo permanente</strong> sul campo per sacrificarlo.<br><em>Non puoi annullare.</em>`
+      : `Sacrifici completi (${p.paid.length}/${p.required}).<br>Tocca una <strong>cella libera evidenziata</strong> per evocare.`;
+    panel.append(info);
+    if (p.paid.length < p.required && !reaction() && !obligatory()) {
+      const list = document.createElement('div');
+      list.className = 'tribute-list';
+      list.style.cssText = 'display:flex;flex-direction:column;gap:.35rem;';
+      for (const item of permanents()) {
+        const d = await card(item.card_id);
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'secondary-button';
+        b.style.cssText = 'width:100%;text-align:left';
+        const cell = findCellByInstanceId(item.id);
+        const auraCount = (cell?.auras || []).filter(a => a.owner_index === 1).length;
+        b.textContent = `${item.type}: ${d.name}${auraCount ? ` · ${auraCount} aura` : ''}`;
+        b.disabled = busy;
+        b.onclick = () => {
+          if (noticeOpen) return;
+          // passa anche la cella per il controllo aure
+          inspect('tribute', item.card_id, { instanceId: item.id, cell });
+        };
+        list.append(b);
+      }
+      panel.append(list);
+    }
+    return;
+  }
+
+  // Offerta normale (nessuna evocazione in corso)
   const h = document.createElement('h2'); h.textContent = 'Offerta'; panel.append(h);
   const rules = document.createElement('p');
   rules.className = 'mostrissimo-rules';
@@ -1297,7 +1362,6 @@ async function drawMostrissimi() {
   for (const inst of state.shared_mostrissimi ?? []) {
     const d = await card(inst.card_id), b = document.createElement('button');
     b.type = 'button'; b.className = 'mostrissimo-card'; b.innerHTML = handCardHTML(d);
-    // Stessa logica visiva della mano: bende se non puoi pagare; lampeggio se evocabile ora.
     const cost = Number(d.sacrifice_cost ?? 0);
     const own = board().flat().filter(c => isCreatureCell(c) && c.owner_index === 1).length;
     const canPay = Number.isInteger(cost) && cost >= 0 && permanents().length >= cost;
@@ -1311,23 +1375,11 @@ async function drawMostrissimi() {
     b.onclick = () => { if (noticeOpen) return; inspect('mostrissimo',inst.card_id); };
     strip.append(b);
   }
-  const p = pending(); if (!p) return;
-  const zone = document.createElement('div'); zone.className = 'tribute-zone is-info'; panel.append(zone);
-  const info = document.createElement('p'); info.className = 'tribute-progress';
-  info.textContent = p.stage === 'etb' ? 'Risoluzione degli effetti all’entrata…' : p.stage === 'before_entry' ? 'Evocazione dichiarata: attendi la reazione.' : `Sacrifici ${p.paid.length}/${p.required}. Non puoi annullare.`;
-  zone.append(info);
-  if (p.stage !== 'paying' || reaction() || obligatory()) return;
-  if (p.paid.length < p.required) {
-    zone.className = 'tribute-zone is-select';
-    const list = document.createElement('div'); list.className = 'tribute-list';
-    for (const item of permanents()) {
-      const d = await card(item.card_id), b = document.createElement('button');
-      b.type = 'button'; b.textContent = `${item.type}: ${d.name}`; b.disabled = busy;
-      b.onclick = () => inspect('tribute',item.card_id,{instanceId:item.id}); list.append(b);
-    }
-    zone.append(list);
-  } else {
-    const msg = document.createElement('p'); msg.className = 'tribute-hint'; msg.textContent = flow?.kind === 'mostrissimo-target' ? 'Tocca il bersaglio dell’effetto all’entrata.' : 'Tocca una cella evidenziata.'; zone.append(msg);
+  if (p) {
+    const zone = document.createElement('div'); zone.className = 'tribute-zone is-info'; panel.append(zone);
+    const info = document.createElement('p'); info.className = 'tribute-progress';
+    info.textContent = p.stage === 'etb' ? 'Risoluzione degli effetti all’entrata…' : p.stage === 'before_entry' ? 'Evocazione dichiarata: attendi la reazione.' : `Sacrifici ${p.paid.length}/${p.required}.`;
+    zone.append(info);
   }
 }
 function controls() {
@@ -1703,7 +1755,7 @@ async function boardClick(pos) {
   if (p) {
     if (p.stage !== 'paying') return;
     if (p.paid.length < p.required) {
-      if (c?.owner_index === 1) return inspect('tribute',c.card_id,{instanceId:c.instance_id});
+      if (c?.owner_index === 1) return inspect('tribute', c.card_id, { instanceId: c.instance_id, cell: c });
       return notice('Scegli un tuo permanente nell’elenco dei sacrifici.','error');
     }
     if (c || !summonCells(p).some(x => eq(x,pos))) return notice('Cella non valida.','error');
@@ -2739,6 +2791,9 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
         aiMedallion,
         tertiaryColor: tertiaryForCreate,
         aiPrimary: pendingStoryBoss, // colore boss oppure 'IND'
+        aiDisplayName: pendingStoryBoss && BOSS_DATA[pendingStoryBoss]?.name
+          ? BOSS_DATA[pendingStoryBoss].name
+          : null,
       };
     }
     const result = await api('/match/create', { method: 'POST', body: createBody });
