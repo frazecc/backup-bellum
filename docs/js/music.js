@@ -1,11 +1,10 @@
 /**
  * Musica di sottofondo in loop (docs/musics/egiziana.mp3).
- * I browser bloccano l’autoplay con suono: partiamo al primo click/tocco.
- * Preferenza muto salvata in localStorage (bellum:music-muted).
+ * Controllo dal pannello Impostazioni (#music-mute-button).
  */
 
 const MUSIC_KEY = 'bellum:music-muted';
-const VOLUME = 0.35; // volume soft, non invade
+const VOLUME = 0.35;
 
 const audio = document.getElementById('bg-music');
 const btn = document.getElementById('music-mute-button');
@@ -35,11 +34,14 @@ function setMuted(muted) {
 function updateButton() {
   if (!btn) return;
   const muted = isMuted() || !!(audio && audio.muted);
-  btn.textContent = muted ? '🔇' : '🔊';
+  const value = document.getElementById('music-mute-value');
+  if (value) value.textContent = muted ? '🔇' : '🔊';
   btn.setAttribute('aria-pressed', muted ? 'true' : 'false');
-  btn.setAttribute('aria-label', muted ? 'Musica disattivata — tocca per attivare' : 'Musica attiva — tocca per silenziare');
-  btn.title = muted ? 'Attiva musica' : 'Silenzia musica';
   btn.classList.toggle('is-muted', muted);
+  const title = document.getElementById('music-mute-title');
+  const desc = document.getElementById('music-mute-desc');
+  if (title) title.textContent = muted ? 'Musica (spenta)' : 'Musica';
+  if (desc) desc.textContent = muted ? 'Tocca per riattivare il sottofondo' : 'Sottofondo egiziano in loop';
 }
 
 async function tryPlay() {
@@ -49,8 +51,8 @@ async function tryPlay() {
   audio.loop = true;
   try {
     await audio.play();
-  } catch (e) {
-    // Autoplay bloccato: aspetteremo un gesto utente
+  } catch (_) {
+    /* autoplay bloccato finché non c’è un gesto */
   }
 }
 
@@ -61,13 +63,10 @@ function unlockOnGesture() {
 
 function init() {
   if (!audio) return;
-
   audio.loop = true;
   audio.volume = VOLUME;
-
-  if (isMuted()) {
-    audio.muted = true;
-  } else {
+  if (isMuted()) audio.muted = true;
+  else {
     audio.muted = false;
     void tryPlay();
   }
@@ -79,7 +78,6 @@ function init() {
     setMuted(next);
   });
 
-  // Sblocco autoplay al primo gesto
   const once = { once: true, passive: true };
   document.addEventListener('pointerdown', unlockOnGesture, once);
   document.addEventListener('keydown', unlockOnGesture, once);

@@ -240,11 +240,33 @@ function wireMenu() {
   button.addEventListener('click',e => { e.stopPropagation(); setOpen(panel.classList.contains('hidden')); });
   panel.addEventListener('click',e => {
     const t = e.target.closest?.('button');
-    // I toggle restano aperti (non chiudono il menu)
-    if (t && t.id !== 'reduce-motion-toggle' && t.id !== 'auto-notice-toggle') setOpen(false);
+    if (t) setOpen(false);
   });
-  document.addEventListener('click',e => { if (!panel.classList.contains('hidden') && !panel.contains(e.target)) setOpen(false); });
+  document.addEventListener('click',e => { if (!panel.classList.contains('hidden') && !panel.contains(e.target) && e.target !== button) setOpen(false); });
   document.addEventListener('keydown',e => { if (e.key === 'Escape' && !panel.classList.contains('hidden')) setOpen(false); });
+}
+
+/** Pannello Impostazioni sempre visibile (audio, auto Ho capito, riduci animazioni). */
+function wireSettings() {
+  const button = $('settings-button'), panel = $('settings-panel');
+  if (!button || !panel || button.dataset.ready) return;
+  button.dataset.ready = 'true';
+  const setOpen = open => {
+    panel.classList.toggle('hidden', !open);
+    button.setAttribute('aria-expanded', String(open));
+  };
+  button.addEventListener('click', e => {
+    e.stopPropagation();
+    setOpen(panel.classList.contains('hidden'));
+  });
+  document.addEventListener('click', e => {
+    if (panel.classList.contains('hidden')) return;
+    if (panel.contains(e.target) || e.target === button) return;
+    setOpen(false);
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !panel.classList.contains('hidden')) setOpen(false);
+  });
   wireReduceMotion();
   wireAutoNotice();
 }
@@ -1396,18 +1418,36 @@ function showDeckColors() {
   if ($('player-deck-colors')) $('player-deck-colors').textContent = human ? `Mazzo: ${human.primary} · ${human.secondary} · ${human.tertiary}` : '';
   if ($('opponent-deck-colors')) $('opponent-deck-colors').textContent = ai ? `Mazzo: ${ai.primary} · ${ai.secondary} · ${ai.tertiary}` : '';
 }
+/** Evita render sovrapposti: se ne parte uno mentre un altro è in corso, ne schedula uno solo alla fine. */
+let renderRunning = false;
+let renderQueued = false;
 async function render() {
-  const set = (id,x) => { if ($(id)) $(id).textContent = String(x); };
-  if (state) { hideStart(); hideHome(); hideStoryStart(); }
-  set('player-life',me()?.life ?? 20); set('player-current-mana',me()?.current_mana ?? 0); set('player-max-mana',me()?.max_mana ?? 0);
-  set('player-hand-count',me()?.hand?.length ?? 0); set('player-deck-count',me()?.deck?.length ?? 0); set('player-graveyard-count',me()?.graveyard?.length ?? 0);
-  set('opponent-life',them()?.life ?? 20); set('opponent-current-mana',them()?.current_mana ?? 0); set('opponent-max-mana',them()?.max_mana ?? 0);
-  set('opponent-hand-count',them()?.hand?.length ?? 0); set('opponent-deck-count',them()?.deck?.length ?? 0); set('opponent-graveyard-count',them()?.graveyard?.length ?? 0);
-  updateOpponentName();
-  showDeckColors(); drawOpponentHand();
-  updateStoryMedallionBanner();
-  updateStoryProgressBadge();
-  await drawBoard(); await drawHand(); await drawMostrissimi(); controls(); await renderReaction(); await renderDeathChoice(); await markPlayerTarget();
+  if (renderRunning) {
+    renderQueued = true;
+    return;
+  }
+  renderRunning = true;
+  try {
+    do {
+      renderQueued = false;
+      const set = (id,x) => { if ($(id)) $(id).textContent = String(x); };
+      if (state) { hideStart(); hideHome(); hideStoryStart(); }
+      set('player-life',me()?.life ?? 20); set('player-current-mana',me()?.current_mana ?? 0); set('player-max-mana',me()?.max_mana ?? 0);
+      set('player-hand-count',me()?.hand?.length ?? 0); set('player-deck-count',me()?.deck?.length ?? 0); set('player-graveyard-count',me()?.graveyard?.length ?? 0);
+      set('opponent-life',them()?.life ?? 20); set('opponent-current-mana',them()?.current_mana ?? 0); set('opponent-max-mana',them()?.max_mana ?? 0);
+      set('opponent-hand-count',them()?.hand?.length ?? 0); set('opponent-deck-count',them()?.deck?.length ?? 0); set('opponent-graveyard-count',them()?.graveyard?.length ?? 0);
+      updateOpponentName();
+      showDeckColors(); drawOpponentHand();
+      updateStoryMedallionBanner();
+      updateStoryProgressBadge();
+      // Board / mano / offerta in parallelo = meno attesa tra un click e l’altro
+      await Promise.all([drawBoard(), drawHand(), drawMostrissimi()]);
+      controls();
+      await Promise.all([renderReaction(), renderDeathChoice(), markPlayerTarget()]);
+    } while (renderQueued);
+  } finally {
+    renderRunning = false;
+  }
 }
 
 /** Aggiorna i chip Medaglione sotto i nomi (tuo + boss) e nasconde il vecchio banner flottante. */
@@ -1609,13 +1649,16 @@ async function request(path, body, message) {
   if (busy || !matchId) return;
   close(); busy = true; controls(); reactionDialog().classList.add('hidden'); choiceDialog().classList.add('hidden');
   hideTargetReminder();
+  let didRender = false;
   try {
     state = (await api(`/match/${encodeURIComponent(matchId)}/${path}`, { method: 'POST', body })).state;
     flow = null;
-    try { await logs(); } catch (e) { console.warn(e); }
+    // Log in background: non bloccare l’UI
+    void logs().catch(e => console.warn(e));
 
     if (state.status === 'finished') {
       await render();
+      didRender = true;
       await handleMatchFinished();
     } else {
       // ETB (on_play): prima creatura in campo + annunci, POI scelta bersaglio
@@ -1623,20 +1666,17 @@ async function request(path, body, message) {
       const isEtbPick = etbSrc === 'on_play' || etbSrc === 'terraforma_trigger' || etbSrc === 'aura_attack';
 
       if (isEtbPick) {
-        // 1) Griglia con la creatura già piazzata (senza modalità bersaglio)
-        await drawBoard();
-        await drawHand();
+        await Promise.all([drawBoard(), drawHand()]);
         controls();
         updateOpponentName();
         updateStoryProgressBadge();
-        // Lascia dipingere il browser
         await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-        // 2) Annunci pubblici (carta giocata / ingresso)
         try { await presentPendingAnnouncements(); } catch (e) { console.warn(e); }
-        // 3) Ora abilita la scelta bersaglio sulla griglia
         await render();
+        didRender = true;
       } else {
         await render();
+        didRender = true;
         let text = null;
         let kind = 'success';
         if (state.mostrissimo_result?.outcome === 'failed') {
@@ -1654,12 +1694,15 @@ async function request(path, body, message) {
     try {
       state = (await api(`/match/${encodeURIComponent(matchId)}`)).state;
       flow = null;
+      didRender = false;
     } catch (refreshError) {
       console.warn(refreshError);
     }
   } finally {
     busy = false;
-    await render().catch(fail);
+    // Un solo render di chiusura se non l’abbiamo già fatto (evita doppio lavoro)
+    if (!didRender) await render().catch(fail);
+    else controls(); // sblocca subito i pulsanti
     if (!state || !matchId || state.status === 'finished') {
       return;
     }
@@ -1671,7 +1714,6 @@ async function request(path, body, message) {
     } else {
       await ensurePhaseBanner().catch(fail);
     }
-    // Se stiamo già scegliendo un bersaglio ETB, non ri-presentare gli stessi annunci
     const etbSrc = deathTarget()?.task?.source;
     const skipPres = etbSrc === 'on_play' || etbSrc === 'terraforma_trigger' || etbSrc === 'aura_attack';
     if (!skipPres) queuePresentation();
@@ -1703,10 +1745,11 @@ async function playerClick() {
   }
 }
 async function boardClick(pos) {
-  // Durante scelta ETB post-ingresso il motore è in pending_target_choice (obligatory): i click restano attivi.
-  // In etb-target non bloccare per noticeOpen (altrimenti non si riesce a scegliere il bersaglio).
-  if (busy) return;
-  if (noticeOpen && flow?.kind !== 'etb-target') return;
+  // Durante scelta ETB / attacco / movimento non perdere i click se busy è ancora true un attimo.
+  const allowWhileBusy = flow?.kind === 'etb-target' || flow?.kind === 'mostrissimo-target'
+    || flow?.kind === 'attack' || flow?.kind === 'move' || flow?.kind === 'hand';
+  if (busy && !allowWhileBusy) return;
+  if (noticeOpen && flow?.kind !== 'etb-target' && flow?.kind !== 'attack' && flow?.kind !== 'move') return;
   if (obligatory() && flow?.kind !== 'etb-target') return;
   if (flow?.kind === 'etb-target') {
     const c = at(pos);
@@ -2918,7 +2961,7 @@ async function init() {
   initialized = true;
   if ($('signed-in-user')) $('signed-in-user').textContent = `@${usernameFromEmail(user.email)}`;
   if ($('player-title')) $('player-title').textContent = usernameFromEmail(user.email) || 'Tu';
-  overlay(); reactionDialog(); choiceDialog(); graveyardDialog(); colorDialog(); wireGraveyards(); wireMenu(); wireNoticeDismiss(); fitStage();
+  overlay(); reactionDialog(); choiceDialog(); graveyardDialog(); colorDialog(); wireGraveyards(); wireMenu(); wireSettings(); wireNoticeDismiss(); fitStage();
   $('cancel-selection-button')?.addEventListener('click',() => {
     if (obligatory()) return;
     if (flow?.kind === 'trap-target') { flow = null; render().catch(fail); notice('Scegli un’altra Trappola o passa.'); return; }
@@ -2947,3 +2990,5 @@ getCurrentUser().then(user => {
   if (user) return init();
 }).catch(fail);
 wireStage();
+// Impostazioni subito (anche sulla schermata login)
+try { wireSettings(); } catch (_) { /* ignore */ }
