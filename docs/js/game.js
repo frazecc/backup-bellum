@@ -1590,6 +1590,9 @@ function colorDialog() {
 }
 function closeColorDialog() {
   $('deck-color-dialog')?.classList.add('hidden');
+  // Non riaprire «Le spoglie…» se siamo in Storia, se la Home è aperta, o se c’è già partita.
+  if (currentMode === 'story') return;
+  if ($('home-dialog') && !$('home-dialog').classList.contains('hidden')) return;
   // Solo se non c’è partita in corso e non stiamo creando: evita «Le spoglie…» dopo moneta/maledizione.
   if (!state && !busy && !matchId && !$('game-screen')?.classList.contains('hidden')) showStart();
 }
@@ -1806,6 +1809,7 @@ function homeDialog() {
   const storyBtn = makePyramid('home-story', 'Modalità Storia', false, () => {
     currentMode = 'story';
     hideHome();
+    hideStart();
     storyStartScreen().catch(fail);
   }, 'img/piramide1.png');
 
@@ -1871,8 +1875,9 @@ function showHome() {
   }
 
   el.classList.remove('hidden');
-  // Nascondi gli altri overlay di avvio
+  // Nascondi gli altri overlay di avvio (closeColorDialog non deve riaprire start)
   hideStart();
+  hideStoryStart();
   closeColorDialog();
 }
 
@@ -2020,7 +2025,10 @@ async function resumeStory() {
     notice('Nessun progresso trovato. Inizia un nuovo destino.', 'error');
     return;
   }
+  // Blocca subito eventuali showStart e nascondi entrambi i dialog di avvio
+  busy = true;
   hideStoryStart();
+  hideStart();
   // Avvia direttamente il prossimo boss (stessi colori già scelti)
   currentMode = 'story';
   await startNextStoryFight(progress);
