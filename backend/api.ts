@@ -100,22 +100,27 @@ class SessionReplacedError extends Error {
   }
 }
 
-async function requireAuth(req: Request): Promise<string> {
+/**
+ * Autenticazione JWT. Di default controlla anche il device attivo.
+ * claim-device DEVE usare skipDeviceCheck: altrimenti un nuovo device non può mai reclamare la sessione.
+ */
+async function requireAuth(req: Request, opts?: { skipDeviceCheck?: boolean }): Promise<string> {
   const header = req.header('authorization');
   if (!header?.startsWith('Bearer ')) throw new Error('Sessione assente: autenticati di nuovo');
   const { data, error } = await supabase.auth.getUser(header.slice('Bearer '.length).trim());
   if (error || !data.user) throw new Error('Sessione Supabase non valida');
   rateLimit(`user:${data.user.id}`, 300, 60_000);
-  // Un solo dispositivo attivo: se il profilo ha un device diverso → kick
-  const deviceId = req.header('x-device-id')?.trim();
-  if (deviceId) {
-    const { data: profile } = await supabase
-      .from('player_profiles')
-      .select('active_device_id')
-      .eq('user_id', data.user.id)
-      .maybeSingle();
-    if (profile?.active_device_id && profile.active_device_id !== deviceId) {
-      throw new SessionReplacedError();
+  if (!opts?.skipDeviceCheck) {
+    const deviceId = req.header('x-device-id')?.trim();
+    if (deviceId) {
+      const { data: profile } = await supabase
+        .from('player_profiles')
+        .select('active_device_id')
+        .eq('user_id', data.user.id)
+        .maybeSingle();
+      if (profile?.active_device_id && profile.active_device_id !== deviceId) {
+        throw new SessionReplacedError();
+      }
     }
   }
   return data.user.id;
@@ -209,7 +214,8 @@ apiRouter.get('/me/profile', async (req: Request, res: Response) => {
 /** Claim device: login su questo dispositivo invalida gli altri. */
 apiRouter.post('/me/claim-device', async (req: Request, res: Response) => {
   try {
-    const userId = await requireAuth(req);
+    // skipDeviceCheck: altrimenti il nuovo device non può mai diventare quello attivo
+    const userId = await requireAuth(req, { skipDeviceCheck: true });
     const deviceId = requiredString(objectValue(req.body).deviceId, 'ID dispositivo');
     if (deviceId.length < 8 || deviceId.length > 128) throw new Error('ID dispositivo non valido');
     await upsertProfile(userId, { active_device_id: deviceId });
