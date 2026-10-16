@@ -1868,7 +1868,11 @@ const FACTION_EYE = {
 /** Overlay narrativo Mummy per scelta colori (anima / artefatto / maledizione).
  *  Home resta sullo sfondo (3 piramidi); Mummy in primo piano. */
 function closeColorDialog() {
-  $('anima-scene')?.classList.add('hidden');
+  const anima = $('anima-scene');
+  if (anima) {
+    anima.classList.add('hidden');
+    anima.style.display = 'none';
+  }
   $('deck-color-dialog')?.classList.add('hidden');
   if (currentMode === 'story') return;
   if ($('home-dialog') && !$('home-dialog').classList.contains('hidden')) return;
@@ -1885,7 +1889,7 @@ function animaSceneEl() {
   el.setAttribute('aria-modal', 'true');
   el.setAttribute('aria-label', 'Scelta dell’anima');
   // Sopra la Home, sotto eventuali altri overlay di gioco
-  el.style.cssText = 'position:fixed;inset:0;z-index:125;display:flex;align-items:center;justify-content:center;background:rgba(8,6,4,.55);padding:1rem;';
+  el.style.cssText = 'position:fixed;inset:0;z-index:280;display:flex;align-items:center;justify-content:center;background:rgba(8,6,4,.72);padding:1rem;';
   document.body.append(el);
   return el;
 }
@@ -1918,6 +1922,7 @@ async function showAnimaScene() {
 
   const el = animaSceneEl();
   el.innerHTML = '';
+  el.style.display = 'flex';
   el.classList.remove('hidden');
 
   const panel = document.createElement('div');
@@ -1947,6 +1952,7 @@ async function showAnimaScene() {
   cancel.textContent = 'Annulla';
   cancel.onclick = () => {
     el.classList.add('hidden');
+    el.style.display = 'none';
     if (currentMode === 'story') showStoryStart();
     else if ($('home-dialog') && !$('home-dialog').classList.contains('hidden')) { /* resta home */ }
     else showStart();
@@ -2022,6 +2028,7 @@ async function showAnimaScene() {
   });
 
   el.classList.add('hidden');
+  el.style.display = 'none';
   // Avvia partita con tertiary già scelto (coerente con il messaggio); maledizione già mostrata
   await newMatch(primary, secondary, {
     isNewStory: currentMode === 'story',
@@ -2031,7 +2038,12 @@ async function showAnimaScene() {
 }
 
 function openColorDialog() {
-  if (busy || reaction() || pending() || obligatory()) return;
+  // Dalla Home / Storia non c’è partita: sblocca sempre eventuali flag residui
+  if (!state && !matchId) busy = false;
+  if (busy || reaction() || pending() || obligatory()) {
+    console.warn('[anima] openColorDialog blocked', { busy, reaction: !!reaction(), pending: !!pending(), obligatory: !!obligatory() });
+    return;
+  }
   showAnimaScene().catch(fail);
 }
 function openColorDialogForStory() {
