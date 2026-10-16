@@ -371,14 +371,8 @@ function notice(text, type = '') {
   const msg = String(text ?? '').trim();
   if (!msg) return Promise.resolve();
 
-  const el = $('phase-banner') || $('game-message');
+  const el = $('phase-banner');
   if (!el) return Promise.resolve();
-
-  if (el.id === 'game-message') {
-    el.textContent = msg;
-    el.className = `game-message ${type}`;
-    return Promise.resolve();
-  }
 
   // Chiude eventuale notice precedente
   if (noticeResolver) {
@@ -433,6 +427,21 @@ function close() {
   document.body.classList.remove('detail-open');
   // Su desktop l'anteprima resta sull'ultima carta vista; non la svuotiamo.
 }
+/** ID stabile di questo browser (per sessione unica cross-device). */
+function getDeviceId() {
+  const KEY = 'bellum:device-id';
+  try {
+    let id = localStorage.getItem(KEY);
+    if (!id) {
+      id = (crypto.randomUUID && crypto.randomUUID()) || `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem(KEY, id);
+    }
+    return id;
+  } catch (_) {
+    return `dev-tmp-${Date.now()}`;
+  }
+}
+
 async function api(path,options={}) {
   const token = await getAccessToken();
   if (!token) throw new Error('Sessione scaduta, accedi di nuovo.');
@@ -440,17 +449,56 @@ async function api(path,options={}) {
   try {
     const res = await fetch(`${API}${path}`,{
       method:options.method ?? 'GET',
-      headers:{Authorization:`Bearer ${token}`,...(options.body !== undefined ? {'Content-Type':'application/json'} : {})},
+      headers:{
+        Authorization:`Bearer ${token}`,
+        'X-Device-Id': getDeviceId(),
+        ...(options.body !== undefined ? {'Content-Type':'application/json'} : {}),
+      },
       body:options.body !== undefined ? JSON.stringify(options.body) : undefined,
       signal:abort.signal,cache:'no-store',
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+    if (!res.ok) {
+      if (json.code === 'session_replaced' || res.status === 401 && /altro dispositivo/i.test(String(json.error || ''))) {
+        try { await signOut(); } catch (_) { /* ignore */ }
+        throw new Error('Hai effettuato l’accesso da un altro dispositivo. Ricarica e accedi di nuovo.');
+      }
+      throw new Error(json.error ?? `HTTP ${res.status}`);
+    }
     return json;
   } catch(e) {
     if (e?.name === 'AbortError') throw new Error('Render non risponde entro 45 secondi. Aggiorna prima di riprovare: la richiesta potrebbe essere stata salvata.');
     throw e;
   } finally { clearTimeout(timer); }
+}
+
+/** Sincronizza profilo server → localStorage (progressi + ultima partita). */
+async function pullProfileFromServer() {
+  try {
+    const profile = await api('/me/profile');
+    if (profile.story_progress && typeof profile.story_progress === 'object') {
+      try { localStorage.setItem(STORY_KEY, JSON.stringify(profile.story_progress)); } catch (_) { /* ignore */ }
+    }
+    if (profile.last_match_id) {
+      try { localStorage.setItem('bellum:last-match', String(profile.last_match_id)); } catch (_) { /* ignore */ }
+    } else {
+      try { localStorage.removeItem('bellum:last-match'); } catch (_) { /* ignore */ }
+    }
+    return profile;
+  } catch (e) {
+    console.warn('Profilo server non disponibile', e);
+    return null;
+  }
+}
+
+/** Claim device + pull profilo (dopo login / Sono io). */
+async function claimDeviceAndSync() {
+  try {
+    await api('/me/claim-device', { method: 'POST', body: { deviceId: getDeviceId() } });
+  } catch (e) {
+    console.warn('Claim device fallito', e);
+  }
+  return pullProfileFromServer();
 }
 // Le carte scadono dopo 5 minuti e a ogni nuova partita: una modifica dall'editor arriva ai giocatori
 // senza ricaricare la pagina. Se il ricaricamento fallisce si usa la copia già in memoria.
@@ -609,10 +657,11 @@ async function renderDeathChoice() {
     }
     const d = await card(selected.task.card_id);
     if (deathTarget()?.choice_id !== selected.choice_id) return;
-    const isEtb = selected.task?.source === 'on_play';
-    if (isEtb) {
-      // Prima la creatura è già in campo (drawBoard nel render), poi scelta bersaglio sulla griglia.
-      // Niente overlay che nasconde il board: l’utente vede la creatura entrata e può bersagliarla.
+    const src = selected.task?.source;
+    // on_play / terraforma / aura → scelta sulla griglia (creatura già in campo).
+    // Solo on_death resta nel dialogo a lista, con testo corretto «alla morte».
+    const useBoardPick = src === 'on_play' || src === 'terraforma_trigger' || src === 'aura_attack' || !src;
+    if (useBoardPick) {
       el.classList.add('hidden');
       if (busy || deathTarget()?.choice_id !== selected.choice_id) return;
       flow = {
@@ -623,7 +672,6 @@ async function renderDeathChoice() {
       };
       try { dismissNotice(); } catch (_) { /* ignore */ }
       await drawBoard();
-      // Evidenzia la creatura appena entrata (fonte dell’effetto)
       const sourceId = selected.task?.source_instance_id;
       if (sourceId) {
         for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
@@ -640,16 +688,11 @@ async function renderDeathChoice() {
           }
         }
       }
-      const fxText = plainText(d) || '';
-      const gm = $('game-message');
-      if (gm) {
-        gm.textContent = `${d.name} è entrata in campo.${fxText ? ' ' + fxText : ''} Tocca il bersaglio evidenziato.`;
-        gm.className = 'game-message success';
-      }
       return;
     } else {
-      title.textContent = 'Bersaglio dell’effetto';
-      text.textContent = `${d.name}: scegli il bersaglio. La scelta è obbligatoria e si risolve prima dell’effetto successivo.`;
+      // Solo effetti davvero «alla morte»
+      title.textContent = 'Bersaglio dell’effetto alla morte';
+      text.textContent = `${d.name}: scegli il bersaglio dell’effetto alla morte.`;
       for (const instanceId of selected.eligible_instance_ids ?? []) {
         let found = null;
         for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
@@ -666,7 +709,7 @@ async function renderDeathChoice() {
         options.append(b);
       }
       if ((selected.eligible_instance_ids ?? []).includes(AI_TARGET)) {
-        options.append(button(`IA · giocatore avversario · PV ${them()?.life ?? '?'}`,() => {
+        options.append(button(`${opponentDisplayName()} · PV ${them()?.life ?? '?'}`,() => {
           if (busy || deathTarget()?.choice_id !== selected.choice_id) return;
           return request('death/target',{choiceId:selected.choice_id,targetInstanceId:AI_TARGET},'Effetto risolto.');
         }));
@@ -891,6 +934,7 @@ function queuePresentation(onlyLast = false) {
 /** Pulisce completamente la UI della partita (griglia, mani, overlay) senza toccare i progressi Storia. */
 function clearMatchUI() {
   try { localStorage.removeItem('bellum:last-match'); } catch (_) { /* ignore */ }
+  void api('/me/profile', { method: 'PUT', body: { last_match_id: null } }).catch(() => { /* ignore */ });
   matchId = null;
   state = null;
   flow = null;
@@ -1092,11 +1136,12 @@ async function inspect(kind,id,extra={}) {
   }
   if (kind === 'unit' && active() && isCreatureCell(current.cell) && current.cell.owner_index === 1 && !current.cell.tired) {
     const direct = foes(current.position).length === 0;
-    add(direct ? 'Attacca direttamente IA' : 'Attacca · 0 mana',() => {
+    const foeName = opponentDisplayName();
+    add(direct ? `Attacca ${foeName}` : 'Attacca',() => {
       if (direct) return request('attack',{attackerPosition:current.position,target:{type:'player',playerIndex:0}},'Attacco dichiarato.');
       flow = {kind:'attack',from:current.position}; close(); render().catch(fail); notice('Tocca il nemico evidenziato.','success');
     });
-    if (direct && attackable(current.position).length) add('Attacca Terraforma · 0 mana',() => { flow = {kind:'attack',from:current.position}; close(); render().catch(fail); notice('Tocca la Terraforma nemica evidenziata.','success'); });
+    if (direct && attackable(current.position).length) add('Attacca Terraforma',() => { flow = {kind:'attack',from:current.position}; close(); render().catch(fail); notice('Tocca la Terraforma nemica evidenziata.','success'); });
     const cost = await moveCost(current.cell);
     if (current !== view) return;
     add(`Muovi · ${cost} mana`,() => { flow = {kind:'move',from:current.position}; close(); render().catch(fail); notice('Tocca una cella libera adiacente.','success'); },Number(me()?.current_mana ?? 0) < cost || !steps(current.position).length);
@@ -1193,7 +1238,7 @@ async function drawMostrissimi() {
   let panel = $('mostrissimo-panel');
   if (!panel) {
     panel = document.createElement('section'); panel.id = 'mostrissimo-panel'; panel.className = 'panel'; panel.setAttribute('aria-label','Offerta Mostrissimi');
-    const slot = $('offer-slot'), before = document.querySelector('.logs-panel') ?? $('game-message');
+    const slot = $('offer-slot'), before = document.querySelector('.logs-panel');
     if (slot) slot.append(panel); else if (before?.parentNode) before.parentNode.insertBefore(panel,before); else document.body.append(panel);
   }
   panel.replaceChildren();
@@ -1539,8 +1584,6 @@ async function boardClick(pos) {
   if (flow?.kind === 'etb-target') {
     const c = at(pos);
     if (!c || !(flow.eligible ?? []).includes(c.instance_id)) {
-      const gm = $('game-message');
-      if (gm) { gm.textContent = 'Bersaglio non valido.'; gm.className = 'game-message error'; }
       return;
     }
     let def = null;
@@ -1711,6 +1754,10 @@ function saveStoryProgress(progress) {
   } catch (e) {
     console.warn('Impossibile salvare i progressi Storia', e);
   }
+  // Server (best-effort): così PC e telefono restano allineati
+  void api('/me/profile', { method: 'PUT', body: { story_progress: progress } }).catch(e => {
+    console.warn('Salvataggio progressi sul server fallito', e);
+  });
 }
 
 function clearStoryProgress() {
@@ -1718,6 +1765,7 @@ function clearStoryProgress() {
     localStorage.removeItem(STORY_KEY);
     localStorage.removeItem('bellum:story-completed'); // vecchia chiave
   } catch { /* ignore */ }
+  void api('/me/profile', { method: 'PUT', body: { story_progress: null } }).catch(() => { /* ignore */ });
 }
 
 function isStoryCompleted() {
@@ -1946,7 +1994,7 @@ function showHome() {
       trophy = document.createElement('div');
       trophy.className = 'home-trophy';
       trophy.innerHTML = `
-        <img src="img/trofei/abitante.png" alt="Abitante della Piramide" width="96" height="96" decoding="async" />
+        <img src="img/Trofei/abitante.png" alt="Abitante della Piramide" width="96" height="96" decoding="async" />
         <span>Abitante della Piramide</span>
       `;
       const content = el.querySelector('.home-content');
@@ -1972,11 +2020,27 @@ function hideHome() {
 let priorMatch = null, probing = false;
 async function probePrior() {
   priorMatch = null;
-  const prior = localStorage.getItem('bellum:last-match'); if (!prior) return;
+  // Preferisci last_match_id dal server (cross-device), fallback localStorage
+  let prior = null;
   try {
-    const [user,result] = await Promise.all([getCurrentUser(),api(`/match/${encodeURIComponent(prior)}`)]);
-    if (result.state?.state_version === 4 && user && result.state.players?.[1]?.user_id === user.id && result.state.status !== 'finished') priorMatch = {id:prior};
-  } catch(e) { console.warn('Ripristino non disponibile',e); }
+    const profile = await api('/me/profile');
+    if (profile?.last_match_id) prior = String(profile.last_match_id);
+  } catch (_) { /* ignore */ }
+  if (!prior) {
+    try { prior = localStorage.getItem('bellum:last-match'); } catch (_) { prior = null; }
+  }
+  if (!prior) return;
+  try {
+    const [user, result] = await Promise.all([getCurrentUser(), api(`/match/${encodeURIComponent(prior)}`)]);
+    if (result.state?.state_version === 4 && user && result.state.players?.[1]?.user_id === user.id && result.state.status !== 'finished') {
+      priorMatch = { id: prior };
+      try { localStorage.setItem('bellum:last-match', prior); } catch (_) { /* ignore */ }
+    } else if (result.state?.status === 'finished') {
+      // Pulisci last_match sul server se la partita è finita
+      void api('/me/profile', { method: 'PUT', body: { last_match_id: null } }).catch(() => {});
+      try { localStorage.removeItem('bellum:last-match'); } catch (_) { /* ignore */ }
+    }
+  } catch (e) { console.warn('Ripristino non disponibile', e); }
 }
 function startDialog() {
   let el = $('start-dialog'); if (el) return el;
@@ -2487,12 +2551,13 @@ function showCoinFlip(firstIsHuman) {
     </svg>`;
     const result = document.createElement('p');
     result.style.cssText = 'margin:1rem 0 .4rem;font-family:"Lilita One",Georgia,serif;font-size:1.35rem;color:#e8c565;letter-spacing:.02em';
-    result.textContent = firstIsHuman ? 'Inizi tu' : 'Inizia Mummy';
+    const foe = opponentDisplayName();
+    result.textContent = firstIsHuman ? 'Inizi tu' : `Inizia ${foe}`;
     const sub = document.createElement('p');
     sub.style.cssText = 'margin:0 0 1.1rem;font-size:.95rem;line-height:1.4';
     sub.textContent = firstIsHuman
       ? 'Primo turno: mana massimo 1. Tocca una carta quando sei pronto.'
-      : 'Mummy muove per prima. Mana massimo 1. Osserva e preparati.';
+      : `${foe} muove per prima. Mana massimo 1. Osserva e preparati.`;
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'primary-button';
@@ -2545,7 +2610,7 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
             saveStoryProgress(progress);
             const med = BOSS_DATA[chosen];
             await showMummyDialog(
-              `Hai attivato il ${med.medaglioneName}!\n«${med.powerDesc}»\n\nQuesto potere resterà attivo anche contro Indrazzico.`
+              `Hai attivato il ${med.medaglioneName}!\n«${med.powerDesc}»`
             );
           }
           progress = getStoryProgress() || progress;
@@ -2715,7 +2780,10 @@ async function init() {
 }
 // Solo dopo conferma identità (login o «Sono io») mostriamo la Home
 window.addEventListener('bellum:auth-ready', () => {
-  init().then(() => showHome()).catch(fail);
+  init()
+    .then(() => claimDeviceAndSync())
+    .then(() => showHome())
+    .catch(fail);
 });
 // Se c’è già sessione, prepariamo i listener ma NON mostriamo ancora la Home
 // (l’utente deve prima cliccare «Sono io»)
