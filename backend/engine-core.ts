@@ -839,9 +839,11 @@ async function drain(c: Context) {
     if (item.kind === 'apply_event') log(c, item.event.actor, 'trace_event_done', `[3e] Conclusa applicazione ${traceEvent(item.event)}.`);
     flushDeaths(c);
     if (c.s.pending_death_order || c.s.pending_target_choice) {
+      const pendingTarget = c.s.pending_target_choice;
+      const targetSource = pendingTarget ? pendingTarget.task.source : null;
       const waitKind = c.s.pending_death_order
         ? 'ordine effetti alla morte'
-        : (c.s.pending_target_choice?.task?.source === 'on_death' ? 'bersaglio alla morte' : 'scelta bersaglio');
+        : (targetSource === 'on_death' ? 'bersaglio alla morte' : 'scelta bersaglio');
       log(c, -1, 'trace_choice_wait', `[3e] Continuazione sospesa per ${waitKind}; ${c.s.work_queue.length} task in attesa.`);
     }
     if (publish(c, checkpointStart)) return;
