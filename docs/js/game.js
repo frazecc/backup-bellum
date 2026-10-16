@@ -2119,9 +2119,8 @@ function homeDialog() {
   // Storia – piramide1.png (sempre cliccabile)
   const storyBtn = makePyramid('home-story', 'Modalità Storia', false, () => {
     currentMode = 'story';
-    hideHome();
+    // NON hideHome: altrimenti resta la griglia vuota sotto il dialog
     hideStart();
-    // Sempre la scelta RIPRENDI / nuovo destino (mai entrare in partita da solo)
     storyStartScreen().catch(fail);
   }, 'img/piramide1.png');
 
@@ -2263,11 +2262,10 @@ function storyStartDialog() {
 
   el = document.createElement('div');
   el.id = 'story-start-dialog';
-  el.className = 'card-detail-overlay start-dialog hidden';
+  el.className = 'story-start-dialog start-dialog hidden';
   el.setAttribute('role', 'dialog');
   el.setAttribute('aria-modal', 'true');
   el.setAttribute('aria-labelledby', 'story-start-title');
-  el.style.zIndex = '120';
 
   const panel = document.createElement('div');
   panel.className = 'panel';
@@ -2297,6 +2295,7 @@ function storyStartDialog() {
   fresh.onclick = () => {
     clearStoryProgress();
     hideStoryStart();
+    hideHome();
     // Inizia una nuova Storia → scelta colori
     openColorDialogForStory();
   };
@@ -2304,7 +2303,8 @@ function storyStartDialog() {
   actions.append(recover, fresh);
   panel.append(title, text, actions);
   el.append(panel);
-  stageRoot().append(el);
+  // Sul body (sopra Home), non dentro stage: evita flash della griglia
+  document.body.append(el);
   return el;
 }
 
