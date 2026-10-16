@@ -119,6 +119,7 @@ export function showAuthScreen(options = {}) {
   // Nascondi Home e schermate Storia se erano aperte
   document.getElementById('home-dialog')?.classList.add('hidden');
   document.getElementById('story-start-dialog')?.classList.add('hidden');
+  document.getElementById('endless-start-dialog')?.classList.add('hidden');
   setAuthMessage();
   paintLoginEyes();
 

@@ -1044,14 +1044,27 @@ async function handleMatchFinished() {
     return;
   }
 
+  if (won && currentMode === 'endless') {
+    await handleEndlessVictory();
+    return;
+  }
+
   if (!won) {
     const wasStory = currentMode === 'story';
+    const wasEndless = currentMode === 'endless';
     clearMatchUI();
     hideHome();
 
     if (wasStory) {
       clearStoryProgress();
     }
+    if (wasEndless) {
+      clearEndlessRun();
+    }
+    try { localStorage.removeItem('bellum:last-match'); } catch (_) { /* ignore */ }
+    matchId = null;
+    state = null;
+    priorMatch = null;
 
     try { dismissNotice(); } catch (_) { /* ignore */ }
     showAuthScreen({ forceLoginForm: false });
@@ -1442,7 +1455,7 @@ async function render() {
     do {
       renderQueued = false;
       const set = (id,x) => { if ($(id)) $(id).textContent = String(x); };
-      if (state) { hideStart(); hideHome(); hideStoryStart(); }
+      if (state) { hideStart(); hideHome(); hideStoryStart(); hideEndlessStart(); }
       set('player-life',me()?.life ?? 20); set('player-current-mana',me()?.current_mana ?? 0); set('player-max-mana',me()?.max_mana ?? 0);
       set('player-hand-count',me()?.hand?.length ?? 0); set('player-deck-count',me()?.deck?.length ?? 0); set('player-graveyard-count',me()?.graveyard?.length ?? 0);
       set('opponent-life',them()?.life ?? 20); set('opponent-current-mana',them()?.current_mana ?? 0); set('opponent-max-mana',them()?.max_mana ?? 0);
@@ -1928,7 +1941,7 @@ function renderColorButtons(codes, onPick) {
 async function showAnimaScene() {
   if (busy || reaction() || pending() || obligatory()) return;
   close(); closeGraveyard();
-  hideStart(); hideStoryStart();
+  hideStart(); hideStoryStart(); hideEndlessStart();
   // Home resta visibile sotto (3 piramidi)
 
   const el = animaSceneEl();
@@ -2045,6 +2058,7 @@ async function showAnimaScene() {
     isNewStory: currentMode === 'story',
     tertiaryColor: tertiary,
     curseAlreadyShown: true,
+    // Endless nuova run (non continue)
   });
 }
 
@@ -2113,6 +2127,43 @@ function isStoryCompleted() {
   const p = getStoryProgress();
   return !!(p && p.completed);
 }
+
+// ---------- PROGRESSI ENDLESS ----------
+// {
+//   primary, secondary, tertiary,
+//   wins: number,   // fight vinte nella run corrente (0 = stai per giocare la 1ª)
+//   best: number,   // massimo storico di fight vinte in una singola run
+// }
+const ENDLESS_KEY = 'bellum:endless-progress';
+
+function getEndlessProgress() {
+  try {
+    const raw = localStorage.getItem(ENDLESS_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function saveEndlessProgress(progress) {
+  try {
+    localStorage.setItem(ENDLESS_KEY, JSON.stringify(progress));
+  } catch { /* ignore */ }
+  // best-effort sync profilo
+  void api('/me/profile', { method: 'PUT', body: { endless_progress: progress } }).catch(() => {});
+}
+
+function clearEndlessRun() {
+  const p = getEndlessProgress() || {};
+  const best = Number(p.best) || 0;
+  saveEndlessProgress({ primary: null, secondary: null, tertiary: null, wins: 0, best });
+}
+
+function endlessAiLife(wins) {
+  return 20 + Math.max(0, Number(wins) || 0) * 5;
+}
+
 
 /** Restituisce i colori ancora da battere (i 3 intermedi rimanenti). */
 function getRemainingBosses(progress) {
@@ -2293,8 +2344,8 @@ function homeDialog() {
   const endlessLocked = !storyDone; // bloccata finché non si vince la Storia
   const endlessBtn = makePyramid('home-endless', endlessLabel, endlessLocked, () => {
     currentMode = 'endless';
-    hideHome();
-    startScreen().catch(fail); // stessa logica di Storia (fotocopia per ora)
+    hideStart();
+    endlessStartScreen().catch(fail);
   }, 'img/piramide2.png');
 
   // Coming Soon – piramide3.png (sempre bloccata per ora)
@@ -2328,22 +2379,36 @@ function showHome() {
     }
   }
 
-  // Trofeo «Abitante della Piramide»
-  let trophy = el.querySelector('.home-trophy');
-  if (storyDone) {
-    if (!trophy) {
-      trophy = document.createElement('div');
-      trophy.className = 'home-trophy';
-      trophy.innerHTML = `
+  // Trofei: Abitante (Storia) + Endless (best run)
+  const content = el.querySelector('.home-content');
+  let trophies = el.querySelector('.home-trophies');
+  if (!trophies && content) {
+    trophies = document.createElement('div');
+    trophies.className = 'home-trophies';
+    content.append(trophies);
+  }
+  if (trophies) {
+    trophies.innerHTML = '';
+    if (storyDone) {
+      const t = document.createElement('div');
+      t.className = 'home-trophy';
+      t.innerHTML = `
         <img src="img/Trofei/abitante.png" alt="Abitante della Piramide" width="96" height="96" decoding="async" />
         <span>Abitante della Piramide</span>
       `;
-      const content = el.querySelector('.home-content');
-      if (content) content.append(trophy);
+      trophies.append(t);
     }
-    trophy.classList.remove('hidden');
-  } else if (trophy) {
-    trophy.classList.add('hidden');
+    const ep = getEndlessProgress();
+    const best = Number(ep?.best) || 0;
+    if (best >= 1) {
+      const t = document.createElement('div');
+      t.className = 'home-trophy home-trophy-endless';
+      t.innerHTML = `
+        <img src="img/Trofei/gg.png" alt="Trofeo Endless" width="96" height="96" decoding="async" />
+        <span>Endless · ${best}</span>
+      `;
+      trophies.append(t);
+    }
   }
 
   el.classList.remove('hidden');
@@ -2579,6 +2644,263 @@ async function startNextStoryFight(progress) {
   // I dialoghi e la scelta del Medaglione vengono gestiti dentro newMatch
   await newMatch(progress.primary, progress.secondary);
 }
+
+// ---------- ENDLESS: avvio / ripresa / vittoria ----------
+function endlessStartDialog() {
+  let el = $('endless-start-dialog');
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = 'endless-start-dialog';
+  el.className = 'story-start-dialog start-dialog hidden';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-modal', 'true');
+  el.setAttribute('aria-labelledby', 'endless-start-title');
+
+  const panel = document.createElement('div');
+  panel.className = 'panel';
+  const title = document.createElement('h2');
+  title.id = 'endless-start-title';
+  title.textContent = 'Modalità Endless';
+  const textEl = document.createElement('p');
+  textEl.id = 'endless-start-text';
+  const actions = document.createElement('div');
+  actions.className = 'start-actions';
+
+  const recover = document.createElement('button');
+  recover.type = 'button';
+  recover.id = 'endless-recover-button';
+  recover.className = 'primary-button';
+  recover.textContent = 'RIPRENDI le tue spoglie';
+  recover.onclick = () => resumeEndless().catch(fail);
+
+  const fresh = document.createElement('button');
+  fresh.type = 'button';
+  fresh.id = 'endless-new-button';
+  fresh.className = 'secondary-button';
+  fresh.textContent = 'Abbraccia un nuovo destino';
+  fresh.onclick = () => {
+    clearEndlessRun();
+    hideEndlessStart();
+    openColorDialog();
+  };
+
+  actions.append(recover, fresh);
+  panel.append(title, textEl, actions);
+  el.append(panel);
+  document.body.append(el);
+  return el;
+}
+
+function hideEndlessStart() {
+  $('endless-start-dialog')?.classList.add('hidden');
+}
+
+function showEndlessStart() {
+  const el = endlessStartDialog();
+  const progress = getEndlessProgress();
+  const hasRun = !!(progress && progress.primary && progress.secondary);
+  const hasMatch = !!priorMatch || !!(state && matchId && state.status !== 'finished');
+  if (state && matchId && state.status !== 'finished' && !priorMatch) {
+    priorMatch = { id: matchId };
+  }
+  const canRecover = hasRun || hasMatch;
+  $('endless-recover-button').classList.toggle('hidden', !canRecover);
+  $('endless-new-button').className = canRecover ? 'secondary-button' : 'primary-button';
+
+  if (canRecover) {
+    const wins = Number(progress?.wins) || 0;
+    let msg = 'Vuoi continuare il tuo percorso, o preferisci ricominciare?';
+    if (hasRun) msg = `Run in corso: ${wins} vittori${wins === 1 ? 'a' : 'e'}. ` + msg;
+    $('endless-start-text').textContent = msg;
+  } else {
+    $('endless-start-text').textContent = 'Nessuna run da recuperare. Scegli i colori e affronta Mummy senza limiti.';
+  }
+  el.classList.remove('hidden');
+}
+
+async function endlessStartScreen() {
+  busy = false;
+  try { await probePrior(); } catch (_) { /* ignore */ }
+  if (state && matchId && state.status !== 'finished') {
+    priorMatch = { id: matchId };
+  }
+  showEndlessStart();
+}
+
+async function resumeEndless() {
+  const progress = getEndlessProgress();
+  busy = true;
+  hideEndlessStart();
+  hideStart();
+  currentMode = 'endless';
+
+  try { await probePrior(); } catch (_) { /* ignore */ }
+
+  if (priorMatch) {
+    const id = priorMatch.id;
+    try {
+      const result = await api(`/match/${encodeURIComponent(id)}`);
+      if (result.state?.state_version !== 4) throw new Error('Partita non più compatibile.');
+      if (result.state.status === 'finished') {
+        priorMatch = null;
+        try { localStorage.removeItem('bellum:last-match'); } catch (_) { /* ignore */ }
+        busy = false;
+        if (progress?.primary) {
+          await startNextEndlessFight(progress);
+        } else {
+          openColorDialog();
+        }
+        return;
+      }
+      matchId = id;
+      state = result.state;
+      flow = null;
+      priorMatch = null;
+      deathDraft = { choiceId: null, instanceIds: [] };
+      localStorage.setItem('bellum:last-match', matchId);
+      hideHome();
+      close();
+      closeGraveyard();
+      closeColorDialog();
+      busy = false;
+      await render().catch(fail);
+      try { await logs(); } catch (e) { console.warn(e); }
+      await notice('Partita precedente ripristinata.', 'success');
+      queuePresentation(true);
+      return;
+    } catch (e) {
+      console.warn('Ripristino Endless fallito', e);
+      priorMatch = null;
+    }
+  }
+
+  busy = false;
+  if (progress?.primary && progress?.secondary) {
+    await startNextEndlessFight(progress);
+  } else {
+    openColorDialog();
+  }
+}
+
+async function startNextEndlessFight(progress) {
+  if (!progress?.primary || !progress?.secondary) return;
+  busy = false;
+  currentMode = 'endless';
+  await newMatch(progress.primary, progress.secondary, {
+    tertiaryColor: progress.tertiary || undefined,
+    curseAlreadyShown: true,
+    endlessContinue: true,
+  });
+}
+
+async function handleEndlessVictory() {
+  let progress = getEndlessProgress() || { wins: 0, best: 0 };
+  const prevBest = Number(progress.best) || 0;
+  progress.wins = (Number(progress.wins) || 0) + 1;
+  const isNewRecord = progress.wins > prevBest;
+  if (isNewRecord) progress.best = progress.wins;
+  // mantieni colori
+  if (state?.deck_colors?.[1]) {
+    progress.primary = state.deck_colors[1].primary || progress.primary;
+    progress.secondary = state.deck_colors[1].secondary || progress.secondary;
+    progress.tertiary = state.deck_colors[1].tertiary || progress.tertiary;
+  }
+  saveEndlessProgress(progress);
+
+  clearMatchUI();
+  matchId = null;
+  state = null;
+  priorMatch = null;
+  try { localStorage.removeItem('bellum:last-match'); } catch (_) { /* ignore */ }
+
+  if (isNewRecord) {
+    await showEndlessRecordPopup(progress.best);
+  } else {
+    await showMummyDialog(`Vittoria! Run: ${progress.wins}.\nProssima fight: Mummy a ${endlessAiLife(progress.wins)} PV.`);
+  }
+
+  await startNextEndlessFight(progress);
+}
+
+function showEndlessRecordPopup(best) {
+  return new Promise(resolve => {
+    let el = $('endless-record-dialog');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'endless-record-dialog';
+      el.className = 'card-detail-overlay';
+      el.setAttribute('role', 'dialog');
+      el.setAttribute('aria-modal', 'true');
+      el.style.zIndex = '160';
+      document.body.append(el);
+    }
+    el.innerHTML = '';
+    const panel = document.createElement('div');
+    panel.className = 'panel';
+    panel.style.cssText = 'width:min(92vw,400px);margin:auto;padding:1.3rem;text-align:center;border:1px solid #d5a758;box-shadow:0 12px 48px #000';
+    const img = document.createElement('img');
+    img.src = 'img/Trofei/gg.png';
+    img.alt = 'Trofeo Endless';
+    img.width = 120;
+    img.height = 120;
+    img.style.cssText = 'display:block;margin:0 auto .8rem;filter:drop-shadow(0 0 12px rgba(232,197,101,.4))';
+    img.onerror = () => { img.style.display = 'none'; };
+    const title = document.createElement('p');
+    title.style.cssText = 'margin:0 0 .4rem;font-family:"Lilita One",Georgia,serif;font-size:1.35rem;color:#e8c565';
+    title.textContent = 'Nuovo record!';
+    const body = document.createElement('p');
+    body.style.cssText = 'margin:0 0 1rem;line-height:1.45';
+    body.textContent = `Endless · ${best} vittori${best === 1 ? 'a' : 'e'} in una run.`;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'primary-button';
+    btn.textContent = 'Continua';
+    btn.onclick = () => { el.classList.add('hidden'); resolve(); };
+    panel.append(img, title, body, btn);
+    el.append(panel);
+    el.classList.remove('hidden');
+  });
+}
+
+/** In Endless il giocatore sceglie chi inizia. */
+function showWhoStarts() {
+  return new Promise(resolve => {
+    let el = $('who-starts-dialog');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'who-starts-dialog';
+      el.className = 'card-detail-overlay';
+      el.setAttribute('role', 'dialog');
+      el.setAttribute('aria-modal', 'true');
+      el.style.zIndex = '145';
+      stageRoot().append(el);
+    }
+    el.innerHTML = '';
+    const panel = document.createElement('div');
+    panel.className = 'panel';
+    panel.style.cssText = 'width:min(92vw,400px);margin:auto;padding:1.3rem;text-align:center;border:1px solid #d5a758;box-shadow:0 12px 48px #000';
+    const title = document.createElement('p');
+    title.style.cssText = 'margin:0 0 1rem;font-family:"Lilita One",Georgia,serif;font-size:1.25rem;color:#e8c565';
+    title.textContent = 'Chi inizia?';
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;flex-wrap:wrap;gap:.6rem;justify-content:center';
+    const you = document.createElement('button');
+    you.type = 'button';
+    you.className = 'primary-button';
+    you.textContent = 'Inizio io';
+    you.onclick = () => { el.classList.add('hidden'); resolve(1); };
+    const foe = document.createElement('button');
+    foe.type = 'button';
+    foe.className = 'secondary-button';
+    foe.textContent = 'Inizia Mummy';
+    foe.onclick = () => { el.classList.add('hidden'); resolve(0); };
+    actions.append(you, foe);
+    panel.append(title, actions);
+    el.append(panel);
+    el.classList.remove('hidden');
+  });
+}
+
 
 /** Scelta del cheat code (1 potere tra i 3 colori del mazzo del giocatore). */
 function showCheatCodeChoice(progress) {
@@ -2887,6 +3209,34 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
     /** Boss scelto prima della create (usato dopo per currentBoss e dialoghi). */
     let pendingStoryBoss = null;
 
+    // —— Endless: vita IA, colori IA random, chi inizia scelto dal giocatore ——
+    if (currentMode === 'endless') {
+      const ep = getEndlessProgress() || { wins: 0, best: 0 };
+      const wins = options.endlessContinue ? (Number(ep.wins) || 0) : 0;
+      if (!options.endlessContinue) {
+        // Nuova run: reset wins, tieni best e colori dopo create
+        ep.wins = 0;
+        ep.primary = primaryColor;
+        ep.secondary = secondaryColor;
+        if (options.tertiaryColor) ep.tertiary = options.tertiaryColor;
+        saveEndlessProgress(ep);
+      }
+      const aiLife = endlessAiLife(wins);
+      const allSix = ['CHI', 'INF', 'PES', 'BUL', 'GRO', 'CLO'];
+      const aiPrimary = allSix[Math.floor(Math.random() * allSix.length)];
+      // Scelta chi inizia PRIMA della create (backend la rispetta)
+      const firstPlayer = await showWhoStarts();
+      createBody.firstPlayer = firstPlayer;
+      createBody.story = {
+        aiStartingLife: aiLife,
+        tertiaryColor: options.tertiaryColor || ep.tertiary || undefined,
+        aiPrimary,
+        aiDisplayName: 'Mummy',
+        firstPlayer,
+      };
+      if (options.tertiaryColor) createBody.tertiaryColor = options.tertiaryColor;
+    }
+
     if (currentMode === 'story') {
       let progress = getStoryProgress();
       const allSix = ['CHI', 'INF', 'PES', 'BUL', 'GRO', 'CLO'];
@@ -2964,6 +3314,7 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
     closeGraveyard();
     hideStart();
     hideStoryStart();
+    hideEndlessStart();
     hideHome(); // importante: dopo anima scene la Home resta aperta e copre stage/dialoghi
     closeColorDialog();
     localStorage.setItem('bellum:last-match', matchId);
@@ -3034,19 +3385,35 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
 
       // 3) Moneta del destino
       await showCoinFlip(state?.active_player_index === 1);
+    } else if (currentMode === 'endless') {
+      // Endless: maledizione solo se non già in scena anima; niente moneta né benedizione
+      if (!options.curseAlreadyShown) {
+        await showCurseDialog(humanColors, aiColors);
+      }
+      // Aggiorna progress con colori effettivi
+      const ep = getEndlessProgress() || { wins: 0, best: 0 };
+      if (humanColors) {
+        ep.primary = humanColors.primary;
+        ep.secondary = humanColors.secondary;
+        ep.tertiary = humanColors.tertiary;
+      }
+      if (!options.endlessContinue) ep.wins = 0;
+      saveEndlessProgress(ep);
+      const desk = $('narrator-desk-speech');
+      if (desk) desk.textContent = 'Endless. Buona fortuna.';
     } else {
-      // Modalità normale / Endless: maledizione + moneta (salta se già in scena anima)
+      // Modalità normale: maledizione + moneta
       if (!options.curseAlreadyShown) {
         await showCurseDialog(humanColors, aiColors);
       }
       await showCoinFlip(state?.active_player_index === 1);
+      const uname = usernameFromEmail((await getCurrentUser())?.email) || 'coraggioso';
+      const bless = `Che le bestie divine ti assistano, ${uname}.`;
+      const desk = $('narrator-desk-speech');
+      if (desk) desk.textContent = bless;
+      await notice(bless, 'success');
     }
 
-    const uname = usernameFromEmail((await getCurrentUser())?.email) || 'coraggioso';
-    const bless = `Che le bestie divine ti assistano, ${uname}.`;
-    const desk = $('narrator-desk-speech');
-    if (desk) desk.textContent = bless;
-    await notice(bless, 'success');
     await render();
     await logs();
     // Ogni partita apre con Manatenimento + Svolgimento del primo giocatore (anche se il motore è già in main).
@@ -3085,7 +3452,7 @@ async function init() {
     if (!pending() && !reaction()) { flow = null; close(); render().catch(fail); notice('Selezione annullata.'); }
   });
   $('end-turn-button')?.addEventListener('click',() => { if (active()) request('end-turn',{},''); });
-  $('logout-button')?.addEventListener('click',() => signOut().then(() => { presentationGeneration++; presentationLayer().style.display = 'none'; matchId = null; state = null; flow = null; priorMatch = null; deathDraft = {choiceId:null,instanceIds:[]}; close(); closeGraveyard(); closeColorDialog(); hideHome(); hideStart(); hideStoryStart(); reactionDialog().classList.add('hidden'); choiceDialog().classList.add('hidden'); }).catch(fail));
+  $('logout-button')?.addEventListener('click',() => signOut().then(() => { presentationGeneration++; presentationLayer().style.display = 'none'; matchId = null; state = null; flow = null; priorMatch = null; deathDraft = {choiceId:null,instanceIds:[]}; close(); closeGraveyard(); closeColorDialog(); hideHome(); hideStart(); hideStoryStart(); hideEndlessStart(); reactionDialog().classList.add('hidden'); choiceDialog().classList.add('hidden'); }).catch(fail));
   document.addEventListener('keydown',e => { if (e.key === 'Escape' && !obligatory()) { if (!$('anima-scene')?.classList.contains('hidden') && !busy) closeColorDialog(); else if (!$('graveyard-dialog')?.classList.contains('hidden')) closeGraveyard(); else if (view) close(); } });
   await render();
   // NON mostriamo la Home qui: solo dopo che l’utente ha confermato «Sono io» o ha fatto login
