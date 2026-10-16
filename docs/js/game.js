@@ -977,41 +977,53 @@ function queuePresentation(onlyLast = false) {
         const list = !replay && Array.isArray(state.public_announcements) && state.public_announcements.length > 1 ? state.public_announcements : [a];
         replay = false;
         for (let i = 0; i < list.length; i++) {
-          await presentPublic(list[i],generation);
+          await presentPublic(list[i], generation);
           if (generation !== presentationGeneration || matchId !== id) break;
-          if (i < list.length - 1) await waitPresentation(180); // breve stacco: i balloon restano distinti
+          if (i < list.length - 1) await waitPresentation(180);
         }
         if (generation !== presentationGeneration || matchId !== id) break;
 
-        // Partita finita durante il turno IA (es. sconfitta) → gestisci subito
         if (state.status === 'finished') {
           await handleMatchFinished();
           break;
         }
 
-        if (state.status !== 'running' || state.pending_reaction || obligatory() || !state.work_queue?.length) break;
+        // Serve input del giocatore (trappola / morte / bersaglio): non advance, non riproporre.
+        if (state.status !== 'running' || state.pending_reaction || obligatory()) break;
+
+        // IMPORTANTE: chiama /advance anche con work_queue vuota.
+        // Altrimenti lo stesso public_announcement resta nello state e viene
+        // riproposto all’infinito → popup a catena e UI bloccata (busy / disabled).
+        // pending_mostrissimo NON blocca advance (i sacrifici restano validi).
         busy = true; controls();
         try {
           state = (await api(`/match/${encodeURIComponent(id)}/advance`,
-            {method:'POST',body:{expectedAnnouncementId:a.id}})).state;
+            { method: 'POST', body: { expectedAnnouncementId: a.id } })).state;
           await render(); await logs();
           await ensurePhaseBanner().catch(fail);
-          // Controlla di nuovo dopo advance (l’IA può averti ucciso)
           if (state.status === 'finished') {
             await handleMatchFinished();
             break;
           }
-        } catch(e) {
+        } catch (e) {
           fail(e);
-          try { state = (await api(`/match/${encodeURIComponent(id)}`)).state; await render(); } catch(refreshError) { console.warn(refreshError); }
+          try { state = (await api(`/match/${encodeURIComponent(id)}`)).state; await render(); } catch (refreshError) { console.warn(refreshError); }
           if (state?.status === 'finished') {
             await handleMatchFinished();
           }
           break;
-        } finally { busy = false; await render().catch(fail); }
+        } finally {
+          busy = false;
+          await render().catch(fail);
+        }
+        // Se il server non ha consumato il checkpoint, esci (evita loop)
         if (state?.public_announcement?.id === a.id) break;
       }
-    } finally { presentationRunning = false; }
+    } finally {
+      presentationRunning = false;
+      busy = false;
+      try { controls(); } catch (_) { /* ignore */ }
+    }
   })();
 }
 
