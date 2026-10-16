@@ -11,6 +11,7 @@
  * Output: JSONL (una riga = un match) + riepilogo su stderr.
  */
 
+import 'dotenv/config';
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
