@@ -476,6 +476,63 @@ function button(text,fn,disabled=false) {
   b.onclick = () => Promise.resolve(fn()).catch(fail);
   return b;
 }
+
+/**
+ * Anteprima del permanente scelto come bersaglio → Conferma / Annulla.
+ * Risolve true se confermato, false se annullato.
+ */
+function confirmTargetChoice(cell, cardDef, hint = '') {
+  return new Promise(resolve => {
+    let el = $('target-confirm-dialog');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'target-confirm-dialog';
+      el.className = 'card-detail-overlay';
+      el.setAttribute('role', 'dialog');
+      el.setAttribute('aria-modal', 'true');
+      el.style.zIndex = '160';
+      stageRoot().append(el);
+    }
+    el.innerHTML = '';
+    const panel = document.createElement('div');
+    panel.className = 'panel';
+    panel.style.cssText = 'width:min(92vw,360px);margin:auto;padding:1.1rem;text-align:center;border:1px solid #d5a758;box-shadow:0 12px 48px #000';
+    const title = document.createElement('h2');
+    title.style.cssText = 'margin:0 0 .5rem;font-size:1.15rem';
+    title.textContent = 'Conferma bersaglio';
+    const sub = document.createElement('p');
+    sub.style.cssText = 'margin:0 0 .6rem;opacity:.9;line-height:1.4';
+    const who = cell?.owner_index === 1 ? 'tua' : 'IA';
+    const stats = isCreatureCell(cell)
+      ? ` · ATK ${cell.attack} · HP ${cell.hp}`
+      : (cell?.hp != null ? ` · PV ${cell.hp}` : '');
+    sub.textContent = hint || `${cardDef?.name ?? 'Permanente'} (${who}${stats})`;
+    const preview = document.createElement('div');
+    preview.style.cssText = 'margin:.5rem auto;max-width:200px';
+    if (cardDef) preview.innerHTML = cardHTML(cardDef, true);
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap;margin-top:.9rem';
+    const done = (ok) => {
+      el.classList.add('hidden');
+      el.innerHTML = '';
+      resolve(ok);
+    };
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'secondary-button';
+    cancel.textContent = 'Annulla';
+    cancel.onclick = () => done(false);
+    const confirm = document.createElement('button');
+    confirm.type = 'button';
+    confirm.className = 'primary-button';
+    confirm.textContent = 'Conferma';
+    confirm.onclick = () => done(true);
+    actions.append(cancel, confirm);
+    panel.append(title, sub, preview, actions);
+    el.append(panel);
+    el.classList.remove('hidden');
+  });
+}
 function overlay() {
   let el = $('card-detail-overlay');
   if (el) return el;
@@ -554,38 +611,42 @@ async function renderDeathChoice() {
     if (deathTarget()?.choice_id !== selected.choice_id) return;
     const isEtb = selected.task?.source === 'on_play';
     if (isEtb) {
-      // ETB dopo ingresso: popup con anteprima + testo → «Ho capito» → griglia.
-      title.textContent = 'Effetto in entrata';
-      const fxText = plainText(d) || 'Nessun testo effetto.';
-      text.innerHTML = `Hai evocato <strong>${escape(d.name)}</strong>.<br>Si attiva il suo effetto in entrata:<br><em>${escape(fxText)}</em>`;
-      const preview = document.createElement('div');
-      preview.style.cssText = 'margin:.6rem auto;max-width:200px';
-      preview.innerHTML = cardHTML(d, true);
-      options.append(preview);
-      const confirmEtb = async () => {
-        if (busy || deathTarget()?.choice_id !== selected.choice_id) return;
-        flow = {
-          kind: 'etb-target',
-          choiceId: selected.choice_id,
-          eligible: selected.eligible_instance_ids ?? [],
-          sourceId: selected.task?.source_instance_id,
-        };
-        el.classList.add('hidden');
-        // Chiudi eventuali notice bloccanti prima di abilitare i click sulla griglia
-        try { dismissNotice(); } catch (_) { /* ignore */ }
-        await drawBoard();
-        // Messaggio non bloccante (non usare notice() qui: bloccherebbe i click sul bersaglio)
-        const gm = $('game-message');
-        if (gm) {
-          gm.textContent = 'Tocca il bersaglio evidenziato.';
-          gm.className = 'game-message success';
-        }
+      // Prima la creatura è già in campo (drawBoard nel render), poi scelta bersaglio sulla griglia.
+      // Niente overlay che nasconde il board: l’utente vede la creatura entrata e può bersagliarla.
+      el.classList.add('hidden');
+      if (busy || deathTarget()?.choice_id !== selected.choice_id) return;
+      flow = {
+        kind: 'etb-target',
+        choiceId: selected.choice_id,
+        eligible: selected.eligible_instance_ids ?? [],
+        sourceId: selected.task?.source_instance_id,
       };
-      actions.append(button('Ho capito', confirmEtb));
-      // Auto «Ho capito»: stesso toggle del menu (non i dialoghi lunghi della Mummia)
-      if (isAutoNotice()) {
-        setTimeout(() => { confirmEtb().catch(fail); }, 900);
+      try { dismissNotice(); } catch (_) { /* ignore */ }
+      await drawBoard();
+      // Evidenzia la creatura appena entrata (fonte dell’effetto)
+      const sourceId = selected.task?.source_instance_id;
+      if (sourceId) {
+        for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
+          const cell = at({ row, col });
+          if (cell?.instance_id === sourceId) {
+            const root = $('shared-board');
+            const rowEl = root?.children?.[row];
+            const btn = rowEl?.children?.[col];
+            if (btn) {
+              btn.classList.add('just-entered');
+              btn.style.outline = '3px solid #2fe0c4';
+              btn.style.boxShadow = '0 0 18px rgba(47,224,196,.55)';
+            }
+          }
+        }
       }
+      const fxText = plainText(d) || '';
+      const gm = $('game-message');
+      if (gm) {
+        gm.textContent = `${d.name} è entrata in campo.${fxText ? ' ' + fxText : ''} Tocca il bersaglio evidenziato.`;
+        gm.className = 'game-message success';
+      }
+      return;
     } else {
       title.textContent = 'Bersaglio dell’effetto';
       text.textContent = `${d.name}: scegli il bersaglio. La scelta è obbligatoria e si risolve prima dell’effetto successivo.`;
@@ -1482,6 +1543,11 @@ async function boardClick(pos) {
       if (gm) { gm.textContent = 'Bersaglio non valido.'; gm.className = 'game-message error'; }
       return;
     }
+    let def = null;
+    try { def = await card(c.card_id); } catch (_) { /* ignore */ }
+    const ok = await confirmTargetChoice(c, def);
+    if (!ok) return; // resta in modalità scelta bersaglio
+    if (deathTarget()?.choice_id !== flow.choiceId) return;
     const choiceId = flow.choiceId;
     flow = null;
     return request('death/target',{choiceId,targetInstanceId:c.instance_id},'Effetto in entrata risolto.');
@@ -1492,6 +1558,10 @@ async function boardClick(pos) {
       if (flow.windowId !== r.window_id) { flow = null; await render(); return notice('Finestra reattiva scaduta.','error'); }
       const d = await card(flow.id);
       if (!targetAllowed(d,c,r.event)) return notice('Bersaglio della Trappola non valido.','error');
+      let def = null;
+      try { def = await card(c.card_id); } catch (_) { /* ignore */ }
+      const ok = await confirmTargetChoice(c, def);
+      if (!ok) return;
       return chooseTrap({windowId:r.window_id,action:'play',cardInstanceId:flow.instanceId,targetInstanceId:c.instance_id});
     }
     return notice('Scegli una Trappola oppure passa.','error');
@@ -1506,6 +1576,10 @@ async function boardClick(pos) {
       return request('mostrissimo/complete',{position:flow.position,targetInstanceId:p.offered_instance_id},'Mostrissimo dichiarato.');
     }
     if (!targetAllowed(d,c)) return notice('Bersaglio dell’effetto all’entrata non valido.','error');
+    let def = null;
+    try { def = await card(c.card_id); } catch (_) { /* ignore */ }
+    const ok = await confirmTargetChoice(c, def);
+    if (!ok) return;
     return request('mostrissimo/complete',{position:flow.position,targetInstanceId:c.instance_id},'Mostrissimo dichiarato.');
   }
   if (p) {
@@ -1545,6 +1619,10 @@ async function boardClick(pos) {
     }
     if (flow.step === 'target') {
       if (!targetAllowed(d,c)) return notice('Bersaglio non valido.','error');
+      let def = null;
+      try { def = await card(c.card_id); } catch (_) { /* ignore */ }
+      const ok = await confirmTargetChoice(c, def);
+      if (!ok) return;
       return request('play-card',{cardInstanceId:flow.instanceId,options:{...(flow.position ? {position:flow.position} : {}),targetInstanceId:c.instance_id}},creature(d) ? 'Creatura dichiarata.' : 'Carta dichiarata.');
     }
   }
