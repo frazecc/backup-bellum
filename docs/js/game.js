@@ -549,7 +549,7 @@ function button(text,fn,disabled=false) {
 /** Testo guida sotto la griglia durante la scelta bersaglio / attacco. */
 function targetReminderText(cardDef) {
   const fx = cardDef ? (plainText(cardDef) || cardDef.name || 'effetto') : 'effetto';
-  return `Stai attivando: «${fx}». Seleziona un bersaglio tra quelli evidenziati (bordo rosso/bianco).`;
+  return `Stai attivando: «${fx}». Seleziona un bersaglio tra quelli evidenziati (bordo bianco).`;
 }
 function showTargetReminder(text) {
   const el = $('selection-instructions');
@@ -1180,11 +1180,11 @@ async function inspect(kind,id,extra={}) {
     add(direct ? `Attacca ${foeName}` : 'Attacca',() => {
       if (direct) return request('attack',{attackerPosition:current.position,target:{type:'player',playerIndex:0}},'Attacco dichiarato.');
       flow = {kind:'attack',from:current.position}; close(); render().catch(fail);
-      showTargetReminder('Seleziona un nemico evidenziato (bordo rosso/bianco) per attaccare.');
+      showTargetReminder('Seleziona un nemico evidenziato (bordo bianco) per attaccare.');
     });
     if (direct && attackable(current.position).length) add('Attacca Terraforma',() => {
       flow = {kind:'attack',from:current.position}; close(); render().catch(fail);
-      showTargetReminder('Seleziona la Terraforma nemica evidenziata (bordo rosso/bianco).');
+      showTargetReminder('Seleziona la Terraforma nemica evidenziata (bordo bianco).');
     });
     const cost = await moveCost(current.cell);
     if (current !== view) return;
