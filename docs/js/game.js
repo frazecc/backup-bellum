@@ -1198,6 +1198,7 @@ async function render() {
   set('player-hand-count',me()?.hand?.length ?? 0); set('player-deck-count',me()?.deck?.length ?? 0); set('player-graveyard-count',me()?.graveyard?.length ?? 0);
   set('opponent-life',them()?.life ?? 20); set('opponent-current-mana',them()?.current_mana ?? 0); set('opponent-max-mana',them()?.max_mana ?? 0);
   set('opponent-hand-count',them()?.hand?.length ?? 0); set('opponent-deck-count',them()?.deck?.length ?? 0); set('opponent-graveyard-count',them()?.graveyard?.length ?? 0);
+  updateOpponentName();
   showDeckColors(); drawOpponentHand();
   updateStoryMedallionBanner();
   updateStoryProgressBadge();
@@ -1257,6 +1258,22 @@ function updateStoryMedallionBanner() {
       bossChip.onclick = null;
     }
   }
+}
+
+/** Nome dell'avversario sopra le carte (boss in Storia, altrimenti Mummy). */
+function updateOpponentName() {
+  const el = $('opponent-name');
+  if (!el) return;
+
+  let name = 'Mummy';
+  if (currentMode === 'story') {
+    const progress = getStoryProgress();
+    const code = progress?.currentBoss;
+    if (code && BOSS_DATA[code]?.name) {
+      name = BOSS_DATA[code].name;
+    }
+  }
+  el.textContent = name;
 }
 
 /** Contatore Storia sotto il nome Mummy. Clic → elenco boss sconfitti. */
