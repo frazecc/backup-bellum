@@ -1859,48 +1859,186 @@ async function boardClick(pos) {
   }
   if (c) return inspect('unit',c.card_id,{position:pos,cell:c});
 }
-function colorDialog() {
-  let el = $('deck-color-dialog');
-  if (el) return el;
-  el = document.createElement('div'); el.id = 'deck-color-dialog'; el.className = 'card-detail-overlay hidden';
-  el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-labelledby', 'deck-color-title');
-  el.style.zIndex = '130';
-  const panel = document.createElement('div'); panel.className = 'panel';
-  panel.style.cssText = 'width:min(92vw,440px);max-height:88dvh;overflow:auto;margin:auto;padding:1.2rem;text-align:center;border:1px solid #d5a758;box-shadow:0 12px 48px #000';
-  const title = document.createElement('h2'); title.id = 'deck-color-title'; title.textContent = 'Scegli i tuoi poteri';
-  const form = document.createElement('form'); form.id = 'deck-color-form'; form.style.cssText = 'display:grid;gap:.8rem';
-  const makeSelect = (id, text) => {
-    const label = document.createElement('label'); label.textContent = text; label.style.cssText = 'display:grid;gap:.3rem;text-align:left';
-    const select = document.createElement('select'); select.id = id; select.required = true;
-    select.style.cssText = 'width:100%;padding:.65rem;background:#171924;color:#fff;border:1px solid #d5a758;border-radius:6px';
-    for (const [code, name] of Object.entries(deckFactionNames)) {
-      const option = document.createElement('option'); option.value = code; option.textContent = `${name} (${code})`; select.append(option);
-    }
-    label.append(select); return label;
-  };
-  form.append(
-    makeSelect('deck-primary-color', 'Il colore dell’anima'),
-    makeSelect('deck-secondary-color', 'Il potere dell’amuleto'),
-  );
-  const validation = document.createElement('p'); validation.id = 'deck-color-validation';
-  validation.setAttribute('role', 'alert'); validation.style.color = '#ffbd92'; form.append(validation);
-  const actions = document.createElement('div'); actions.style.cssText = 'display:flex;justify-content:center;flex-wrap:wrap;gap:.6rem';
-  const confirm = document.createElement('button'); confirm.type = 'submit'; confirm.className = 'primary-button';
-  confirm.textContent = 'Sigilla il patto'; confirm.id = 'deck-color-confirm';
-  const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'secondary-button';
-  cancel.textContent = 'Annulla'; cancel.onclick = () => closeColorDialog();
-  actions.append(confirm, cancel); form.append(actions);
-  form.addEventListener('submit', e => { e.preventDefault(); submitColors().catch(fail); });
-  panel.append(title, form); el.append(panel); stageRoot().append(el);
-  return el;
-}
+/** Colori iris per gli occhi della maledizione (fallback cerchi). */
+const FACTION_EYE = {
+  CHI: '#c9b88a', INF: '#5a8dc2', PES: '#8a72b8',
+  BUL: '#c4684f', GRO: '#5aa87c', CLO: '#e0a22a', IND: '#8a96a3',
+};
+
+/** Overlay narrativo Mummy per scelta colori (anima / artefatto / maledizione).
+ *  Home resta sullo sfondo (3 piramidi); Mummy in primo piano. */
 function closeColorDialog() {
+  $('anima-scene')?.classList.add('hidden');
   $('deck-color-dialog')?.classList.add('hidden');
-  // Non riaprire «Le spoglie…» se siamo in Storia, se la Home è aperta, o se c’è già partita.
   if (currentMode === 'story') return;
   if ($('home-dialog') && !$('home-dialog').classList.contains('hidden')) return;
-  // Solo se non c’è partita in corso e non stiamo creando: evita «Le spoglie…» dopo moneta/maledizione.
   if (!state && !busy && !matchId && !$('game-screen')?.classList.contains('hidden')) showStart();
+}
+
+function animaSceneEl() {
+  let el = $('anima-scene');
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = 'anima-scene';
+  el.className = 'anima-scene hidden';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-modal', 'true');
+  el.setAttribute('aria-label', 'Scelta dell’anima');
+  // Sopra la Home, sotto eventuali altri overlay di gioco
+  el.style.cssText = 'position:fixed;inset:0;z-index:125;display:flex;align-items:center;justify-content:center;background:rgba(8,6,4,.55);padding:1rem;';
+  document.body.append(el);
+  return el;
+}
+
+function renderColorButtons(codes, onPick) {
+  const wrap = document.createElement('div');
+  wrap.className = 'anima-color-grid';
+  wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:.55rem;justify-content:center;margin-top:.9rem;max-width:min(92vw,420px);';
+  for (const code of codes) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'primary-button anima-color-btn';
+    btn.dataset.color = code;
+    const name = deckFactionNames[code] || code;
+    const iris = FACTION_EYE[code] || '#e8c565';
+    btn.style.cssText = `min-width:7.2rem;padding:.7rem .85rem;border:2px solid ${iris};box-shadow:0 0 0 1px rgba(0,0,0,.35),0 0 14px ${iris}44;font-size:.95rem;`;
+    btn.innerHTML = `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${iris};margin-right:.45rem;vertical-align:middle;box-shadow:0 0 6px ${iris}"></span>${name}`;
+    btn.onclick = () => onPick(code);
+    wrap.append(btn);
+  }
+  return wrap;
+}
+
+/** Scena a step: A anima → B artefatto → goodbye Mummy → occhi maledizione → newMatch. */
+async function showAnimaScene() {
+  if (busy || reaction() || pending() || obligatory()) return;
+  close(); closeGraveyard();
+  hideStart(); hideStoryStart();
+  // Home resta visibile sotto (3 piramidi)
+
+  const el = animaSceneEl();
+  el.innerHTML = '';
+  el.classList.remove('hidden');
+
+  const panel = document.createElement('div');
+  panel.className = 'panel anima-panel';
+  panel.style.cssText = 'width:min(94vw,460px);max-height:92dvh;overflow:auto;margin:auto;padding:1.15rem 1.1rem 1.3rem;text-align:center;border:1px solid #d5a758;box-shadow:0 16px 56px #000;background:linear-gradient(180deg,#1a1410 0%,#0e0b09 100%);';
+
+  const med = document.createElement('div');
+  med.className = 'narrator-medallion bob';
+  med.style.cssText = 'width:150px;height:150px;margin:0 auto .7rem;border-radius:50%;overflow:hidden;border:2px solid #d5a758;';
+  med.innerHTML = `<img class="narrator-img" src="img/mummy/mummy-base.png" alt="Mummy" width="150" height="150" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">`;
+
+  const nameEl = document.createElement('div');
+  nameEl.style.cssText = 'font-family:"Lilita One",Georgia,serif;color:#e8c565;font-size:1.15rem;margin-bottom:.35rem;letter-spacing:.03em;';
+  nameEl.textContent = 'Mummy';
+
+  const speech = document.createElement('p');
+  speech.id = 'anima-speech';
+  speech.style.cssText = 'margin:0 auto;line-height:1.5;font-size:1.08rem;max-width:36ch;white-space:pre-line;';
+
+  const choices = document.createElement('div');
+  choices.id = 'anima-choices';
+
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'secondary-button';
+  cancel.style.cssText = 'margin-top:1rem;';
+  cancel.textContent = 'Annulla';
+  cancel.onclick = () => {
+    el.classList.add('hidden');
+    if (currentMode === 'story') showStoryStart();
+    else if ($('home-dialog') && !$('home-dialog').classList.contains('hidden')) { /* resta home */ }
+    else showStart();
+  };
+
+  panel.append(med, nameEl, speech, choices, cancel);
+  el.append(panel);
+
+  const allCodes = Object.keys(deckFactionNames);
+
+  // —— Passo A: colore dell’anima ——
+  speech.textContent = 'Benvenuto, coraggioso. Dimmi, com’è fatta la tua anima?';
+  choices.innerHTML = '';
+  const primary = await new Promise(resolve => {
+    choices.append(renderColorButtons(allCodes, code => resolve(code)));
+  });
+
+  // —— Passo B: artefatto ——
+  speech.textContent = 'Interessante… ti aiuterò: quale artefatto vuoi?';
+  choices.innerHTML = '';
+  const remaining = allCodes.filter(c => c !== primary);
+  const secondary = await new Promise(resolve => {
+    choices.append(renderColorButtons(remaining, code => resolve(code)));
+  });
+
+  // —— Goodbye Mummy ——
+  let uname = 'coraggioso';
+  try {
+    const u = await getCurrentUser();
+    uname = usernameFromEmail(u?.email) || 'coraggioso';
+  } catch (_) { /* ignore */ }
+  speech.textContent = `Bene. Sei pronto per la prima stanza. Buona fortuna, ${uname}.`;
+  choices.innerHTML = '';
+  cancel.style.display = 'none';
+  await new Promise(resolve => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'primary-button';
+    btn.textContent = 'Continua';
+    btn.onclick = () => resolve();
+    choices.append(btn);
+  });
+
+  // —— Maledizione: solo 2 occhi del terzo colore ——
+  const candidates = allCodes.filter(c => c !== primary && c !== secondary);
+  const tertiary = candidates[Math.floor(Math.random() * candidates.length)];
+  const tName = deckFactionNames[tertiary] || tertiary;
+  const iris = FACTION_EYE[tertiary] || '#e8c565';
+
+  med.style.display = 'none';
+  nameEl.style.display = 'none';
+  speech.textContent = `Un’ombra ti sfiora. Ora ${tName} fa parte di te.`;
+  choices.innerHTML = '';
+  const eyes = document.createElement('div');
+  eyes.setAttribute('aria-hidden', 'true');
+  eyes.style.cssText = 'display:flex;gap:2.2rem;justify-content:center;align-items:center;margin:.6rem 0 1rem;';
+  for (let i = 0; i < 2; i++) {
+    const eye = document.createElement('div');
+    eye.style.cssText = `width:52px;height:52px;border-radius:50%;background:#0b0806;border:3px solid #3a2e1a;box-shadow:0 0 18px ${iris}88, inset 0 0 12px #000;display:flex;align-items:center;justify-content:center;`;
+    const pupil = document.createElement('div');
+    pupil.style.cssText = `width:22px;height:22px;border-radius:50%;background:${iris};box-shadow:0 0 10px ${iris},0 0 2px #fff8;`;
+    eye.append(pupil);
+    eyes.append(eye);
+  }
+  choices.append(eyes);
+  await new Promise(resolve => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'primary-button';
+    btn.textContent = 'Affronto il destino';
+    btn.onclick = () => resolve();
+    choices.append(btn);
+  });
+
+  el.classList.add('hidden');
+  // Avvia partita con tertiary già scelto (coerente con il messaggio); maledizione già mostrata
+  await newMatch(primary, secondary, {
+    isNewStory: currentMode === 'story',
+    tertiaryColor: tertiary,
+    curseAlreadyShown: true,
+  });
+}
+
+function openColorDialog() {
+  if (busy || reaction() || pending() || obligatory()) return;
+  showAnimaScene().catch(fail);
+}
+function openColorDialogForStory() {
+  openColorDialog();
+}
+async function submitColors() {
+  // Legacy no-op: la scelta passa da showAnimaScene
 }
 
 // ---------- HOME PAGE: deserto + tre piramidi (Storia / Endless / Coming Soon) ----------
@@ -2238,7 +2376,7 @@ function startDialog() {
 }
 function showStart() {
   if (state || busy) return;
-  if ($('deck-color-dialog') && !$('deck-color-dialog').classList.contains('hidden')) return;
+  if ($('anima-scene') && !$('anima-scene').classList.contains('hidden')) return;
   const el = startDialog(), has = !!priorMatch;
   $('start-recover-button').classList.toggle('hidden',!has);
   $('start-new-button').className = has ? 'secondary-button' : 'primary-button';
@@ -2295,8 +2433,7 @@ function storyStartDialog() {
   fresh.onclick = () => {
     clearStoryProgress();
     hideStoryStart();
-    hideHome();
-    // Inizia una nuova Storia → scelta colori
+    // Home resta sullo sfondo (3 piramidi); Mummy in primo piano nella scena anima
     openColorDialogForStory();
   };
 
@@ -2326,22 +2463,7 @@ function showStoryStart() {
   $('story-new-button').className = canRecover ? 'secondary-button' : 'primary-button';
 
   if (canRecover) {
-    const remaining = hasProgress ? getRemainingBosses(progress) : [];
-    const beatenCount = (progress?.beaten || []).length;
-    let msg = hasProgress
-      ? `Hai già sconfitto ${beatenCount} boss.`
-      : 'Hai una partita interrotta.';
-    if (hasProgress && remaining.length > 0) {
-      msg += ` Ti restano ${remaining.length} boss + Indrazzico.`;
-    } else if (hasProgress && progress && !progress.indrazzicoBeaten && remaining.length === 0) {
-      msg += ` Ti resta solo Indrazzico, l’Ombra Eterna.`;
-    }
-    if (hasMatch) {
-      msg += ' C’è una partita non finita: «RIPRENDI» la continua da dove l’hai lasciata.';
-    } else {
-      msg += ' Vuoi riprendere le tue spoglie o abbracciare un nuovo destino?';
-    }
-    $('story-start-text').textContent = msg;
+    $('story-start-text').textContent = 'Vuoi continuare il tuo percorso, o preferisci ricominciare?';
   } else {
     $('story-start-text').textContent = 'Nessuna spoglia da recuperare. Puoi solo abbracciare un nuovo destino e iniziare il Cammino.';
   }
@@ -2621,13 +2743,6 @@ function showStoryContinueChoice(isIndrazzicoNext) {
   });
 }
 
-/** Apre la scelta colori specificamente per una nuova Storia. */
-function openColorDialogForStory() {
-  // Per ora riusiamo la scelta colori normale.
-  // In Fase 2 collegheremo la creazione partita alla Storia.
-  openColorDialog();
-}
-
 async function recoverPrior() {
   if (!priorMatch || busy) return;
   const id = priorMatch.id; busy = true; controls();
@@ -2643,35 +2758,6 @@ async function recoverPrior() {
   }
 }
 
-function openColorDialog() {
-  if (busy || reaction() || pending() || obligatory()) return;
-  close(); closeGraveyard();
-  hideStart(); hideHome(); // non deve restare sotto e riapparire dopo moneta/maledizione
-  const el = colorDialog();
-  $('deck-color-validation').textContent = '';
-  if ($('deck-primary-color').value === $('deck-secondary-color').value) $('deck-secondary-color').value = 'INF';
-  el.classList.remove('hidden'); $('deck-primary-color').focus();
-}
-async function submitColors() {
-  if (busy || obligatory()) return;
-  const primaryColor = $('deck-primary-color')?.value, secondaryColor = $('deck-secondary-color')?.value;
-  if (!deckFactionNames[primaryColor] || !deckFactionNames[secondaryColor] || primaryColor === secondaryColor) {
-    $('deck-color-validation').textContent = 'Scegli due colori diversi.'; return;
-  }
-  $('deck-color-validation').textContent = '';
-
-  // Se siamo in Modalità Storia e non c’è ancora un progresso, creiamo la nuova Storia
-  if (currentMode === 'story') {
-    const existing = getStoryProgress();
-    if (!existing || existing.completed) {
-      // Nuova Storia: salveremo primary/secondary dopo la creazione partita (serve il tertiary)
-      await newMatch(primaryColor, secondaryColor, { isNewStory: true });
-      return;
-    }
-  }
-
-  await newMatch(primaryColor, secondaryColor);
-}
 function showCurseDialog(humanColors, aiColors) {
   return new Promise(resolve => {
     let el = $('curse-dialog');
@@ -2686,29 +2772,31 @@ function showCurseDialog(humanColors, aiColors) {
     }
     const tertiary = humanColors?.tertiary;
     const tName = deckFactionNames[tertiary] || tertiary || 'sconosciuto';
+    const iris = (typeof FACTION_EYE !== 'undefined' && FACTION_EYE[tertiary]) || '#e8c565';
     el.innerHTML = '';
     const panel = document.createElement('div');
     panel.className = 'panel';
-    panel.style.cssText = 'width:min(92vw,440px);margin:auto;padding:1.2rem;text-align:center;border:1px solid #d5a758;box-shadow:0 12px 48px #000';
+    panel.style.cssText = 'width:min(92vw,440px);margin:auto;padding:1.3rem 1.2rem;text-align:center;border:1px solid #d5a758;box-shadow:0 12px 48px #000';
     const body = document.createElement('p');
-    body.style.cssText = 'margin:0 0 .8rem;line-height:1.45;font-size:1.05rem';
-    body.innerHTML = `Oh no. Un’ombra ti afferra e ti marchia.<br><strong>${tName}</strong> fa parte di te ora.`;
-    const glyph = document.createElement('img');
-    glyph.src = 'img/geroglifico.png';
-    glyph.alt = 'Marchio geroglifico';
-    glyph.width = 120;
-    glyph.height = 280;
-    glyph.style.cssText = 'display:block;margin:.6rem auto 1rem;max-width:120px;height:auto;filter:drop-shadow(0 0 12px rgba(232,197,101,.35))';
-    glyph.onerror = () => { glyph.style.display = 'none'; };
-    const wait = document.createElement('p');
-    wait.style.cssText = 'margin:0 0 1.1rem;font-family:"Lilita One",Georgia,serif;font-size:1.25rem;color:#e8c565;letter-spacing:.02em';
-    wait.textContent = 'La piramide ti attende';
+    body.style.cssText = 'margin:0 0 .6rem;line-height:1.5;font-size:1.08rem;';
+    body.textContent = `Un’ombra ti sfiora. Ora ${tName} fa parte di te.`;
+    const eyes = document.createElement('div');
+    eyes.setAttribute('aria-hidden', 'true');
+    eyes.style.cssText = 'display:flex;gap:2.2rem;justify-content:center;align-items:center;margin:.7rem 0 1.1rem;';
+    for (let i = 0; i < 2; i++) {
+      const eye = document.createElement('div');
+      eye.style.cssText = `width:52px;height:52px;border-radius:50%;background:#0b0806;border:3px solid #3a2e1a;box-shadow:0 0 18px ${iris}88, inset 0 0 12px #000;display:flex;align-items:center;justify-content:center;`;
+      const pupil = document.createElement('div');
+      pupil.style.cssText = `width:22px;height:22px;border-radius:50%;background:${iris};box-shadow:0 0 10px ${iris},0 0 2px #fff8;`;
+      eye.append(pupil);
+      eyes.append(eye);
+    }
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'primary-button';
     btn.textContent = 'Affronto il destino';
     btn.onclick = () => { el.classList.add('hidden'); resolve(); };
-    panel.append(body, glyph, wait, btn);
+    panel.append(body, eyes, btn);
     el.append(panel);
     el.classList.remove('hidden');
   });
@@ -2772,6 +2860,7 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
   try {
     // Body base +, in Storia: vita boss, Medaglione, terziario stabile, colore del boss IA
     const createBody = { primaryColor, secondaryColor };
+    if (options.tertiaryColor) createBody.tertiaryColor = options.tertiaryColor;
     /** Boss scelto prima della create (usato dopo per currentBoss e dialoghi). */
     let pendingStoryBoss = null;
 
@@ -2811,7 +2900,9 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
       } else {
         // —— Nuova Storia: terziario + primo boss scelti lato client ——
         const candidates = allSix.filter(c => c !== primaryColor && c !== secondaryColor);
-        tertiaryForCreate = candidates[Math.floor(Math.random() * candidates.length)];
+        tertiaryForCreate = options.tertiaryColor && candidates.includes(options.tertiaryColor)
+          ? options.tertiaryColor
+          : candidates[Math.floor(Math.random() * candidates.length)];
         const remainingForBoss = candidates.filter(c => c !== tertiaryForCreate);
         pendingStoryBoss = remainingForBoss[Math.floor(Math.random() * remainingForBoss.length)];
         aiLife = 20;
@@ -2887,8 +2978,8 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
         saveStoryProgress(progress);
       }
 
-      // 1) Maledizione solo se è una NUOVA Storia
-      if (isNewStoryRun) {
+      // 1) Maledizione solo se è una NUOVA Storia e non già mostrata nella scena anima
+      if (isNewStoryRun && !options.curseAlreadyShown) {
         await showCurseDialog(humanColors, aiColors);
       }
 
@@ -2920,8 +3011,10 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
       // 3) Moneta del destino
       await showCoinFlip(state?.active_player_index === 1);
     } else {
-      // Modalità normale / Endless: maledizione + moneta come sempre
-      await showCurseDialog(humanColors, aiColors);
+      // Modalità normale / Endless: maledizione + moneta (salta se già in scena anima)
+      if (!options.curseAlreadyShown) {
+        await showCurseDialog(humanColors, aiColors);
+      }
       await showCoinFlip(state?.active_player_index === 1);
     }
 
@@ -2961,7 +3054,7 @@ async function init() {
   initialized = true;
   if ($('signed-in-user')) $('signed-in-user').textContent = `@${usernameFromEmail(user.email)}`;
   if ($('player-title')) $('player-title').textContent = usernameFromEmail(user.email) || 'Tu';
-  overlay(); reactionDialog(); choiceDialog(); graveyardDialog(); colorDialog(); wireGraveyards(); wireMenu(); wireSettings(); wireNoticeDismiss(); fitStage();
+  overlay(); reactionDialog(); choiceDialog(); graveyardDialog(); wireGraveyards(); wireMenu(); wireSettings(); wireNoticeDismiss(); fitStage();
   $('cancel-selection-button')?.addEventListener('click',() => {
     if (obligatory()) return;
     if (flow?.kind === 'trap-target') { flow = null; render().catch(fail); notice('Scegli un’altra Trappola o passa.'); return; }
@@ -2969,7 +3062,7 @@ async function init() {
   });
   $('end-turn-button')?.addEventListener('click',() => { if (active()) request('end-turn',{},''); });
   $('logout-button')?.addEventListener('click',() => signOut().then(() => { presentationGeneration++; presentationLayer().style.display = 'none'; matchId = null; state = null; flow = null; priorMatch = null; deathDraft = {choiceId:null,instanceIds:[]}; close(); closeGraveyard(); closeColorDialog(); hideHome(); hideStart(); hideStoryStart(); reactionDialog().classList.add('hidden'); choiceDialog().classList.add('hidden'); }).catch(fail));
-  document.addEventListener('keydown',e => { if (e.key === 'Escape' && !obligatory()) { if (!$('deck-color-dialog')?.classList.contains('hidden') && !busy) closeColorDialog(); else if (!$('graveyard-dialog')?.classList.contains('hidden')) closeGraveyard(); else if (view) close(); } });
+  document.addEventListener('keydown',e => { if (e.key === 'Escape' && !obligatory()) { if (!$('anima-scene')?.classList.contains('hidden') && !busy) closeColorDialog(); else if (!$('graveyard-dialog')?.classList.contains('hidden')) closeGraveyard(); else if (view) close(); } });
   await render();
   // NON mostriamo la Home qui: solo dopo che l’utente ha confermato «Sono io» o ha fatto login
   // (evento bellum:auth-ready).
