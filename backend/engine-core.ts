@@ -838,12 +838,9 @@ async function drain(c: Context) {
       log(c, item.owner, 'trace_effect_end', `[3e] Terminato ${traceEffect(item)}${c.s.pending_target_choice ? (item.source === 'on_death' ? '; in attesa del bersaglio alla morte' : '; in attesa del bersaglio') : ''}.`);
     if (item.kind === 'apply_event') log(c, item.event.actor, 'trace_event_done', `[3e] Conclusa applicazione ${traceEvent(item.event)}.`);
     flushDeaths(c);
+    // Nel for sopra TS restringe pending_target_choice a falsy: non accedere a .task qui.
     if (c.s.pending_death_order || c.s.pending_target_choice) {
-      const pendingTarget = c.s.pending_target_choice;
-      const targetSource = pendingTarget ? pendingTarget.task.source : null;
-      const waitKind = c.s.pending_death_order
-        ? 'ordine effetti alla morte'
-        : (targetSource === 'on_death' ? 'bersaglio alla morte' : 'scelta bersaglio');
+      const waitKind = c.s.pending_death_order ? 'ordine effetti alla morte' : 'scelta bersaglio';
       log(c, -1, 'trace_choice_wait', `[3e] Continuazione sospesa per ${waitKind}; ${c.s.work_queue.length} task in attesa.`);
     }
     if (publish(c, checkpointStart)) return;
