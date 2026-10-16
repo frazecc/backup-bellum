@@ -50,9 +50,8 @@
 <section id="game-screen" class="screen game-screen hidden" aria-live="polite">
         <div class="stage-frame">
           <!-- Colonna sinistra PC: narratore Mummy (visibile da ~1100px). -->
-          <aside class="stage-side stage-side-left" aria-label="Il narratore">
+          <aside class="stage-side stage-side-left" aria-label="Mummy">
             <div class="narrator-desk" id="narrator-desk">
-              <div class="narrator-desk-label">Il narratore</div>
               <div class="narrator-medallion bob" id="narrator-desk-medallion">
                 <img class="narrator-img" id="narrator-desk-img" src="img/mummy/mummy-base.png" alt="" width="220" height="220" onerror="this.style.display='none';this.nextElementSibling?.classList.remove('hidden')">
                 <svg class="narrator-fallback hidden" aria-hidden="true" width="220" height="220" viewBox="0 0 120 120"><defs><clipPath id="mMmcDesk"><ellipse cx="60" cy="68" rx="34" ry="44"/></clipPath></defs><ellipse cx="60" cy="68" rx="34" ry="44" fill="#d8caa8"/><g clip-path="url(#mMmcDesk)" stroke="#f6ecd2" stroke-width="7" stroke-linecap="round"><path d="M18 36L104 18"/><path d="M16 50L106 34"/><path d="M16 84L106 100"/><path d="M18 98L104 114"/></g><g clip-path="url(#mMmcDesk)" stroke="#a89972" stroke-width="1.2"><path d="M18 43L104 25"/><path d="M16 57L106 41"/><path d="M16 91L106 107"/></g><rect x="24" y="56" width="72" height="20" rx="10" fill="#0b0806"/><circle cx="45" cy="66" r="9" fill="#ffb02e" opacity=".35"/><circle cx="75" cy="66" r="9" fill="#ffb02e" opacity=".35"/><circle cx="45" cy="66" r="4" fill="#ffb02e"/><circle cx="75" cy="66" r="4" fill="#ffb02e"/><ellipse cx="60" cy="68" rx="34" ry="44" fill="none" stroke="#8a7650" stroke-width="2"/></svg>
@@ -66,8 +65,7 @@
           <div id="stage" class="stage">
             <div id="torch-overlay" class="torch-overlay" aria-hidden="true"></div>
             <div id="phase-banner" class="phase-banner" role="status" aria-live="polite" hidden></div>
-            <div id="narrator-popup" class="narrator-popup hidden" role="dialog" aria-modal="true" aria-label="Il narratore parla">
-              <div class="narrator-popup-label">Il narratore parla</div>
+            <div id="narrator-popup" class="narrator-popup hidden" role="dialog" aria-modal="true" aria-label="Mummy parla">
               <div class="narrator-medallion bob" id="narrator-popup-medallion">
                 <img class="narrator-img" id="narrator-popup-img" src="img/mummy/mummy-base.png" alt="" width="220" height="220" onerror="this.style.display='none';this.nextElementSibling?.classList.remove('hidden')">
                 <svg class="narrator-fallback hidden" aria-hidden="true" width="220" height="220" viewBox="0 0 120 120"><defs><clipPath id="mMmcPop"><ellipse cx="60" cy="68" rx="34" ry="44"/></clipPath></defs><ellipse cx="60" cy="68" rx="34" ry="44" fill="#d8caa8"/><g clip-path="url(#mMmcPop)" stroke="#f6ecd2" stroke-width="7" stroke-linecap="round"><path d="M18 36L104 18"/><path d="M16 50L106 34"/><path d="M16 84L106 100"/><path d="M18 98L104 114"/></g><g clip-path="url(#mMmcPop)" stroke="#a89972" stroke-width="1.2"><path d="M18 43L104 25"/><path d="M16 57L106 41"/><path d="M16 91L106 107"/></g><rect x="24" y="56" width="72" height="20" rx="10" fill="#0b0806"/><circle cx="45" cy="66" r="9" fill="#ffb02e" opacity=".35"/><circle cx="75" cy="66" r="9" fill="#ffb02e" opacity=".35"/><circle cx="45" cy="66" r="4" fill="#ffb02e"/><circle cx="75" cy="66" r="4" fill="#ffb02e"/><ellipse cx="60" cy="68" rx="34" ry="44" fill="none" stroke="#8a7650" stroke-width="2"/></svg>
@@ -127,9 +125,8 @@
               <div id="offer-slot" class="offer-slot"></div>
             </div>
 
-            <div class="info-zone" aria-label="Eventi e messaggi della partita">
+            <div class="info-zone" aria-label="Eventi della partita">
               <p id="selection-instructions" class="selection-instructions" hidden></p>
-              <p id="game-message" class="game-message" role="status" aria-live="polite"></p>
               <section class="logs-panel panel" aria-label="Cronologia della partita">
                 <ol id="log-latest" class="log-latest" aria-hidden="true"></ol>
                 <details class="log-disclosure">
@@ -172,10 +169,9 @@
             <div class="card-preview-desk" id="card-preview-desk">
               <div class="card-preview-label">Anteprima carta</div>
               <div class="card-preview-slot" id="card-preview-slot">
-                <p class="card-preview-empty" id="card-preview-empty">Tocca una carta nel campo per vederla qui a grandezza piena.</p>
+                <p class="card-preview-empty" id="card-preview-empty"></p>
                 <div class="card-preview-card hidden" id="card-preview-card" aria-hidden="true"></div>
               </div>
-              <div class="card-preview-hint">Tocca una carta nel campo o in mano per l’anteprima.</div>
             </div>
           </aside>
         </div>
