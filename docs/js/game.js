@@ -442,6 +442,23 @@ function getDeviceId() {
   }
 }
 
+/** Etichetta leggibile del device (non è un MAC: i browser non lo espongono). */
+function getDeviceLabel() {
+  try {
+    const ua = navigator.userAgent || '';
+    if (/Android/i.test(ua)) return 'Android';
+    if (/iPhone|iPod/i.test(ua)) return 'iPhone';
+    if (/iPad/i.test(ua)) return 'iPad';
+    if (/Mobile/i.test(ua)) return 'Cellulare';
+    if (/Macintosh|Mac OS/i.test(ua)) return 'Mac';
+    if (/Windows/i.test(ua)) return 'PC Windows';
+    if (/Linux/i.test(ua)) return 'PC Linux';
+    return 'Computer';
+  } catch (_) {
+    return 'Dispositivo';
+  }
+}
+
 async function api(path,options={}) {
   const token = await getAccessToken();
   if (!token) throw new Error('Sessione scaduta, accedi di nuovo.');
@@ -495,7 +512,10 @@ async function pullProfileFromServer() {
 /** Claim device + pull profilo (dopo login / Sono io). */
 async function claimDeviceAndSync() {
   try {
-    await api('/me/claim-device', { method: 'POST', body: { deviceId: getDeviceId() } });
+    await api('/me/claim-device', {
+      method: 'POST',
+      body: { deviceId: getDeviceId(), deviceLabel: getDeviceLabel() },
+    });
   } catch (e) {
     console.warn('Claim device fallito', e);
   }
@@ -1942,6 +1962,7 @@ function homeDialog() {
     currentMode = 'story';
     hideHome();
     hideStart();
+    // Sempre la scelta RIPRENDI / nuovo destino (mai entrare in partita da solo)
     storyStartScreen().catch(fail);
   }, 'img/piramide1.png');
 
@@ -2129,28 +2150,35 @@ function storyStartDialog() {
 }
 
 function showStoryStart() {
-  if (state || busy) return;
   const el = storyStartDialog();
   const progress = getStoryProgress();
   const hasProgress = !!(progress && !progress.completed && (
     (progress.beaten && progress.beaten.length > 0) || progress.primary
   ));
-  const hasMatch = !!priorMatch;
+  // Partita interrotta: da probePrior oppure già in memoria su questo device
+  const hasMatch = !!priorMatch || !!(state && matchId && state.status !== 'finished');
+  if (state && matchId && state.status !== 'finished' && !priorMatch) {
+    priorMatch = { id: matchId };
+  }
 
-  $('story-recover-button').classList.toggle('hidden', !hasProgress);
-  $('story-new-button').className = hasProgress ? 'secondary-button' : 'primary-button';
+  // Mostra sempre RIPRENDI se c’è progresso O partita da recuperare
+  const canRecover = hasProgress || hasMatch;
+  $('story-recover-button').classList.toggle('hidden', !canRecover);
+  $('story-new-button').className = canRecover ? 'secondary-button' : 'primary-button';
 
-  if (hasProgress) {
-    const remaining = getRemainingBosses(progress);
-    const beatenCount = (progress.beaten || []).length;
-    let msg = `Hai già sconfitto ${beatenCount} boss.`;
-    if (remaining.length > 0) {
+  if (canRecover) {
+    const remaining = hasProgress ? getRemainingBosses(progress) : [];
+    const beatenCount = (progress?.beaten || []).length;
+    let msg = hasProgress
+      ? `Hai già sconfitto ${beatenCount} boss.`
+      : 'Hai una partita interrotta.';
+    if (hasProgress && remaining.length > 0) {
       msg += ` Ti restano ${remaining.length} boss + Indrazzico.`;
-    } else if (!progress.indrazzicoBeaten) {
+    } else if (hasProgress && progress && !progress.indrazzicoBeaten && remaining.length === 0) {
       msg += ` Ti resta solo Indrazzico, l’Ombra Eterna.`;
     }
     if (hasMatch) {
-      msg += ' Hai una partita interrotta: «RIPRENDI» la continua da dove l’hai lasciata.';
+      msg += ' C’è una partita non finita: «RIPRENDI» la continua da dove l’hai lasciata.';
     } else {
       msg += ' Vuoi riprendere le tue spoglie o abbracciare un nuovo destino?';
     }
@@ -2166,9 +2194,14 @@ function hideStoryStart() {
   $('story-start-dialog')?.classList.add('hidden');
 }
 
+/** Schermata scelta Storia: SEMPRE chiede RIPRENDI o nuovo destino (mai auto-start). */
 async function storyStartScreen() {
-  if (state || busy) return;
+  busy = false;
   try { await probePrior(); } catch (_) { /* ignore */ }
+  // Se c’è già una partita aperta in questa scheda, resta recuperabile ma non si entra da soli
+  if (state && matchId && state.status !== 'finished') {
+    priorMatch = { id: matchId };
+  }
   showStoryStart();
 }
 
