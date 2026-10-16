@@ -368,7 +368,8 @@ async function resolveEffectOrChoose(c: Context, task: ResolveEffectWork) {
       const choices = targetChoices(c.s, task.owner, fx);
       if (choices.length && task.owner === 1) {
         c.s.pending_target_choice = { choice_id: randomUUID(), chooser_index: 1, task, eligible_instance_ids: choices };
-        log(c, 1, 'death_target_window', `${d.name}: scegli il bersaglio dell’effetto.`, { card_id: d.id, window_id: c.s.pending_target_choice.choice_id });
+        const why = task.source === 'on_death' ? 'effetto alla morte' : task.source === 'on_play' ? 'effetto in entrata' : 'effetto';
+        log(c, 1, 'target_choice_window', `${d.name}: scegli il bersaglio (${why}).`, { card_id: d.id, window_id: c.s.pending_target_choice.choice_id });
         return;
       }
       if (choices.length) {
@@ -833,12 +834,16 @@ async function drain(c: Context) {
       if (c.s.pending_mostrissimo?.card_id === item.card_id && c.s.pending_mostrissimo.player_index === item.actor) delete c.s.pending_mostrissimo;
     } else if (item.kind === 'check_winner') checkWinner(c, item.reason);
     else if (item.kind === 'advance_ai') { c.s.anti_loop_counter = 0; await advanceAi(c); }
-    if (item.kind === 'resolve_effect' && (item.source === 'trap' || item.source === 'on_death'))
-      log(c, item.owner, 'trace_effect_end', `[3e] Terminato ${traceEffect(item)}${c.s.pending_target_choice ? '; in attesa del bersaglio on-death' : ''}.`);
+    if (item.kind === 'resolve_effect' && (item.source === 'trap' || item.source === 'on_death' || item.source === 'on_play'))
+      log(c, item.owner, 'trace_effect_end', `[3e] Terminato ${traceEffect(item)}${c.s.pending_target_choice ? (item.source === 'on_death' ? '; in attesa del bersaglio alla morte' : '; in attesa del bersaglio') : ''}.`);
     if (item.kind === 'apply_event') log(c, item.event.actor, 'trace_event_done', `[3e] Conclusa applicazione ${traceEvent(item.event)}.`);
     flushDeaths(c);
-    if (c.s.pending_death_order || c.s.pending_target_choice)
-      log(c, -1, 'trace_death_wait', `[3e] Continuazione sospesa per scelta on-death; ${c.s.work_queue.length} task in attesa.`);
+    if (c.s.pending_death_order || c.s.pending_target_choice) {
+      const waitKind = c.s.pending_death_order
+        ? 'ordine effetti alla morte'
+        : (c.s.pending_target_choice?.task?.source === 'on_death' ? 'bersaglio alla morte' : 'scelta bersaglio');
+      log(c, -1, 'trace_choice_wait', `[3e] Continuazione sospesa per ${waitKind}; ${c.s.work_queue.length} task in attesa.`);
+    }
     if (publish(c, checkpointStart)) return;
   }
   if (c.s.status === 'running' && !c.s.pending_reaction && !c.s.pending_death_order && !c.s.pending_target_choice && c.s.work_queue.length) throw new Error('Limite di sicurezza della coda eventi raggiunto');

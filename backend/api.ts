@@ -93,13 +93,40 @@ setInterval(() => {
   const now = Date.now();
   for (const [key, times] of rateHits) if (!times.length || now - times[times.length - 1] > 15 * 60_000) rateHits.delete(key);
 }, 60_000).unref();
+class SessionReplacedError extends Error {
+  constructor() {
+    super('Sessione sostituita: hai effettuato l’accesso da un altro dispositivo');
+    this.name = 'SessionReplacedError';
+  }
+}
+
 async function requireAuth(req: Request): Promise<string> {
   const header = req.header('authorization');
   if (!header?.startsWith('Bearer ')) throw new Error('Sessione assente: autenticati di nuovo');
   const { data, error } = await supabase.auth.getUser(header.slice('Bearer '.length).trim());
   if (error || !data.user) throw new Error('Sessione Supabase non valida');
   rateLimit(`user:${data.user.id}`, 300, 60_000);
+  // Un solo dispositivo attivo: se il profilo ha un device diverso → kick
+  const deviceId = req.header('x-device-id')?.trim();
+  if (deviceId) {
+    const { data: profile } = await supabase
+      .from('player_profiles')
+      .select('active_device_id')
+      .eq('user_id', data.user.id)
+      .maybeSingle();
+    if (profile?.active_device_id && profile.active_device_id !== deviceId) {
+      throw new SessionReplacedError();
+    }
+  }
   return data.user.id;
+}
+
+async function upsertProfile(userId: string, patch: Record<string, unknown>) {
+  const { error } = await supabase.from('player_profiles').upsert(
+    { user_id: userId, updated_at: new Date().toISOString(), ...patch },
+    { onConflict: 'user_id' },
+  );
+  if (error) throw new Error(`Profilo: ${error.message}`);
 }
 // Il proprietario di una partita non cambia mai: una volta letto lo ricordiamo
 // (solo risultati positivi, con tetto di dimensione) e risparmiamo una query a richiesta.
@@ -120,7 +147,12 @@ async function ownedMatch(req: Request): Promise<string> {
   await assertMatchOwner(matchId, userId);
   return matchId;
 }
-function respondError(res: Response, error: unknown) { res.status(error instanceof RateLimitError ? 429 : 400).json({ error: errorMessage(error) }); }
+function respondError(res: Response, error: unknown) {
+  const status = error instanceof RateLimitError ? 429
+    : error instanceof SessionReplacedError ? 401
+    : 400;
+  res.status(status).json({ error: errorMessage(error), code: error instanceof SessionReplacedError ? 'session_replaced' : undefined });
+}
 
 // --- Stato pubblico (S2) ---------------------------------------------------
 // Il motore lavora sempre con lo stato completo; al browser va solo ciò che il
@@ -155,6 +187,53 @@ apiRouter.use((_req: Request, res: Response, next: NextFunction) => {
   next();
 });
 apiRouter.get('/health', (_req: Request, res: Response) => res.status(200).json({ status: 'ok', service: 'bellum-penumbrum-api' }));
+
+/** Profilo giocatore: progressi Storia + ultima partita + device attivo (cross-device). */
+apiRouter.get('/me/profile', async (req: Request, res: Response) => {
+  try {
+    const userId = await requireAuth(req);
+    const { data, error } = await supabase
+      .from('player_profiles')
+      .select('story_progress, last_match_id, active_device_id, updated_at')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) throw new Error(`Lettura profilo: ${error.message}`);
+    res.json({
+      story_progress: data?.story_progress ?? null,
+      last_match_id: data?.last_match_id ?? null,
+      updated_at: data?.updated_at ?? null,
+    });
+  } catch (error) { respondError(res, error); }
+});
+
+/** Claim device: login su questo dispositivo invalida gli altri. */
+apiRouter.post('/me/claim-device', async (req: Request, res: Response) => {
+  try {
+    const userId = await requireAuth(req);
+    const deviceId = requiredString(objectValue(req.body).deviceId, 'ID dispositivo');
+    if (deviceId.length < 8 || deviceId.length > 128) throw new Error('ID dispositivo non valido');
+    await upsertProfile(userId, { active_device_id: deviceId });
+    res.json({ ok: true });
+  } catch (error) { respondError(res, error); }
+});
+
+/** Salva progressi Storia (e/o last_match_id). Chiamare a ogni azione rilevante. */
+apiRouter.put('/me/profile', async (req: Request, res: Response) => {
+  try {
+    const userId = await requireAuth(req);
+    const body = objectValue(req.body);
+    const patch: Record<string, unknown> = {};
+    if ('story_progress' in body) patch.story_progress = body.story_progress ?? null;
+    if ('last_match_id' in body) {
+      const v = body.last_match_id;
+      patch.last_match_id = v === null || v === '' ? null : requiredString(v, 'ID partita');
+    }
+    if (!Object.keys(patch).length) throw new Error('Nessun campo da aggiornare');
+    await upsertProfile(userId, patch);
+    res.json({ ok: true });
+  } catch (error) { respondError(res, error); }
+});
+
 apiRouter.post('/match/create', async (req: Request, res: Response) => {
   try {
     const userId = await requireAuth(req), body = objectValue(req.body);
@@ -203,6 +282,8 @@ apiRouter.post('/match/create', async (req: Request, res: Response) => {
     }
 
     const { matchId, state } = await createNewMatch(userId, primary, secondary, createOpts);
+    // Ultima partita attiva sul profilo → recuperabile da qualsiasi device
+    try { await upsertProfile(userId, { last_match_id: matchId }); } catch (e) { console.warn(e); }
     res.status(201).json({ match_id: matchId, state });
   } catch (error) { respondError(res, error); }
 });
