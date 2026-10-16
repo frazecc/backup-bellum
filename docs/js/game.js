@@ -965,6 +965,62 @@ async function presentPublic(a, generation) {
 }
 // Passo 3: ogni risultato pubblico ha il suo balloon (state.public_announcements, in ordine); /advance usa
 // sempre l'ID dell'ultimo (state.public_announcement). Dopo refresh/recupero (onlyLast) si ripresenta solo l'ultimo.
+
+/** Una sola volta per partita: popup Mummy arrabbiata quando scatta il taglio vita (4ª Storia). */
+let storyLifeCutShownForMatch = null;
+async function maybeShowStoryLifeCut() {
+  if (currentMode !== 'story' || !state || !matchId) return;
+  if (storyLifeCutShownForMatch === matchId) return;
+  const sm = state.story_modifiers;
+  if (!sm?.ai_life_cut_turn) return;
+  // Dopo il manatenimento del turno N il server ha già tagliato gli HP
+  if (!sm.ai_life_cut_applied && (state.current_turn || 0) < sm.ai_life_cut_turn) return;
+  if ((state.current_turn || 0) < sm.ai_life_cut_turn) return;
+  storyLifeCutShownForMatch = matchId;
+  try {
+    await showAngryMummyDialog('Questo è troppo, ci penso io!');
+  } catch (e) {
+    console.warn(e);
+  }
+}
+
+function showAngryMummyDialog(text) {
+  return new Promise(resolve => {
+    let el = $('angry-mummy-dialog');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'angry-mummy-dialog';
+      el.className = 'card-detail-overlay';
+      el.setAttribute('role', 'dialog');
+      el.setAttribute('aria-modal', 'true');
+      el.style.zIndex = '170';
+      document.body.append(el);
+    }
+    el.innerHTML = '';
+    const panel = document.createElement('div');
+    panel.className = 'panel';
+    panel.style.cssText = 'width:min(92vw,420px);margin:auto;padding:1.2rem;text-align:center;border:1px solid #d5a758;box-shadow:0 12px 48px #000';
+    const img = document.createElement('img');
+    img.src = 'img/mummy/arrabbiata.png';
+    img.alt = 'Mummia arrabbiata';
+    img.width = 160;
+    img.height = 160;
+    img.style.cssText = 'display:block;margin:0 auto .75rem;border-radius:12px;object-fit:cover;filter:drop-shadow(0 0 12px rgba(255,100,80,.35))';
+    img.onerror = () => { img.style.display = 'none'; };
+    const p = document.createElement('p');
+    p.style.cssText = 'margin:0 0 1rem;line-height:1.45;font-size:1.1rem';
+    p.textContent = text;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'primary-button';
+    btn.textContent = 'Ho capito';
+    btn.onclick = () => { el.classList.add('hidden'); resolve(); };
+    panel.append(img, p, btn);
+    el.append(panel);
+    el.classList.remove('hidden');
+  });
+}
+
 function queuePresentation(onlyLast = false) {
   if (presentationRunning || !matchId || !state?.public_announcement) return;
   const generation = presentationGeneration;
@@ -1510,6 +1566,7 @@ async function render() {
       await Promise.all([drawBoard(), drawHand(), drawMostrissimi()]);
       controls();
       await Promise.all([renderReaction(), renderDeathChoice(), markPlayerTarget()]);
+      void maybeShowStoryLifeCut().catch(console.warn);
     } while (renderQueued);
   } finally {
     renderRunning = false;
@@ -3317,7 +3374,7 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
         tertiaryForCreate = progress.tertiary;
         const remaining = getRemainingBosses(progress);
         const fightIndex = getStoryFightIndex(progress);
-        aiLife = remaining.length === 0 ? 20 : getBossLifeForFight(fightIndex);
+        aiLife = (remaining.length === 0 || fightIndex >= 3) ? 200 : getBossLifeForFight(fightIndex);
 
         // 3ª partita: scegli il Medaglione PRIMA di creare, così vale subito (una sola volta)
         if (fightIndex === 2 && !progress.chosenPower) {
@@ -3359,6 +3416,9 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
           ? pendingStoryBoss
           : null;
 
+      const isFourthFight = (progress && progress.tertiary
+        ? getStoryFightIndex(progress)
+        : 0) >= 3 || pendingStoryBoss === 'IND' || (progress && getRemainingBosses(progress).length === 0);
       createBody.story = {
         aiStartingLife: aiLife,
         humanMedallion: progress?.chosenPower || null,
@@ -3368,6 +3428,8 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
         aiDisplayName: pendingStoryBoss && BOSS_DATA[pendingStoryBoss]?.name
           ? BOSS_DATA[pendingStoryBoss].name
           : null,
+        // 4ª fight: 200 HP, al manatenimento del 3° turno → 20
+        ...(isFourthFight ? { aiLifeCutTurn: 3, aiLifeAfterCut: 20 } : {}),
       };
     }
     const result = await api('/match/create', { method: 'POST', body: createBody });
@@ -3432,7 +3494,7 @@ async function newMatch(primaryColor, secondaryColor, options = {}) {
       if (nextBoss === 'IND') {
         await showMummyDialog(`È arrivato il momento. Affronterai ${boss.name}.\n${boss.threat}`);
         await showMummyDialog(
-          'Indrazzico appare con una forza spaventosa…\n\n«Ora stanno esagerando… ci penso io.»\n\nLa Mummia riduce i suoi punti vita a 20.\nLa lotta sarà comunque durissima.'
+          'Indrazzico appare con una forza spaventosa…\n\nHa 200 punti vita. Tieni duro i primi turni:\nquando esagerano, ci penso io.'
         );
         if (progress.chosenPower && BOSS_DATA[progress.chosenPower]) {
           const med = BOSS_DATA[progress.chosenPower];
