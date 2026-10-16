@@ -1187,6 +1187,103 @@ export async function createNewMatch(
   });
   return { matchId, state };
 }
+
+/** Partita PvP: entrambi umani. P1 (sfidante) = index 1, P2 = index 0. */
+export async function createPvpMatch(
+  player1UserId: string,
+  player2UserId: string,
+  p1Colors: { primary: DeckFaction; secondary: DeckFaction; tertiary: DeckFaction },
+  p2Colors: { primary: DeckFaction; secondary: DeckFaction; tertiary: DeckFaction },
+  firstPlayer: PlayerIndex,
+): Promise<{ matchId: string; state: GameState }> {
+  const [pool, catalogue] = await Promise.all([deckPool(), offer()]);
+  const available = availableFactions(pool), bosses = bossFactions(pool);
+
+  const ensure = (c: { primary: DeckFaction; secondary: DeckFaction; tertiary: DeckFaction }, label: string) => {
+    if (!bosses.includes(c.primary)) throw new Error(`${label}: ${c.primary} senza boss 6 mana`);
+    if (!available.includes(c.primary) || !available.includes(c.secondary) || !available.includes(c.tertiary))
+      throw new Error(`${label}: colori non disponibili nel catalogo`);
+    if (c.primary === c.secondary || c.primary === c.tertiary || c.secondary === c.tertiary)
+      throw new Error(`${label}: i tre colori devono essere distinti`);
+  };
+  ensure(p1Colors, 'Giocatore 1');
+  ensure(p2Colors, 'Giocatore 2');
+
+  const p1Cards = deck(pool, p1Colors);
+  const p2Cards = deck(pool, p2Colors);
+
+  const { data, error } = await db.from('matches').insert({
+    player_id: player1UserId,
+    opponent_type: 'pvp',
+    opponent_name: player2UserId,
+    player_won: null,
+    turns_count: 0,
+    duration_seconds: 0,
+    player_faction_id: 1,
+    opponent_faction_id: 1,
+  }).select('id').single();
+  if (error || !data) throw new Error(`Creazione partita PvP: ${error?.message ?? 'nessun ID'}`);
+  const matchId = String(data.id);
+
+  // Index 1 = P1 (sfidante), index 0 = P2 (accettante)
+  const p2 = player(0, player2UserId, p2Cards);
+  const p1 = player(1, player1UserId, p1Cards);
+  p2.life = 20;
+  p1.life = 20;
+
+  const firstHand = 3, secondHand = 4;
+  if (firstPlayer === 1) {
+    for (let i = 0; i < secondHand; i++) p2.hand.push(p2.deck.shift()!);
+    for (let i = 0; i < firstHand; i++) p1.hand.push(p1.deck.shift()!);
+  } else {
+    for (let i = 0; i < secondHand; i++) p1.hand.push(p1.deck.shift()!);
+    for (let i = 0; i < firstHand; i++) p2.hand.push(p2.deck.shift()!);
+  }
+
+  p1.max_mana = p1.current_mana = 1;
+  p2.max_mana = p2.current_mana = 1;
+
+  const state: GameState & { match_mode?: string } = {
+    state_version: 4,
+    state_revision: 0,
+    match_id: matchId,
+    status: 'running',
+    players: [p2, p1],
+    deck_colors: [p2Colors, p1Colors],
+    board: blank(),
+    current_turn: 1,
+    active_player_index: firstPlayer,
+    phase: 'main',
+    anti_loop_counter: 0,
+    winner_index: null,
+    shared_mostrissimi: catalogue.shared,
+    remaining_mostrissimi: catalogue.remaining,
+    used_mostrissimi: [],
+    work_queue: [],
+    last_mostrissimo_turn: {},
+    mostrissimo_result: null,
+    story_modifiers: null,
+    match_mode: 'pvp',
+  };
+
+  await commit(matchId, state, []);
+  await logMatchAction(matchId, {
+    turn: 1, phase: 'main', player_index: -1, action_type: 'match_create_pvp',
+    description: `PvP: P1 ${p1Colors.primary}/${p1Colors.secondary}/${p1Colors.tertiary} vs P2 ${p2Colors.primary}/${p2Colors.secondary}/${p2Colors.tertiary}. Inizia ${firstPlayer === 1 ? 'P1' : 'P2'}.`,
+  });
+  return { matchId, state };
+}
+
+export async function forfeitMatch(id: string, loserIndex: PlayerIndex): Promise<GameState> {
+  return mutate(id, async c => {
+    const s = c.s;
+    if (s.status !== 'running') throw new Error('Partita già conclusa');
+    s.status = 'finished';
+    s.winner_index = (loserIndex === 0 ? 1 : 0) as PlayerIndex;
+    log(c, loserIndex, 'forfeit', 'Abbandono: sconfitta a tavolino.');
+  });
+}
+
 export async function getMatchState(id: string): Promise<GameState> { return load(id); }
 export async function playCard(id: string, p: PlayerIndex, cardInstanceId: string, options: PlayCardOptions = {}): Promise<GameState> {
   return mutate(id, async c => {
@@ -1348,10 +1445,17 @@ export async function resolveTargetChoice(id: string, p: PlayerIndex, choice: Ta
     await applyEffect(c, { ...pending.task, target_instance_id: choice.target_instance_id });
   });
 }
-export async function endHumanTurn(id: string): Promise<GameState> {
+export async function endHumanTurn(id: string, p: PlayerIndex = 1): Promise<GameState> {
   return mutate(id, async c => {
-    const s = c.s; assertTurn(s, 1);
-    expireTemporaryBuffs(s); s.phase = 'end'; log(c, 1, 'turn_end', 'Termini il turno.');
+    const s = c.s; assertTurn(s, p);
+    expireTemporaryBuffs(s); s.phase = 'end'; log(c, p, 'turn_end', 'Termini il turno.');
+    const isPvp = !!(s as GameState & { match_mode?: string }).match_mode && (s as GameState & { match_mode?: string }).match_mode === 'pvp';
+    if (isPvp) {
+      // Passa il turno all’altro umano (niente IA)
+      const next = (p === 0 ? 1 : 0) as PlayerIndex;
+      startTurn(c, next);
+      return;
+    }
     s.ai_progress = { stage: 'upkeep', actions_taken: 0 };
     prepend(s, { kind: 'advance_ai' });
   });

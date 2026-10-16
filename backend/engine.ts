@@ -7,6 +7,8 @@ export {
   logMatchAction,
   getCardData,
   createNewMatch,
+  createPvpMatch,
+  forfeitMatch,
   getMatchState,
   playCard,
   moveCreature,
