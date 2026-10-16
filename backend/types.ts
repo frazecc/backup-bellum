@@ -18,6 +18,8 @@ export type StoryModifiers = {
   human_medallion: DeckFaction | null;
   /** Medaglione del boss (IA), attivo dalla 3ª lotta. Null per Indrazzico / prime lotte. */
   ai_medallion?: DeckFaction | null;
+  /** Nome visualizzato del boss IA nei log (es. "Ladra Neferet"). */
+  ai_display_name?: string | null;
 };
 export type EffectType =
   | 'draw' | 'damage' | 'damage_creature' | 'heal' | 'discard'

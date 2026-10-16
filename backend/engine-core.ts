@@ -36,7 +36,15 @@ export type CreateMatchOptions = {
    * 'IND' = Indrazzico: se non esistono carte IND nel catalogo, fallback sulla maledizione del giocatore.
    */
   aiPrimary?: DeckFaction | 'IND' | null;
+  /** Nome del boss da mostrare nei log al posto di “L’IA”. */
+  aiDisplayName?: string | null;
 };
+
+/** Nome giocatore nei log (in Storia usa il nome del boss). */
+function who(s: GameState, p: PlayerIndex): string {
+  if (p === 1) return 'Tu';
+  return s.story_modifiers?.ai_display_name || label(p);
+}
 
 function humanMedallion(s: GameState): DeckFaction | null {
   return s.story_modifiers?.human_medallion ?? null;
@@ -253,7 +261,7 @@ async function applyEffect(c: Context, task: ResolveEffectWork) {
   if (e.type === 'draw') {
     const recipient = e.target === 'opponent' ? foe : p;
     const count = draw(c, recipient, n);
-    log(c, p, 'effect_draw', `${d.name}: ${label(recipient)} pesca ${count} carta/e.`, { amount: count });
+    log(c, p, 'effect_draw', `${d.name}: ${who(s, recipient)} pesca ${count} carta/e.`, { amount: count });
   } else if (e.type === 'discard') {
     const recipient = e.target === 'self' ? p : foe;
     let count = 0;
@@ -263,7 +271,7 @@ async function applyEffect(c: Context, task: ResolveEffectWork) {
       const i = Math.floor(Math.random() * s.players[recipient].hand.length);
       s.players[recipient].graveyard.push(s.players[recipient].hand.splice(i, 1)[0]); count++;
     }
-    log(c, p, 'effect_discard', `${d.name}: ${label(recipient)} scarta ${count} carta/e.`);
+    log(c, p, 'effect_discard', `${d.name}: ${who(s, recipient)} scarta ${count} carta/e.`);
   } else if (e.type === 'heal') {
     if (e.target === 'any_creature') selected!.cell.hp = Math.min(selected!.cell.max_hp, selected!.cell.hp + n);
     else if (e.target?.startsWith('all_creatures')) {
@@ -1118,9 +1126,10 @@ export async function createNewMatch(
   const bossMedallion = options.aiMedallion && ['CHI','INF','PES','BUL','GRO','CLO'].includes(options.aiMedallion)
     ? options.aiMedallion
     : null;
+  const aiDisplayName = options.aiDisplayName?.trim() || null;
   const storyModifiers: StoryModifiers | null =
-    (options.aiStartingLife != null || medallion || bossMedallion)
-      ? { ai_starting_life: aiLife, human_medallion: medallion, ai_medallion: bossMedallion }
+    (options.aiStartingLife != null || medallion || bossMedallion || aiDisplayName)
+      ? { ai_starting_life: aiLife, human_medallion: medallion, ai_medallion: bossMedallion, ai_display_name: aiDisplayName }
       : null;
 
   // Lancio di moneta: chi inizia è casuale. Il primo ha 3 carte in mano, il secondo 4.

@@ -268,6 +268,7 @@ apiRouter.post('/match/create', async (req: Request, res: Response) => {
       aiMedallion?: DeckFaction | null;
       tertiaryColor?: DeckFaction | null;
       aiPrimary?: DeckFaction | 'IND' | null;
+      aiDisplayName?: string | null;
     } = {};
     const story = body.story;
     if (story && typeof story === 'object' && !Array.isArray(story)) {
@@ -297,6 +298,9 @@ apiRouter.post('/match/create', async (req: Request, res: Response) => {
         } else {
           createOpts.aiPrimary = deckFactionValue(st.aiPrimary, 'Boss IA');
         }
+      }
+      if (typeof st.aiDisplayName === 'string' && st.aiDisplayName.trim()) {
+        createOpts.aiDisplayName = st.aiDisplayName.trim().slice(0, 80);
       }
     }
 
