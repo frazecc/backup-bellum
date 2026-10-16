@@ -459,9 +459,10 @@ async function api(path,options={}) {
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
-      if (json.code === 'session_replaced' || res.status === 401 && /altro dispositivo/i.test(String(json.error || ''))) {
+      if (json.code === 'session_replaced' || (res.status === 401 && /altro dispositivo|session_replaced|sostituita/i.test(String(json.error || '')))) {
         try { await signOut(); } catch (_) { /* ignore */ }
-        throw new Error('Hai effettuato l’accesso da un altro dispositivo. Ricarica e accedi di nuovo.');
+        try { showAuthScreen({ forceLoginForm: false }); } catch (_) { /* ignore */ }
+        throw new Error('Hai effettuato l’accesso da un altro dispositivo. Qui devi accedere di nuovo.');
       }
       throw new Error(json.error ?? `HTTP ${res.status}`);
     }
