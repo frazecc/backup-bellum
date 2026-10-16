@@ -319,6 +319,8 @@ apiRouter.post('/match/create', async (req: Request, res: Response) => {
       aiPrimary?: DeckFaction | 'IND' | null;
       aiDisplayName?: string | null;
       firstPlayer?: 0 | 1 | null;
+      aiLifeCutTurn?: number | null;
+      aiLifeAfterCut?: number | null;
     } = {};
     // tertiaryColor anche a livello root (scena anima)
     if (body.tertiaryColor != null && body.tertiaryColor !== '') {
@@ -360,6 +362,14 @@ apiRouter.post('/match/create', async (req: Request, res: Response) => {
       }
       if (st.firstPlayer === 0 || st.firstPlayer === 1) {
         createOpts.firstPlayer = st.firstPlayer as 0 | 1;
+      }
+      if (st.aiLifeCutTurn != null) {
+        const t = Number(st.aiLifeCutTurn);
+        if (Number.isFinite(t) && t >= 1 && t <= 50) createOpts.aiLifeCutTurn = Math.floor(t);
+      }
+      if (st.aiLifeAfterCut != null) {
+        const life = Number(st.aiLifeAfterCut);
+        if (Number.isFinite(life) && life >= 1 && life <= 200) createOpts.aiLifeAfterCut = Math.floor(life);
       }
     }
 

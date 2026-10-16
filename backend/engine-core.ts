@@ -40,6 +40,9 @@ export type CreateMatchOptions = {
   aiDisplayName?: string | null;
   /** Chi inizia: 1 = umano, 0 = IA. Se omesso → moneta a caso. */
   firstPlayer?: PlayerIndex | null;
+  /** Storia 4ª fight: al manatenimento del turno N taglia la vita IA. */
+  aiLifeCutTurn?: number | null;
+  aiLifeAfterCut?: number | null;
 };
 
 /** Nome giocatore nei log (in Storia usa il nome del boss). */
@@ -878,6 +881,25 @@ function startTurn(c: Context, p: PlayerIndex) {
   s.active_player_index = p; s.phase = 'upkeep'; s.anti_loop_counter = 0; s.mostrissimo_result = null;
   // Ogni inizio turno (umano o IA) avanza il contatore globale: mana max = current_turn.
   s.current_turn++;
+  // Storia 4ª fight: al manatenimento del 3° turno la Mummia taglia gli HP del boss.
+  const sm = s.story_modifiers as (typeof s.story_modifiers & {
+    ai_life_cut_turn?: number | null;
+    ai_life_after_cut?: number | null;
+    ai_life_cut_applied?: boolean;
+  }) | null | undefined;
+  if (
+    sm &&
+    !sm.ai_life_cut_applied &&
+    sm.ai_life_cut_turn != null &&
+    s.current_turn === sm.ai_life_cut_turn
+  ) {
+    const after = Number(sm.ai_life_after_cut);
+    const newLife = Number.isFinite(after) && after > 0 ? Math.floor(after) : 20;
+    const before = s.players[0].life;
+    s.players[0].life = Math.min(before, newLife);
+    sm.ai_life_cut_applied = true;
+    log(c, 0, 'story_life_cut', `La Mummia interviene: vita del boss ${before} → ${s.players[0].life}.`);
+  }
   prepend(s, { kind: 'declare_event', event: { kind: 'upkeep_start', actor: p } });
 }
 // Bersaglio legale ≠ mossa conveniente: cure e bonus vanno solo su creature dell'IA, danni e
@@ -1129,9 +1151,21 @@ export async function createNewMatch(
     ? options.aiMedallion
     : null;
   const aiDisplayName = options.aiDisplayName?.trim() || null;
-  const storyModifiers: StoryModifiers | null =
-    (options.aiStartingLife != null || medallion || bossMedallion || aiDisplayName)
-      ? { ai_starting_life: aiLife, human_medallion: medallion, ai_medallion: bossMedallion, ai_display_name: aiDisplayName }
+  const storyModifiers: (StoryModifiers & {
+    ai_life_cut_turn?: number | null;
+    ai_life_after_cut?: number | null;
+    ai_life_cut_applied?: boolean;
+  }) | null =
+    (options.aiStartingLife != null || medallion || bossMedallion || aiDisplayName || options.aiLifeCutTurn != null)
+      ? {
+          ai_starting_life: aiLife,
+          human_medallion: medallion,
+          ai_medallion: bossMedallion,
+          ai_display_name: aiDisplayName,
+          ai_life_cut_turn: options.aiLifeCutTurn ?? null,
+          ai_life_after_cut: options.aiLifeAfterCut ?? null,
+          ai_life_cut_applied: false,
+        }
       : null;
 
   // Chi inizia: se options.firstPlayer è 0|1 lo rispetta, altrimenti moneta a caso.
