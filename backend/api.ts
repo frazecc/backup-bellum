@@ -199,27 +199,40 @@ apiRouter.get('/me/profile', async (req: Request, res: Response) => {
     const userId = await requireAuth(req);
     const { data, error } = await supabase
       .from('player_profiles')
-      .select('story_progress, last_match_id, active_device_id, updated_at')
+      .select('story_progress, last_match_id, active_device_id, active_device_label, session_claimed_at, updated_at')
       .eq('user_id', userId)
       .maybeSingle();
     if (error) throw new Error(`Lettura profilo: ${error.message}`);
     res.json({
       story_progress: data?.story_progress ?? null,
       last_match_id: data?.last_match_id ?? null,
+      active_device_label: data?.active_device_label ?? null,
+      session_claimed_at: data?.session_claimed_at ?? null,
       updated_at: data?.updated_at ?? null,
     });
   } catch (error) { respondError(res, error); }
 });
 
-/** Claim device: login su questo dispositivo invalida gli altri. */
+/**
+ * Claim device: questo login diventa l’unico autorizzato.
+ * Tag salvati: device id, etichetta leggibile, orario (l’orario più recente vince sempre).
+ */
 apiRouter.post('/me/claim-device', async (req: Request, res: Response) => {
   try {
-    // skipDeviceCheck: altrimenti il nuovo device non può mai diventare quello attivo
+    // skipDeviceCheck: il nuovo device deve poter sovrascrivere quello precedente
     const userId = await requireAuth(req, { skipDeviceCheck: true });
-    const deviceId = requiredString(objectValue(req.body).deviceId, 'ID dispositivo');
+    const body = objectValue(req.body);
+    const deviceId = requiredString(body.deviceId, 'ID dispositivo');
     if (deviceId.length < 8 || deviceId.length > 128) throw new Error('ID dispositivo non valido');
-    await upsertProfile(userId, { active_device_id: deviceId });
-    res.json({ ok: true });
+    const rawLabel = typeof body.deviceLabel === 'string' ? body.deviceLabel.trim() : '';
+    const deviceLabel = (rawLabel || 'Dispositivo').slice(0, 80);
+    const claimedAt = new Date().toISOString();
+    await upsertProfile(userId, {
+      active_device_id: deviceId,
+      active_device_label: deviceLabel,
+      session_claimed_at: claimedAt,
+    });
+    res.json({ ok: true, device_id: deviceId, device_label: deviceLabel, claimed_at: claimedAt });
   } catch (error) { respondError(res, error); }
 });
 
